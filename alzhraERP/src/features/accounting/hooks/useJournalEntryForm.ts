@@ -119,6 +119,49 @@ export const useJournalEntryForm = (
   // توحيد مع SOX_BALANCE_TOLERANCE (مطابق لطبقة الخدمة) بدل 0.01 السابق
   const isBalanced = Math.abs(difference) < BALANCE_TOLERANCE && totals.debit_amount > 0;
 
+  const autoBalance = () => {
+    const currentLines = form.getValues('lines');
+    const currentDebit = currentLines.reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0);
+    const currentCredit = currentLines.reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0);
+    const diff = Number((currentDebit - currentCredit).toFixed(2));
+    if (Math.abs(diff) < BALANCE_TOLERANCE) return;
+
+    if (diff > 0) {
+      // المدين أكبر من الدائن: يجب تعويض الفارق في جانب الدائن
+      let targetIdx = currentLines.findIndex(l => !l.debit_amount && !l.credit_amount);
+      if (targetIdx === -1) {
+        targetIdx = currentLines.findIndex(l => Number(l.credit_amount) > 0);
+      }
+      if (targetIdx === -1 && currentLines.length > 1) {
+        targetIdx = currentLines.length - 1;
+      }
+      if (targetIdx !== -1) {
+        const newCredit = Number(
+          (Number(currentLines[targetIdx].credit_amount || 0) + diff).toFixed(2)
+        );
+        setValue(`lines.${targetIdx}.credit_amount`, newCredit, { shouldValidate: true });
+        setValue(`lines.${targetIdx}.debit_amount`, 0, { shouldValidate: true });
+      }
+    } else {
+      // الدائن أكبر من المدين: يجب تعويض الفارق في جانب المدين
+      const absDiff = Math.abs(diff);
+      let targetIdx = currentLines.findIndex(l => !l.debit_amount && !l.credit_amount);
+      if (targetIdx === -1) {
+        targetIdx = currentLines.findIndex(l => Number(l.debit_amount) > 0);
+      }
+      if (targetIdx === -1 && currentLines.length > 0) {
+        targetIdx = 0;
+      }
+      if (targetIdx !== -1) {
+        const newDebit = Number(
+          (Number(currentLines[targetIdx].debit_amount || 0) + absDiff).toFixed(2)
+        );
+        setValue(`lines.${targetIdx}.debit_amount`, newDebit, { shouldValidate: true });
+        setValue(`lines.${targetIdx}.credit_amount`, 0, { shouldValidate: true });
+      }
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       reset();
@@ -147,5 +190,6 @@ export const useJournalEntryForm = (
     totals,
     difference,
     isBalanced,
+    autoBalance,
   };
 };

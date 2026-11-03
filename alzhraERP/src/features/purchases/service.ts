@@ -95,7 +95,24 @@ export const purchasesService = {
   getPurchases: async (companyId: string, branchId?: string | null, limit = 500) => {
     const { data, error } = await purchasesApi.getPurchases(companyId, branchId, limit);
     if (error) throw error;
-    return data;
+    return (data || []).map((row: any) => ({
+      ...row,
+      party_phone: (row.party as any)?.phone ?? null,
+      matched_items: Array.isArray(row.invoice_items)
+        ? (row.invoice_items as any[]).map((item: any) => ({
+            id: item.id,
+            product_id: item.product_id ?? '',
+            product_name: item.product?.name_ar || item.description || 'صنف غير محدد',
+            sku: item.product?.sku || null,
+            part_number: item.product?.part_number || null,
+            brand: item.product?.brand || null,
+            quantity: Number(item.quantity) || 0,
+            unit_price: Number(item.cost_price ?? item.unit_price) || 0,
+            total: Number(item.total) || 0,
+            is_direct_match: false,
+          }))
+        : [],
+    }));
   },
 
   searchPurchases: async (

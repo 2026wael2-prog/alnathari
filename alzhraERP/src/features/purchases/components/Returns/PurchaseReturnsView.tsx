@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Eye, RotateCcw, FileText } from 'lucide-react';
+import { Plus, Eye, RotateCcw, FileText, Package } from 'lucide-react';
 import { usePurchaseReturns, usePurchaseReturnsStats } from '../../hooks/usePurchaseReturns';
 import Button from '../../../../ui/base/Button';
 import { exportToPDF } from '../../../../core/utils/pdfExporter';
@@ -34,12 +34,16 @@ const normalizePurchaseReturns = (
 ): ReturnsListRow[] | undefined =>
   rows?.map(row => {
     const record = row as unknown as Record<string, unknown>;
+    const refInv = record.reference_invoice as
+      | { invoice_number?: string | null }
+      | null
+      | undefined;
     return {
       ...row,
       return_reason:
         typeof record.return_reason === 'string' ? record.return_reason : 'مرتجع مشتريات',
       notes: typeof record.notes === 'string' ? record.notes : null,
-      reference_invoice: null,
+      reference_invoice: refInv ? { invoice_number: refInv.invoice_number ?? null } : null,
       reference_invoice_id:
         typeof record.reference_invoice_id === 'string' ? record.reference_invoice_id : null,
       issue_date: row.issue_date,
@@ -54,7 +58,11 @@ const normalizePurchaseReturns = (
   });
 const partyName = (row: ReturnsListRow): string => row.party?.name ?? 'غير محدد';
 const originalInvoice = (row: ReturnsListRow): string =>
-  row.reference_invoice?.invoice_number ?? row.reference_invoice_id ?? '';
+  row.reference_invoice?.invoice_number
+    ? `#${row.reference_invoice.invoice_number}`
+    : row.reference_invoice_id
+      ? `#${row.reference_invoice_id.substring(0, 8)}`
+      : '';
 const returnNotes = (row: ReturnsListRow): string => row.notes ?? '';
 const returnAmount = (row: ReturnsListRow): string => Number(row.total_amount ?? 0).toFixed(2);
 const returnDate = (row: ReturnsListRow): string =>
@@ -88,6 +96,42 @@ const ReturnCardHeader = ({ returnItem }: { returnItem: ReturnsListRow }): React
     </div>
   );
 };
+
+const ReturnItemsPreview = ({ items }: { items: unknown[] | null }): React.ReactElement | null => {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return (
+    <div className="mt-2.5 flex flex-wrap gap-1 border-t border-gray-100 pt-2 dark:border-slate-700/60">
+      {(items as any[]).slice(0, 4).map((item: any, idx: number) => {
+        const name = item.product?.name_ar || item.description || 'صنف غير محدد';
+        const partNo = item.product?.part_number;
+        return (
+          <span
+            key={item.id || idx}
+            className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-800 dark:bg-slate-700 dark:text-slate-200"
+            title={`التكلفة: ${item.cost_price ?? item.unit_price ?? 0} | الكمية: ${item.quantity ?? 1}${partNo ? ` | رقم القطعة: ${partNo}` : ''}`}
+          >
+            <Package size={10} className="shrink-0 text-red-500" />
+            <span className="font-semibold">{name}</span>
+            {partNo && (
+              <span className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                [{partNo}]
+              </span>
+            )}
+            <span className="font-mono text-[10px] font-bold text-red-600 dark:text-red-400">
+              ×{item.quantity}
+            </span>
+          </span>
+        );
+      })}
+      {items.length > 4 && (
+        <span className="self-center text-[10px] font-bold text-gray-400">
+          +{items.length - 4} أصناف أخرى
+        </span>
+      )}
+    </div>
+  );
+};
+
 const ReturnCardFooter = ({
   returnItem,
   viewDetails,
@@ -141,6 +185,7 @@ const ReturnCard = ({ returnItem, onViewDetails }: ReturnCardProps): React.React
       className="cursor-pointer rounded-xl border border-gray-100 bg-white p-4 transition-colors hover:border-red-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-red-600"
     >
       <ReturnCardHeader returnItem={returnItem} />
+      <ReturnItemsPreview items={returnItem.invoice_items} />
       <ReturnCardFooter returnItem={returnItem} viewDetails={viewDetails} />
     </div>
   );

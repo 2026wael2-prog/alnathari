@@ -84,7 +84,8 @@ export const salesQuotationsApi = {
       .eq('company_id', companyId)
       .eq('type', 'sales')
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: false });
 
     if (branchId) {
       query = query.eq('branch_id', branchId);

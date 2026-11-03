@@ -55,7 +55,7 @@ const PartiesStats: React.FC<Props> = ({ stats, type }) => {
         </div>
       </div>
 
-      {/* Card 2: Receivables (لنا) */}
+      {/* Card 2: Receivables (لنا) — للموردين: دفعات مقدمة أو سلف */}
       <div className="group relative overflow-hidden rounded-xl border border-emerald-200/60 bg-emerald-50/40 p-3.5 shadow-sm transition-all hover:border-emerald-300 dark:border-emerald-900/40 dark:bg-emerald-950/20">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
@@ -63,7 +63,7 @@ const PartiesStats: React.FC<Props> = ({ stats, type }) => {
               ? 'مستحقات لنا (مدين)'
               : type === 'employee'
                 ? 'سلف مستردة (لنا)'
-                : 'أرصدة مدينة لنا'}
+                : 'دفعات مقدمة للموردين'}
           </span>
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
             <TrendingUp size={15} />
@@ -78,11 +78,15 @@ const PartiesStats: React.FC<Props> = ({ stats, type }) => {
           </span>
         </div>
         <div className="mt-2 flex items-center gap-1 border-t border-emerald-100/80 pt-2 text-[10px] text-emerald-700/80 dark:border-emerald-900/40 dark:text-emerald-400">
-          <span>مبالغ مطلوبة لصالح المنشأة</span>
+          <span>
+            {type === 'supplier'
+              ? 'مبالغ دفعناها مقدماً للموردين'
+              : 'مبالغ مطلوبة لصالح المنشأة'}
+          </span>
         </div>
       </div>
 
-      {/* Card 3: Payables (علينا / أمانات) */}
+      {/* Card 3: Payables (علينا / مستحقات الموردين) */}
       <div className="group relative overflow-hidden rounded-xl border border-amber-200/60 bg-amber-50/40 p-3.5 shadow-sm transition-all hover:border-amber-300 dark:border-amber-900/40 dark:bg-amber-950/20">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300">
@@ -90,7 +94,7 @@ const PartiesStats: React.FC<Props> = ({ stats, type }) => {
               ? 'أمانات / دفعات مقدمة (دائن)'
               : type === 'employee'
                 ? 'رواتب ومستحقات الموظفين (دائن)'
-                : 'مستحقات للموردين (دائن)'}
+                : 'مستحقات علينا للموردين'}
           </span>
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
             <TrendingDown size={15} />
@@ -105,7 +109,11 @@ const PartiesStats: React.FC<Props> = ({ stats, type }) => {
           </span>
         </div>
         <div className="mt-2 flex items-center gap-1 border-t border-amber-100/80 pt-2 text-[10px] text-amber-700/80 dark:border-amber-900/40 dark:text-amber-400">
-          <span>التزامات أو أرصدة دائنة</span>
+          <span>
+            {type === 'supplier'
+              ? 'مبالغ مستحقة السداد للموردين'
+              : 'التزامات أو أرصدة دائنة'}
+          </span>
         </div>
       </div>
 

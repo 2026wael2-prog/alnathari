@@ -92,11 +92,22 @@ const rowDate = (row: ReturnsListRow): number =>
 const rowPartyName = (row: ReturnsListRow): string =>
   row.party === null ? '' : (row.party.name ?? '');
 const compareRows = (a: ReturnsListRow, b: ReturnsListRow, sortField: SortField): number => {
-  if (sortField === 'issue_date') return rowDate(a) - rowDate(b);
+  if (sortField === 'issue_date') {
+    const diff = rowDate(a) - rowDate(b);
+    if (diff !== 0) return diff;
+    const createdA = new Date(a.created_at ?? 0).getTime() || 0;
+    const createdB = new Date(b.created_at ?? 0).getTime() || 0;
+    if (createdA !== createdB) return createdA - createdB;
+    return (a.invoice_number ?? '').localeCompare(b.invoice_number ?? '', undefined, {
+      numeric: true,
+    });
+  }
   if (sortField === 'total_amount')
     return Number(a.total_amount ?? 0) - Number(b.total_amount ?? 0);
   if (sortField === 'party_name') return rowPartyName(a).localeCompare(rowPartyName(b));
-  return (a.invoice_number ?? '').localeCompare(b.invoice_number ?? '');
+  return (a.invoice_number ?? '').localeCompare(b.invoice_number ?? '', undefined, {
+    numeric: true,
+  });
 };
 
 const sortRows =

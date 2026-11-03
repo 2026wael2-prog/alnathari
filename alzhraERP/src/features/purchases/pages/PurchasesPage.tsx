@@ -330,6 +330,17 @@ const PurchasesPage: React.FC = () => {
         const dateA = new Date(a.issue_date ?? a.date ?? 0).getTime() || 0;
         const dateB = new Date(b.issue_date ?? b.date ?? 0).getTime() || 0;
         cmp = dateA - dateB;
+        if (cmp === 0) {
+          const createdA = new Date(a.created_at ?? 0).getTime() || 0;
+          const createdB = new Date(b.created_at ?? 0).getTime() || 0;
+          if (createdA !== createdB) {
+            cmp = createdA - createdB;
+          } else {
+            const numA = String(a.invoice_number ?? a.invoiceNumber ?? '');
+            const numB = String(b.invoice_number ?? b.invoiceNumber ?? '');
+            cmp = numA.localeCompare(numB, undefined, { numeric: true });
+          }
+        }
       }
       return sortOrder === 'desc' ? -cmp : cmp;
     });

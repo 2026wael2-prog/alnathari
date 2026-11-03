@@ -1,4 +1,5 @@
 import { logger } from '../../core/utils/logger';
+import { parseError } from '../../core/utils/errorUtils';
 
 import { supabase } from '../../lib/supabaseClient';
 import type { BondFormData, BondType } from './types';
@@ -108,7 +109,9 @@ export const bondsApi = {
     });
 
     if (error) {
-      throw error;
+      // تحويل PostgrestError إلى AppError عربية واضحة تظهر على الشاشة
+      const appErr = parseError(error);
+      throw appErr;
     }
 
     const result = resultData as any;
@@ -133,7 +136,9 @@ export const bondsApi = {
       });
 
       if (commError) {
-        logger.error('bondsApi', 'Failed to create commission bond', commError);
+        const commAppErr = parseError(commError);
+        logger.error('bondsApi', 'Failed to create commission bond', commAppErr);
+        // لا نوقف العملية لأن السند الرئيسي نجح — فقط نسجّل الخطأ
       }
     }
 

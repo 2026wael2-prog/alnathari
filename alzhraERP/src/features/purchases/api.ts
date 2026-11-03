@@ -128,14 +128,23 @@ export const purchasesApi = {
         `
       id, invoice_number, issue_date, total_amount, status, type, payment_method,
       currency_code, exchange_rate, notes, return_reason, reference_invoice_id, created_at,
-      party:party_id(name), invoice_items(id, cost_price, quantity, unit_price, total, description)
+      reference_invoice:reference_invoice_id(id, invoice_number),
+      party:party_id(name, phone),
+      invoice_items(
+        id, product_id, cost_price, quantity, unit_price, total, description,
+        product:products!fk_invoice_items_company_product(id, name_ar, sku, part_number, brand)
+      )
     `
       )
       .eq('company_id', companyId)
       .in('type', ['purchase', 'purchase_return'])
       .is('deleted_at', null);
     if (hasText(branchId)) query = query.eq('branch_id', branchId);
-    return query.order('issue_date', { ascending: false }).limit(limit);
+    return query
+      .order('issue_date', { ascending: false })
+      .order('created_at', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: false })
+      .limit(limit);
   },
 
   searchPurchasesAdvanced: async (

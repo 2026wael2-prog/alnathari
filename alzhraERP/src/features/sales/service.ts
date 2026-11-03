@@ -1,5 +1,5 @@
 import { salesApi } from './api/index';
-import type { CreateInvoiceDTO } from './types';
+import type { CreateInvoiceDTO, MatchedInvoiceItem } from './types';
 import { messagingService } from '../notifications/messagingService';
 import { notificationService } from '../notifications/service';
 import { toBaseCurrency } from '../../core/utils/currencyUtils';
@@ -45,15 +45,31 @@ const safeBaseTotal = (
 interface RawInvoice {
   id: string;
   invoice_number: string | null;
-  party: { name?: string } | null;
+  party: { name?: string; phone?: string } | null;
   issue_date: string;
+  created_at?: string;
   total_amount: number | null;
   status: string;
   type: string;
   payment_method: string | null;
   currency_code: string | null;
   exchange_rate: number | null;
-  invoice_items: unknown[] | null;
+  invoice_items: Array<{
+    id: string;
+    product_id?: string | null;
+    description?: string | null;
+    quantity: number;
+    unit_price: number;
+    total: number;
+    cost_price?: number | null;
+    product?: {
+      id?: string;
+      name_ar?: string | null;
+      sku?: string | null;
+      part_number?: string | null;
+      brand?: string | null;
+    } | null;
+  }> | null;
   reference_invoice_id: string | null;
 }
 
@@ -74,7 +90,9 @@ export const salesService = {
           id: _inv.id,
           invoiceNumber: _inv.invoice_number,
           customerName: _inv.party?.name || CASH_CUSTOMER_LABEL,
+          partyPhone: _inv.party?.phone || null,
           date: formatLocalDate(_inv.issue_date),
+          createdAt: _inv.created_at,
           total: Number(_inv.total_amount) || 0,
           baseTotal: safeBaseTotal(_inv.total_amount, _inv.currency_code, _inv.exchange_rate),
           status: _inv.status,
@@ -84,6 +102,20 @@ export const salesService = {
           exchangeRate: Number(_inv.exchange_rate) || 1,
           itemCount: Array.isArray(_inv.invoice_items) ? _inv.invoice_items.length : 0,
           referenceInvoiceId: _inv.reference_invoice_id,
+          matchedItems: (Array.isArray(_inv.invoice_items)
+            ? _inv.invoice_items.map(item => ({
+                id: item.id,
+                product_id: item.product_id ?? null,
+                product_name: item.product?.name_ar || item.description || 'صنف غير محدد',
+                sku: item.product?.sku ?? null,
+                part_number: item.product?.part_number ?? null,
+                brand: item.product?.brand ?? null,
+                quantity: Number(item.quantity) || 0,
+                unit_price: Number(item.unit_price) || 0,
+                total: Number(item.total) || 0,
+                is_direct_match: false,
+              }))
+            : []) as MatchedInvoiceItem[],
         };
       });
     } catch (error) {
@@ -129,6 +161,7 @@ export const salesService = {
         customerName: r.party_name || CASH_CUSTOMER_LABEL,
         partyPhone: r.party_phone,
         date: formatLocalDate(r.issue_date),
+        createdAt: (r as any).created_at || r.issue_date,
         total: Number(r.total_amount) || 0,
         baseTotal: safeBaseTotal(r.total_amount, r.currency_code, r.exchange_rate),
         status: r.status as any,

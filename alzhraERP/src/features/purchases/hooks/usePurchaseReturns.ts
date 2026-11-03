@@ -3,6 +3,7 @@ import type { UseQueryResult, UseMutationResult } from '@tanstack/react-query';
 import { purchasesService, purchasesApi } from '../service';
 import { useAuthStore } from '../../auth/store';
 import { useFeedbackStore } from '../../feedback/store';
+import { parseError } from '../../../core/utils/errorUtils';
 import type { CreatePurchaseDTO } from '../types';
 import type { PurchaseListRow } from '../service';
 
@@ -39,7 +40,7 @@ export const usePurchaseReturnsStats = (): UseQueryResult<{
   });
 };
 
-export const useCreatePurchaseReturn = (): UseMutationResult<unknown, Error, CreatePurchaseDTO> => {
+export const useCreatePurchaseReturn = (): UseMutationResult<unknown, unknown, CreatePurchaseDTO> => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { showToast } = useFeedbackStore();
@@ -48,7 +49,7 @@ export const useCreatePurchaseReturn = (): UseMutationResult<unknown, Error, Cre
       const companyId = user?.company_id;
       const userId = user?.id;
       if (!hasCompanyId(companyId) || !hasCompanyId(userId))
-        throw new Error('Missing auth context');
+        throw new Error('جلسة العمل منتهية — يرجى تسجيل الدخول مجدداً');
       return purchasesService.processPurchaseReturn(data, companyId, userId);
     },
     onSuccess: () => {
@@ -60,8 +61,8 @@ export const useCreatePurchaseReturn = (): UseMutationResult<unknown, Error, Cre
       void queryClient.invalidateQueries({ queryKey: ['accounts'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-    onError: (error: Error) => {
-      showToast(error.message.length > 0 ? error.message : 'فشل في إنشاء مرتجع المشتريات', 'error');
+    onError: (error: unknown) => {
+      showToast(parseError(error).message, 'error');
     },
   });
 };

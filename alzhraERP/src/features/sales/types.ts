@@ -86,6 +86,7 @@ export interface InvoiceListItem {
   invoiceNumber: string;
   customerName: string;
   date: string;
+  createdAt?: string;
   total: number;
   status: InvoiceStatus;
   type: InvoiceType;

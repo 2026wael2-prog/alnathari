@@ -40,8 +40,8 @@ export const useParties = (type: PartyType, searchTerm = '') => {
   }, [query.data, searchTerm]);
 
   const stats = useMemo(() => {
-    return partiesService.calculateStats(query.data || []);
-  }, [query.data]);
+    return partiesService.calculateStats(query.data || [], type);
+  }, [query.data, type]);
 
   return { ...query, data: filteredData, stats };
 };

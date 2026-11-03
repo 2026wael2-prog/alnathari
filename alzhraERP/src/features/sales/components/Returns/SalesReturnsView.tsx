@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Eye, RotateCcw, FileText, Trash2, ShoppingCart } from 'lucide-react';
+import { Plus, Eye, RotateCcw, FileText, Trash2, Package } from 'lucide-react';
 import ExcelTable from '../../../../ui/common/ExcelTable';
 import {
   useSalesReturns,
@@ -44,7 +44,10 @@ const normalizeSalesReturn = (row: SalesReturn): ReturnsListRow => ({
   invoice_items: row.invoice_items ?? [],
   party: row.party === null || row.party === undefined ? null : { name: row.party.name },
   reference_invoice_id: row.reference_invoice_id ?? null,
-  return_reason: null,
+  reference_invoice: row.reference_invoice
+    ? { invoice_number: row.reference_invoice.invoice_number ?? null }
+    : null,
+  return_reason: row.return_reason ?? null,
 });
 
 interface SalesReturnsViewProps {
@@ -57,13 +60,14 @@ interface SalesReturnRow {
   id: string;
   invoice_number?: string | null;
   reference_invoice_id?: string | null;
+  reference_invoice?: { id?: string; invoice_number?: string | null } | null;
   issue_date?: string | null;
   created_at?: string | null;
   total_amount?: number | null;
   currency_code?: string | null;
   exchange_rate?: number | null;
   status?: string | null;
-  invoice_items?: { length: number } | null;
+  invoice_items?: Array<any> | { length: number } | null;
   party?: { name?: string | null } | null;
 }
 
@@ -247,14 +251,18 @@ const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
                 accessor: (row: SalesReturnRow) => (
                   <div className="flex items-center gap-2 max-md:gap-2">
                     <FileText size={12} className="text-blue-500" />
-                    <span className="font-medium text-blue-600">
-                      #{row.reference_invoice_id || '---'}
+                    <span className="font-mono font-bold text-blue-600">
+                      {row.reference_invoice?.invoice_number
+                        ? `#${row.reference_invoice.invoice_number}`
+                        : row.reference_invoice_id
+                          ? `#${row.reference_invoice_id.substring(0, 8)}`
+                          : '---'}
                     </span>
                   </div>
                 ),
                 accessorKey: 'reference_invoice_id',
                 sortKey: 'reference_invoice_id',
-                width: '130px',
+                width: '140px',
                 align: 'center',
               },
               {
@@ -267,19 +275,55 @@ const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
                 align: 'center',
               },
               {
-                header: 'الأصناف',
-                accessor: (row: SalesReturnRow) => (
-                  <div className="flex items-center gap-1 text-gray-500 max-md:gap-1.5">
-                    <ShoppingCart size={12} />
-                    <span className="text-xs font-bold">
-                      {row.invoice_items?.length || 0} أصناف
-                    </span>
-                  </div>
-                ),
+                header: 'الأصناف والقطع المرتجعة',
+                accessor: (row: SalesReturnRow) => {
+                  const items = Array.isArray(row.invoice_items)
+                    ? (row.invoice_items as any[])
+                    : [];
+                  if (items.length === 0) {
+                    return (
+                      <span className="text-[11px] text-gray-400 dark:text-slate-500">
+                        لا توجد أصناف
+                      </span>
+                    );
+                  }
+                  return (
+                    <div className="flex flex-col gap-1 py-1">
+                      <div className="flex flex-wrap gap-1">
+                        {items.slice(0, 2).map((item: any, idx: number) => {
+                          const name = item.product?.name_ar || item.description || 'صنف غير محدد';
+                          const partNo = item.product?.part_number;
+                          return (
+                            <span
+                              key={item.id || idx}
+                              className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-800 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
+                              title={`السعر: ${item.unit_price} | الكمية: ${item.quantity}${partNo ? ` | رقم القطعة: ${partNo}` : ''}`}
+                            >
+                              <Package size={11} className="shrink-0 text-rose-500" />
+                              <span className="font-semibold">{name}</span>
+                              {partNo && (
+                                <span className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                                  [{partNo}]
+                                </span>
+                              )}
+                              <span className="font-mono text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                                ×{item.quantity}
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                      {items.length > 2 && (
+                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                          +{items.length - 2} أصناف أخرى
+                        </span>
+                      )}
+                    </div>
+                  );
+                },
                 accessorKey: 'invoice_items.length',
                 sortKey: 'item_count',
-                width: '100px',
-                align: 'center',
+                width: '260px',
               },
               {
                 header: 'العملة',

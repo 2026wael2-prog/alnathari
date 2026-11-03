@@ -40,7 +40,8 @@ export const purchaseQuotationsApi = {
       .eq('company_id', companyId)
       .eq('type', 'purchase')
       .is('deleted_at', null)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: false }),
 
   getQuotationDetails: async (quotationId: string) =>
     supabase

@@ -1,5 +1,6 @@
 /* eslint-disable complexity, max-lines-per-function, @typescript-eslint/consistent-type-imports, @typescript-eslint/array-type, @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-confusing-void-expression, @typescript-eslint/strict-boolean-expressions, @typescript-eslint/prefer-nullish-coalescing, jsx-a11y/label-has-associated-control, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-template-expressions, @typescript-eslint/no-unnecessary-condition */
 import React, { useMemo, useState } from 'react';
+import { Building2, LayoutList } from 'lucide-react';
 import { useAuthStore } from '../../auth/store';
 import { bondsService } from '../../bonds/service';
 import type { Bond } from '../../bonds/types';
@@ -15,6 +16,7 @@ import { StatementPrintSheet } from './statement/StatementPrintSheet';
 import { StatementSelectedActionsBar } from './statement/StatementSelectedActionsBar';
 import { StatementSummaryCards } from './statement/StatementSummaryCards';
 import { StatementToolbar } from './statement/StatementToolbar';
+import { RentTrackerView } from './statement/RentTrackerView';
 
 interface StatementViewProps {
   partyType: PartyType;
@@ -23,6 +25,7 @@ interface StatementViewProps {
 
 const StatementView: React.FC<StatementViewProps> = ({ partyType, initialPartyId }) => {
   const [selectedPartyId, setSelectedPartyId] = useState<string>(initialPartyId || '');
+  const [activeTab, setActiveTab] = useState<'statement' | 'rent'>('statement');
 
   React.useEffect(() => {
     if (initialPartyId) {
@@ -106,6 +109,13 @@ const StatementView: React.FC<StatementViewProps> = ({ partyType, initialPartyId
 
   const selectedParty = parties?.find(p => p.id === selectedPartyId);
   const movements = useMemo(() => statement || [], [statement]);
+
+  // هل هذا الطرف صاحب إيجار؟ (يحتوي اسمه على 'إيجار' أو الوصف يحتوي عليه)
+  const isRentParty = useMemo(() => {
+    const name = (selectedParty?.name ?? '').toLowerCase();
+    return name.includes('إيجار') || name.includes('ايجار') ||
+      movements.some(m => (m.desc ?? '').includes('استحقاق إيجار'));
+  }, [selectedParty, movements]);
 
   // Extract all currencies present in movements
   const availableCurrencies = useMemo(() => {
@@ -329,66 +339,104 @@ const StatementView: React.FC<StatementViewProps> = ({ partyType, initialPartyId
           </div>
         ) : (
           <>
-            {/* Print Header View */}
-            <StatementPrintSheet
-              company={company}
-              partyType={partyType}
-              partyName={selectedParty?.name ?? ''}
-              printSubtitle={
-                isPrintingSelectedOnly
-                  ? `كشف حساب مالي (${selectedMovements.length} معاملات محددة)`
-                  : undefined
-              }
-            />
+            {/* تبويبات: كشف الحساب / متابعة الإيجار */}
+            {isRentParty && (
+              <div className="no-print flex items-center gap-1 rounded-xl border border-slate-200/80 bg-slate-50/50 p-1 dark:border-slate-800 dark:bg-slate-900/30">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('statement')}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                    activeTab === 'statement'
+                      ? 'bg-white text-blue-700 shadow dark:bg-slate-800 dark:text-blue-400'
+                      : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  <LayoutList size={13} />
+                  كشف الحساب الكامل
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('rent')}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                    activeTab === 'rent'
+                      ? 'bg-white text-blue-700 shadow dark:bg-slate-800 dark:text-blue-400'
+                      : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  <Building2 size={13} />
+                  متابعة الإيجار الشهري
+                </button>
+              </div>
+            )}
+            {/* عرض متابعة الإيجار */}
+            {isRentParty && activeTab === 'rent' ? (
+              <RentTrackerView movements={movements} />
+            ) : (
+              <>
+                {/* Print Header View */}
+                <StatementPrintSheet
+                  company={company}
+                  partyType={partyType}
+                  partyName={selectedParty?.name ?? ''}
+                  printSubtitle={
+                    isPrintingSelectedOnly
+                      ? `كشف حساب مالي (${selectedMovements.length} معاملات محددة)`
+                      : undefined
+                  }
+                />
 
-            {/* Currency Filter & Search Toolbar (Screen Only) */}
-            <StatementToolbar
-              selectedCurrency={selectedCurrency}
-              setSelectedCurrency={setSelectedCurrency}
-              availableCurrencies={availableCurrencies}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-            />
+                {/* Currency Filter & Search Toolbar (Screen Only) */}
+                <StatementToolbar
+                  selectedCurrency={selectedCurrency}
+                  setSelectedCurrency={setSelectedCurrency}
+                  availableCurrencies={availableCurrencies}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                />
 
-            {/* Interactive Statement Excel Data Grid */}
-            <StatementMovementsTable
-              filteredMovements={filteredMovements}
-              selectedRowIds={selectedRowIds}
-              expandedRowIds={expandedRowIds}
-              rowColors={rowColors}
-              activeColorPickerRowId={activeColorPickerRowId}
-              isPrintingSelectedOnly={isPrintingSelectedOnly}
-              partyName={selectedParty?.name || ''}
-              isAllSelected={isAllSelected}
-              onToggleSelectAll={handleToggleSelectAll}
-              onToggleRowSelection={handleToggleRowSelection}
-              onToggleRowExpand={handleToggleRowExpand}
-              onOpenColorPicker={setActiveColorPickerRowId}
-              onApplyColorToSingleRow={handleApplyColorToSingleRow}
-              onPrintSingleTransaction={handlePrintSingleTransaction}
-              onOpenInvoiceModal={setActiveInvoiceId}
-              onOpenBondModal={handleOpenBondModal}
-            />
+                {/* Interactive Statement Excel Data Grid */}
+                <StatementMovementsTable
+                  filteredMovements={filteredMovements}
+                  selectedRowIds={selectedRowIds}
+                  expandedRowIds={expandedRowIds}
+                  rowColors={rowColors}
+                  activeColorPickerRowId={activeColorPickerRowId}
+                  isPrintingSelectedOnly={isPrintingSelectedOnly}
+                  partyName={selectedParty?.name || ''}
+                  isAllSelected={isAllSelected}
+                  onToggleSelectAll={handleToggleSelectAll}
+                  onToggleRowSelection={handleToggleRowSelection}
+                  onToggleRowExpand={handleToggleRowExpand}
+                  onOpenColorPicker={setActiveColorPickerRowId}
+                  onApplyColorToSingleRow={handleApplyColorToSingleRow}
+                  onPrintSingleTransaction={handlePrintSingleTransaction}
+                  onOpenInvoiceModal={setActiveInvoiceId}
+                  onOpenBondModal={handleOpenBondModal}
+                />
 
-            {/* Financial Summary Cards with Multi-Currency & Proper Tafqeet */}
-            <StatementSummaryCards
-              movements={filteredMovements}
-              partyType={partyType}
-              activeCurrency={selectedCurrency}
-            />
+                {/* Financial Summary Cards */}
+                <StatementSummaryCards
+                  movements={filteredMovements}
+                  partyType={partyType}
+                  activeCurrency={selectedCurrency}
+                />
+              </>
+            )}
 
-            {/* Floating Action Bar for Selected Rows */}
-            <StatementSelectedActionsBar
-              selectedMovements={selectedMovements}
-              selectedParty={selectedParty}
-              partyType={partyType}
-              companyName={company.nameAr}
-              onClearSelection={() => setSelectedRowIds(new Set())}
-              onApplyColor={handleApplyColorToSelected}
-              onPrintSingleTransaction={handlePrintSingleTransaction}
-              onPrintSelectedStatement={handlePrintSelectedStatement}
-              onExportSelectedExcel={handleExportSelectedExcel}
-            />
+            {/* Floating Action Bar for Selected Rows — only in statement tab */}
+            {(!isRentParty || activeTab === 'statement') && (
+              <StatementSelectedActionsBar
+                selectedMovements={selectedMovements}
+                selectedParty={selectedParty}
+                partyType={partyType}
+                companyName={company.nameAr}
+                onClearSelection={() => setSelectedRowIds(new Set())}
+                onApplyColor={handleApplyColorToSelected}
+                onPrintSingleTransaction={handlePrintSingleTransaction}
+                onPrintSelectedStatement={handlePrintSelectedStatement}
+                onExportSelectedExcel={handleExportSelectedExcel}
+              />
+            )}
           </>
         )
       ) : (

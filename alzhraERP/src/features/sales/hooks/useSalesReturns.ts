@@ -14,7 +14,6 @@ import { toReturnPayloadItems } from '../../returns/utils/returnHelpers';
 import type { Json } from '../../../core/database.types';
 import { normalizeSearch } from '../../../core/utils';
 import { formatLocalDate } from '../../../core/utils/dateUtils';
-import { logger } from '../../../core/utils/logger';
 import { parseError } from '../../../core/utils/errorUtils';
 
 export interface SalesReturn {
@@ -27,6 +26,7 @@ export interface SalesReturn {
   currency_code?: string | null;
   exchange_rate?: number | null;
   reference_invoice_id?: string | null;
+  reference_invoice?: { id?: string; invoice_number?: string | null } | null;
   /** سبب الإرجاع كما خُزِّن عند الإنشاء (كان يُرسَل في p_return_reason ولم يُقرأ) */
   return_reason?: string | null;
   party?: {
@@ -40,6 +40,14 @@ export interface SalesReturn {
     quantity: number;
     unit_price: number;
     total: number;
+    cost_price?: number | null;
+    product?: {
+      id?: string;
+      name_ar?: string | null;
+      sku?: string | null;
+      part_number?: string | null;
+      brand?: string | null;
+    } | null;
   }>;
   created_at: string;
 }
@@ -58,6 +66,7 @@ export type SalesReturnQueryResult = Pick<
   | 'currency_code'
   | 'exchange_rate'
 > & {
+  reference_invoice?: { id?: string; invoice_number?: string | null } | null;
   party: Pick<Party, 'id' | 'name'> | null;
   invoice_items: Array<
     Pick<InvoiceItem, 'id' | 'product_id' | 'description' | 'quantity' | 'unit_price' | 'total'> & {
@@ -116,9 +125,11 @@ export const useSalesReturns = (filters?: {
             quantity,
             unit_price,
             total,
-            cost_price
+            cost_price,
+            product:products!fk_invoice_items_company_product(id, name_ar, sku, part_number, brand)
           ),
           reference_invoice_id,
+          reference_invoice:reference_invoice_id(id, invoice_number),
           return_reason,
           created_at
         `
@@ -139,7 +150,10 @@ export const useSalesReturns = (filters?: {
         query = query.lte('issue_date', filters.endDate);
       }
 
-      const { data, error } = await query.order('issue_date', { ascending: false });
+      const { data, error } = await query
+        .order('issue_date', { ascending: false })
+        .order('created_at', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: false });
 
       if (error) throw error;
       const typedData = data as unknown as SalesReturnQueryResult[];
@@ -198,7 +212,7 @@ export const useSalesReturnsStats = () => {
       }, 0);
       const avgReturn = returnCount > 0 ? totalReturns / returnCount : 0;
       const pendingCount = returns.filter(
-        (r: any) => r.status === 'draft' || r.status === 'posted'
+        (r: any) => r.status === 'draft' || r.status === 'pending'
       ).length;
 
       return {
@@ -232,7 +246,7 @@ export const useCreateSalesReturn = () => {
       exchangeRate?: number | undefined;
     }) => {
       if (!user?.company_id || !user?.id) {
-        throw new Error('Missing authentication context');
+        throw new Error('جلسة العمل منتهية — يرجى تسجيل الدخول مجدداً');
       }
 
       const partyId =
@@ -244,60 +258,29 @@ export const useCreateSalesReturn = () => {
       const exchangeRate = typeof data.exchangeRate === 'number' ? data.exchangeRate : 1;
       const issueDate = data.issueDate ?? formatLocalDate();
 
-      try {
-        const { data: result, error } = await supabase.rpc('process_sales_return', {
-          p_invoice_id: data.invoiceId,
-          p_party_id: partyId as unknown as string,
-          p_payment_method: data.paymentMethod ?? 'cash',
-          p_items: payloadItems,
-          p_return_reason: data.returnReason ?? '',
-          p_status: data.status ?? 'posted',
-          p_notes: data.notes ?? '',
-          p_issue_date: issueDate,
-          p_currency_code: currency,
-          p_exchange_rate: exchangeRate,
-          p_company_id: user.company_id,
-          p_user_id: user.id,
-        });
+      const { data: result, error } = await supabase.rpc('process_sales_return', {
+        p_invoice_id: data.invoiceId,
+        p_party_id: partyId as unknown as string,
+        p_payment_method: data.paymentMethod ?? 'cash',
+        p_items: payloadItems,
+        p_return_reason: data.returnReason ?? '',
+        p_status: data.status ?? 'posted',
+        p_notes: data.notes ?? '',
+        p_issue_date: issueDate,
+        p_currency_code: currency,
+        p_exchange_rate: exchangeRate,
+        p_company_id: user.company_id,
+        p_user_id: user.id,
+      });
 
-        if (error) throw error;
-        return result as { invoice_number: string };
-      } catch (primaryError: unknown) {
-        logger.warn(
-          'useSalesReturns',
-          'process_sales_return failed, attempting fallback to commit_sale_return:',
-          primaryError
-        );
-
-        const fallbackParams = {
-          p_company_id: user.company_id,
-          p_user_id: user.id,
-          p_party_id: partyId as unknown as string,
-          p_items: payloadItems,
-          p_currency: currency,
-          p_exchange_rate: exchangeRate,
-          ...(data.notes !== undefined ? { p_notes: data.notes } : {}),
-          ...(data.invoiceId ? { p_reference_invoice_id: data.invoiceId } : {}),
-          ...(data.returnReason !== undefined ? { p_return_reason: data.returnReason } : {}),
-        };
-
-        const { data: fallbackResult, error: fallbackError } = await supabase.rpc(
-          'commit_sale_return',
-          fallbackParams
-        );
-
-        if (fallbackError) {
-          throw parseError(fallbackError);
-        }
-
-        return fallbackResult as { invoice_number: string };
-      }
+      if (error) throw parseError(error);
+      return result as { invoice_number: string };
     },
     onSuccess: invoice => {
       showToast(`تم إنشاء مرتجع المبيعات #${invoice.invoice_number} بنجاح`, 'success');
       invalidateByPreset(queryClient, 'saleReturn');
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
       showToast(parseError(error).message, 'error');
     },
   });

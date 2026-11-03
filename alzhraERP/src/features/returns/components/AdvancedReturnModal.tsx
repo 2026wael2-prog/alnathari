@@ -17,9 +17,10 @@ import {
 import type { PurchaseItem } from '../../purchases/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateByPreset } from '../../../lib/invalidation';
-import { mapReturnStatus } from '../utils/returnHelpers';
+import { mapReturnStatus, toReturnPayloadItems } from '../utils/returnHelpers';
 import type { Invoice } from '../types';
 import { logger } from '../../../core/utils/logger';
+import { parseError } from '../../../core/utils/errorUtils';
 
 interface AdvancedReturnModalProps {
   isOpen: boolean;
@@ -237,17 +238,21 @@ export const AdvancedReturnModal: React.FC<AdvancedReturnModalProps> = ({
                   ...(data.notes ? { notes: data.notes } : {}),
                 });
               } else if (returnType === 'purchase') {
-                // إصلاح: مرتجع المشتريات لم يكن يُنشأ إطلاقاً
-                await createPurchaseReturn.mutateAsync({
-                  supplierId: selectedInvoice.party?.id ?? selectedInvoice.party_id ?? null,
-                  items: selectedItems.map(item => ({
+                // تحويل الأصناف من camelCase (واجهة) إلى snake_case (payload الـ RPC)
+                // عبر toReturnPayloadItems لضمان product_id, unit_price, cost_price الصحيحة
+                const purchasePayloadItems = toReturnPayloadItems(
+                  selectedItems.map(item => ({
                     productId: item.productId,
                     name: item.name,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     costPrice: item.costPrice ?? 0,
-                    discount: 0,
-                  })) as unknown as PurchaseItem[],
+                  }))
+                ) as unknown as PurchaseItem[];
+
+                await createPurchaseReturn.mutateAsync({
+                  supplierId: selectedInvoice.party?.id ?? selectedInvoice.party_id ?? null,
+                  items: purchasePayloadItems,
                   invoiceNumber: selectedInvoice.invoice_number ?? '',
                   issueDate: data.date,
                   notes: data.notes || '',
@@ -270,11 +275,7 @@ export const AdvancedReturnModal: React.FC<AdvancedReturnModalProps> = ({
               onClose();
             } catch (error) {
               logger.error('AdvancedReturnModal', 'Error saving return:', error);
-              const err = error as { message?: string };
-              showToast(
-                err?.message || 'فشل حفظ المرتجع، يرجى التحقق من البيانات والمحاولة مرة أخرى',
-                'error'
-              );
+              showToast(parseError(error).message, 'error');
             }
           })}
         >

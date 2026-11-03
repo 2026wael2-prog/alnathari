@@ -7,6 +7,7 @@ import type { Invoice, Party } from '@/core/types/supabase-helpers';
 import { salesQuotationsApi } from './quotationsApi';
 import type { MatchedInvoiceItem, SearchInvoiceResultRow } from '@/core/types/invoiceSearch';
 import { optArg } from '@/core/utils/rpcArgs';
+import { resolveSaleInvoiceDueDate } from '../utils/dueDate';
 
 // Re-export quotations API
 export { salesQuotationsApi };
@@ -55,14 +56,24 @@ export const salesApi = {
         id,
         invoice_number,
         issue_date,
+        created_at,
         total_amount,
         status,
         type,
         payment_method,
         currency_code,
         exchange_rate,
-        party:party_id(name),
-        invoice_items(id),
+        party:party_id(name, phone),
+        invoice_items(
+          id,
+          product_id,
+          description,
+          quantity,
+          unit_price,
+          total,
+          cost_price,
+          product:products!fk_invoice_items_company_product(id, name_ar, sku, part_number, brand)
+        ),
         reference_invoice_id
       `
       )
@@ -70,10 +81,9 @@ export const salesApi = {
       .eq('type', 'sale')
       .neq('status', 'void')
       .is('deleted_at', null)
-      // [FIX] رابط ترتيب ثانٍ فريد: كل فواتير اليوم تتساوى في issue_date، وبدون
-      // رابط فريد كان ترتيبها بين الصفحات يتقلب (range pagination) فتظهر
-      // فواتير مكررة وتُتخطى أخرى في سجل المبيعات.
+      // ترتيب الأحدث أولاً: حسب تاريخ الإصدار ثم وقت الإنشاء ثم المعرف لمنع التكرار
       .order('issue_date', { ascending: false })
+      .order('created_at', { ascending: false, nullsFirst: false })
       .order('id', { ascending: false })
       .range(from, to);
 
@@ -147,7 +157,17 @@ export const salesApi = {
       // التعبير عن «إلزامي الحضور ويقبل NULL»، فيُقيَّد النوع صراحةً هنا فقط.
       p_party_id: (payload.partyId || null) as string,
       p_invoice_date: payload.issueDate || formatLocalDate(),
-      p_due_date: payload.dueDate || formatLocalDate(),
+      // [FIX §18] كان `payload.dueDate || formatLocalDate()` ⇒ الاستحقاق = الإصدار
+      // لكل فاتورة آجلة (صفر يوم سماح)، فظهر 100% من المديونية «متأخراً».
+      // الآن: الصريح يُحترم، والنقدي = الإصدار، والآجل بمدة سماح مجهولة يُرسل
+      // NULL ليحسمه مُشغّل قاعدة البيانات من parties.payment_terms_days.
+      // النوع المولَّد يعلن `p_due_date: string` بينما العمود يقبل NULL والدالة
+      // تقبل NULL — نفس مفارقة p_party_id أعلاه، والتضييق صريح هنا فقط.
+      p_due_date: resolveSaleInvoiceDueDate({
+        issueDate: payload.issueDate ?? null,
+        explicitDueDate: payload.dueDate ?? null,
+        paymentMethod: payload.paymentMethod,
+      }) as unknown as string,
       p_items: payload.items.map(i => ({
         product_id: i.productId,
         quantity: i.quantity,

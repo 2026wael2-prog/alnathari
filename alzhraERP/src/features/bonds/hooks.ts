@@ -7,6 +7,7 @@ import { assertPermission } from '../../core/hooks/usePermission';
 import { useBranchFilter } from '../branches/hooks/useBranchFilter';
 import { invalidateFinancialQueries } from '../../core/utils/querySyncUtils';
 import { invalidateByPreset } from '../../lib/invalidation';
+import { parseError } from '../../core/utils/errorUtils';
 
 export const useBonds = (type?: BondType) => {
   const { user } = useAuthStore();
@@ -59,8 +60,9 @@ export const useBondMutation = () => {
         variables.type === 'receipt' ? 'قبض' : variables.type === 'transfer' ? 'تحويل' : 'صرف';
       showToast(`تم إصدار سند ال${typeName} وترحيله آلياً`, 'success');
     },
-    onError: (error: Error) => {
-      showToast(error.message, 'error', error);
+    onError: (error: unknown) => {
+      const appErr = parseError(error);
+      showToast(appErr.message, 'error');
     },
   });
 };
@@ -83,8 +85,9 @@ export const useDeleteBond = () => {
       invalidateByPreset(queryClient, 'bond');
       showToast('تم إلغاء السند وعكس القيود بنجاح', 'success');
     },
-    onError: (error: Error) => {
-      showToast(error.message || 'حدث خطأ غير متوقع', 'error', error);
+    onError: (error: unknown) => {
+      const appErr = parseError(error);
+      showToast(appErr.message || 'حدث خطأ غير متوقع', 'error');
     },
   });
 };

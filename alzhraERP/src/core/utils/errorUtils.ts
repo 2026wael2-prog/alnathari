@@ -52,12 +52,22 @@ const parsePortalTokenError = (rawMessage: string): string | null => {
 export const parseError = (error: unknown): AppError => {
   const errorRecord = isRecord(error) ? error : undefined;
   const code = typeof errorRecord?.code === 'string' ? errorRecord.code : 'UNKNOWN';
-  const rawMessage =
+
+  // PostgrestError: قد تكون message عامة ("Internal Server Error") بينما
+  // الرسالة الفعلية من RAISE EXCEPTION تأتي في hint أو details
+  const hint = typeof errorRecord?.hint === 'string' ? errorRecord.hint : '';
+  const rawMessageBase =
     error instanceof Error
       ? error.message
       : typeof errorRecord?.message === 'string'
         ? errorRecord.message
         : String(error);
+  // إذا كانت message عامة من PostgREST، نجرّب hint ثم details كـ fallback
+  const isGenericHttpMsg =
+    rawMessageBase.toLowerCase().includes('internal server error') ||
+    rawMessageBase.toLowerCase().includes('bad request') ||
+    rawMessageBase === 'error';
+  const rawMessage = isGenericHttpMsg && hint ? hint : rawMessageBase;
   const lowerMsg = rawMessage.toLowerCase();
 
   // Network Errors - Catch generic fetch failures
@@ -171,6 +181,13 @@ export const parseError = (error: unknown): AppError => {
         company_id_required: 'معرف المنشأة مطلوب.',
         access_denied: 'عذراً، لا تمتلك صلاحية تنفيذ هذه العملية.',
         fiscal_year_not_found: 'لا توجد سنة مالية مفتوحة تشمل تاريخ المصروف.',
+        // أخطاء دالة create_financial_bond والتحويلات الداخلية
+        tenant_violation:
+          'الحساب المحدد لا ينتمي لهذه المنشأة أو غير موجود. يرجى مراجعة اختيار الحساب.',
+        auto_post_failed:
+          'تعذّر ترحيل السند تلقائياً. يرجى التحقق من إعدادات الحسابات وإعادة المحاولة.',
+        'نوع السند غير صحيح':
+          'نوع السند المحدد غير مدعوم. يرجى التواصل مع الدعم الفني.',
       };
       for (const [prefix, msg] of Object.entries(rpcPrefixMap)) {
         if (rawMessage.startsWith(prefix + ':') || rawMessage === prefix) {

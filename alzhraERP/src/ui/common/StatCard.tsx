@@ -17,6 +17,13 @@ interface StatCardProps {
       }
     | undefined;
   className?: string;
+  /**
+   * يجعل البطاقة قابلة للنقر (تُستخدم كفلتر: بطاقة «متأخر» تُصفّي الطابور).
+   * اختياري تماماً: بدون تمريره تبقى البطاقة عنصر عرض كما كانت.
+   */
+  onClick?: (() => void) | undefined;
+  /** تمييز البطاقة المختارة كفلتر نشط. */
+  isActive?: boolean | undefined;
 }
 
 const StatCard: React.FC<StatCardProps> = ({
@@ -29,17 +36,40 @@ const StatCard: React.FC<StatCardProps> = ({
   variant = 'default',
   trend,
   className,
+  onClick,
+  isActive = false,
 }) => {
   const isCompact = variant === 'compact';
+  const isInteractive = typeof onClick === 'function';
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (!onClick) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onClick();
+    }
+  };
 
   return (
     <div
+      {...(isInteractive
+        ? {
+            role: 'button',
+            tabIndex: 0,
+            onClick,
+            onKeyDown: handleKeyDown,
+            'aria-pressed': isActive,
+          }
+        : {})}
       className={cn(
         'stat-card group flex flex-col justify-between overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] shadow-sm transition-all duration-300 hover:border-blue-500/20 hover:shadow-md',
         isCompact ? 'p-3 lg:p-4' : 'p-3 max-md:p-2.5 md:p-4 lg:rounded-2xl lg:p-5 xl:p-6',
+        isInteractive && 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50',
+        isActive && 'border-blue-500/60 ring-2 ring-blue-500/40',
         className
       )}
     >
+
       <div className={cn('flex items-start justify-between', isCompact ? 'mb-1' : 'mb-2')}>
         <div className="flex flex-col">
           <span
