@@ -65,6 +65,7 @@ export const reconciliationApi = {
         p_opening_float: payload.opening_float,
         p_actual_cash_counted: payload.actual_cash_counted,
         p_cash_denominations: payload.cash_denominations,
+        p_cash_rates: payload.cash_rates ?? null,
         p_card_terminal_receipt_total: payload.card_terminal_receipt_total,
         p_float_retained_for_tomorrow: payload.float_retained_for_tomorrow,
         p_cash_handed_to_owner: payload.cash_handed_to_owner,

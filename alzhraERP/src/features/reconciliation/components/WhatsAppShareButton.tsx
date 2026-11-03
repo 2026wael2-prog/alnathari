@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Copy, Check, MessageSquare } from 'lucide-react';
 import Button from '../../../ui/base/Button';
+import { cn } from '../../../core/utils';
 import { useFeedbackStore } from '../../feedback/store';
-import { reconciliationService } from '../services/reconciliationService';
+import { reconciliationService, type CurrencyCashRow } from '../services/reconciliationService';
 import type { DailyDrawerSummary } from '../types';
 
 interface WhatsAppShareButtonProps {
@@ -12,6 +13,8 @@ interface WhatsAppShareButtonProps {
   floatRetained: number;
   cashToOwner: number;
   shopName?: string;
+  /** تفصيل الجرد الفعلي حسب العملة — يُضاف للتقرير عند وجوده */
+  cashBreakdown?: CurrencyCashRow[] | undefined;
   className?: string;
 }
 
@@ -67,11 +70,11 @@ export const WhatsAppShareButton: React.FC<WhatsAppShareButtonProps> = ({
   floatRetained,
   cashToOwner,
   shopName = 'المحل',
+  cashBreakdown,
   className = '',
 }) => {
   const [copied, setCopied] = useState(false);
   const { showToast } = useFeedbackStore();
-
   const buildMessageText = (): string =>
     reconciliationService.formatWhatsAppSummary(summary, {
       actualCash,
@@ -79,6 +82,7 @@ export const WhatsAppShareButton: React.FC<WhatsAppShareButtonProps> = ({
       floatRetained,
       cashToOwner,
       shopName,
+      cashBreakdown,
     });
 
   const handleCopy = async (): Promise<void> => {
@@ -100,7 +104,7 @@ export const WhatsAppShareButton: React.FC<WhatsAppShareButtonProps> = ({
   };
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={cn('flex items-center gap-2', className)}>
       <ShareActionButtons
         copied={copied}
         onCopy={() => void handleCopy()}

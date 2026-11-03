@@ -5,20 +5,31 @@ import {
   reconciliationService,
   resolveSummaryCurrency,
   resolveTolerance,
+  roundMoney,
+  calculateMultiCurrencyTotal,
+  normalizeStoredCashCounts,
+  getCurrencyCounts,
+  calculateCardVariance,
+  hasMixedCurrencySales,
+  type CashCountsByCurrency,
+  type CurrencyCashRow,
 } from '../services/reconciliationService';
-import type {
-  CashDenominationCounts,
-  CommitDailyReconciliationDTO,
-  DailyDrawerSummary,
-} from '../types';
+import type { CommitDailyReconciliationDTO, DailyDrawerSummary } from '../types';
 
 export type CountMode = 'denominations' | 'quick';
 
 export interface ReconciliationFormValues {
   countMode: CountMode;
-  cashCounts: CashDenominationCounts;
+  /** عدّ الفئات لكل عملة على حدة — جوهر الجرد المتعدد */
+  cashCountsByCurrency: CashCountsByCurrency;
+  /** العملة المعروضة في شبكة الفئات */
+  activeCurrency: string;
+  /** أسعار التحويل المعروضة صراحةً (عملة → معامل نحو الأساس) */
+  rates: Record<string, number>;
   manualCashTotal: number;
   actualCard: number;
+  /** هل أدخل المستخدم تقرير الماكينة فعلاً؟ (يمنع «المطابقة الوهمية») */
+  cardEntered: boolean;
   cardTerminalRef: string;
   floatRetained: number;
   varianceReason: string;
@@ -28,9 +39,12 @@ export interface ReconciliationFormValues {
 export interface ReconciliationFormApi {
   values: ReconciliationFormValues;
   setCountMode: Dispatch<SetStateAction<CountMode>>;
-  setCashCounts: Dispatch<SetStateAction<CashDenominationCounts>>;
+  setCashCountsByCurrency: Dispatch<SetStateAction<CashCountsByCurrency>>;
+  setActiveCurrency: Dispatch<SetStateAction<string>>;
+  setRate: (currency: string, rate: number) => void;
   setManualCashTotal: Dispatch<SetStateAction<number>>;
   setActualCard: Dispatch<SetStateAction<number>>;
+  setCardEntered: Dispatch<SetStateAction<boolean>>;
   setCardTerminalRef: Dispatch<SetStateAction<string>>;
   setFloatRetained: Dispatch<SetStateAction<number>>;
   setVarianceReason: Dispatch<SetStateAction<string>>;
@@ -45,28 +59,22 @@ export interface ReconciliationView {
   cashVarianceInfo: ReturnType<typeof reconciliationService.calculateVariance>;
   salesByCurrency: NonNullable<DailyDrawerSummary['sales_by_currency']>;
   hasMixedCurrencySales: boolean;
+  /** صفوف الجرد الفعلي لكل عملة (إجمالي العملة × سعرها) */
+  cashRows: CurrencyCashRow[];
+  hasForeignCurrencyCounts: boolean;
+  /** عملات عُدّت بلا سعر صرف — تمنع الاعتماد */
+  missingRateCurrencies: string[];
+  tolerance: number;
+  /** فارق الشبكة، أو null عندما لم يُدخل تقرير الماكينة بعد */
+  cardVariance: number | null;
+  expectedCard: number;
   isAlreadyClosed: boolean;
   isOwner: boolean;
   isLocked: boolean;
   cashToOwner: number;
+  /** الصافي سالب (الفكة المستبقاة أكبر من الكاش) — حالة مستحيلة يجب حجبها */
+  netIsNegative: boolean;
 }
-/**
- * مبرر الفارق إلزامي عند تجاوز حد التسامح: الخادم يرفض الإقفال بدونه (ERRCODE 22023)،
- * فنفرض نفس الشرط محلياً برسالة واضحة بدل رحلة ذهاب وإياب مرفوضة.
- */
-export const resolveVarianceReasonBlocker = (
-  isWithinTolerance: boolean,
-  varianceReason: string
-): string | null => {
-  if (isWithinTolerance) return null;
-  if (varianceReason.trim().length > 0) return null;
-  return 'مبرر الفارق إلزامي: الفارق يتجاوز حد التسامح المسموح، اكتب السبب قبل اعتماد الإقفال';
-};
-
-/** نفس دلالة الشرط (truthy) في JS للأرقام، مع إرضاء strict-boolean-expressions. */
-export const isTruthyNumber = (value: number | null | undefined): value is number =>
-  value !== null && value !== undefined && value !== 0 && !Number.isNaN(value);
-
 /** نفس دلالة الشرط (truthy) في JS للنصوص، مع إرضاء strict-boolean-expressions. */
 export const isNonEmptyString = (value: string | null | undefined): value is string =>
   value !== null && value !== undefined && value !== '';
@@ -78,9 +86,6 @@ export const stringOrEmpty = (value: string | null | undefined): string => value
 export const numberOr = (value: number | null | undefined, fallback: number): number =>
   value ?? fallback;
 
-const countsOrEmpty = (counts: CashDenominationCounts | null | undefined): CashDenominationCounts =>
-  counts ?? {};
-
 /** اسم المنشأة المعروض، مع الاسم الافتراضي نفسه المستخدم سابقاً عند الفراغ. */
 export const resolveShopName = (companyName: string | null | undefined): string =>
   isNonEmptyString(companyName) ? companyName : 'مؤسسة الجعفري';
@@ -88,46 +93,59 @@ export const resolveShopName = (companyName: string | null | undefined): string 
 export const buildZeroCashConfirmMessage = (currency: string): string =>
   `الكاش الفعلي المدخل هو ${formatCurrency(0, currency)}، هل أنت متأكد من المتابعة؟`;
 
-export interface ExpectedCardSync {
-  kind: 'expected-card';
-  actualCard: number;
-}
-
 export interface ExistingReconciliationSync {
   kind: 'existing';
-  cashCounts: CashDenominationCounts;
+  cashCountsByCurrency: CashCountsByCurrency;
   manualCashTotal: number;
   countMode: CountMode;
   actualCard: number;
+  cardEntered: boolean;
   floatRetained: number;
   varianceReason: string;
   notes: string;
 }
 
-export type SummarySyncPlan = ExistingReconciliationSync | ExpectedCardSync;
+export interface FreshDaySync {
+  kind: 'fresh';
+}
 
-/** خطة مزامنة النموذج مع اليومية القائمة — دالة نقية خارج المكوّن لخفض التعقيد. */
+export type SummarySyncPlan = ExistingReconciliationSync | FreshDaySync;
+
+/**
+ * خطة مزامنة النموذج مع اليومية القائمة — دالة نقية خارج المكوّن.
+ *
+ * إصلاح جوهري: كانت اليومية الجديدة تملأ «الفعلي» للشبكة بقيمة «المتوقع»
+ * (`actualCard: expected_card_terminal`) فتُعلن مطابقة 100% قبل قراءة تقرير
+ * الماكينة وتُحفظ `card_variance = 0` كذباً. الآن تبدأ اليومية فارغة دائماً.
+ */
 export const planSummarySync = (
   summary: DailyDrawerSummary | null | undefined
 ): SummarySyncPlan | null => {
-  const rec = summary?.existing_reconciliation;
-  if (rec === null || rec === undefined) {
-    if (summary === null || summary === undefined) return null;
-    // Default initial actual card to expected card for convenience
-    return { kind: 'expected-card', actualCard: summary.expected_card_terminal || 0 };
+  if (summary === null || summary === undefined) return null;
+  const rec = summary.existing_reconciliation;
+  if (rec === null) {
+    return { kind: 'fresh' };
   }
-  const denoms = countsOrEmpty(rec.cash_denominations);
-  const counted = numberOr(
-    rec.actual_cash_counted,
-    reconciliationService.calculateDenominationsTotal(denoms)
-  );
+  const baseCurrency = resolveSummaryCurrency(summary);
+  const countsByCurrency = normalizeStoredCashCounts(rec.cash_denominations, baseCurrency);
+  const hasCounts = Object.keys(countsByCurrency).length > 0;
+  // الإجمالي المحفوظ هو مصدر الحقيقة؛ والفئات تُستخدم بديلاً للسجلات الناقصة فقط
+  const counted =
+    rec.actual_cash_counted !== 0
+      ? rec.actual_cash_counted
+      : reconciliationService.calculateDenominationsTotal(
+          getCurrencyCounts(countsByCurrency, baseCurrency)
+        );
+  const cardActual = numberOr(rec.card_terminal_receipt_total, 0);
   return {
     kind: 'existing',
-    cashCounts: denoms,
+    cashCountsByCurrency: countsByCurrency,
     manualCashTotal: counted,
-    countMode: Object.keys(denoms).length > 0 ? 'denominations' : 'quick',
-    actualCard: rec.card_terminal_receipt_total || 0,
-    floatRetained: rec.float_retained_for_tomorrow || 300,
+    countMode: hasCounts ? 'denominations' : 'quick',
+    actualCard: cardActual,
+    // اليومية المحفوظة أُدخلت فعلاً إذا وُجد رقم تقرير صريح
+    cardEntered: cardActual !== 0,
+    floatRetained: numberOr(rec.float_retained_for_tomorrow, 0),
     varianceReason: stringOrEmpty(rec.variance_reason),
     notes: stringOrEmpty(rec.notes),
   };
@@ -147,9 +165,7 @@ const deriveSummaryScalars = (summary: DailyDrawerSummary | undefined): SummaryS
   otherSales: summary?.other_sales ?? 0,
 });
 
-/**
- * كل القيم المشتقّة المعروضة — دالة نقية خارج المكوّن (نفس ترتيب الحساب السابق).
- */
+/** كل القيم المشتقّة المعروضة — دالة نقية خارج المكوّن. */
 export const deriveReconciliationView = (
   summary: DailyDrawerSummary | undefined,
   form: ReconciliationFormValues,
@@ -157,22 +173,28 @@ export const deriveReconciliationView = (
 ): ReconciliationView => {
   const { expectedCash, salesByCurrency, isAlreadyClosed, otherSales } =
     deriveSummaryScalars(summary);
-  const currency = summary ? resolveSummaryCurrency(summary) : 'SAR';
+  const currency = summary ? resolveSummaryCurrency(summary) : form.activeCurrency;
   const currencyLabel = currencySymbol(currency);
-  const denomCalculatedTotal = reconciliationService.calculateDenominationsTotal(form.cashCounts);
+  const cashResult = calculateMultiCurrencyTotal(
+    form.cashCountsByCurrency,
+    form.rates,
+    currency
+  );
   const actualCashCounted =
-    form.countMode === 'denominations' ? denomCalculatedTotal : form.manualCashTotal;
+    form.countMode === 'denominations' ? cashResult.baseTotal : form.manualCashTotal;
+  const tolerance = resolveTolerance(summary);
   const cashVarianceInfo = reconciliationService.calculateVariance(
     actualCashCounted,
     expectedCash,
-    resolveTolerance(summary)
+    tolerance
   );
-  const hasMixedCurrencySales =
-    salesByCurrency.some(row => row.currency_code.toUpperCase() !== currency) || otherSales > 0;
+  const hasMixedCurrencySalesFlag = hasMixedCurrencySales(salesByCurrency, currency, otherSales);
+  const expectedCard = summary?.expected_card_terminal ?? 0;
+  const cardVariance = calculateCardVariance(form.actualCard, expectedCard, form.cardEntered);
   const isOwner = role === 'owner';
   const isLocked = isAlreadyClosed && !isOwner;
-  const cashToOwner = Math.max(0, Math.round((actualCashCounted - form.floatRetained) * 100) / 100);
-
+  const cashToOwner = roundMoney(actualCashCounted - form.floatRetained);
+  // صفوف العملات وأسعارها تخصّ وضع تفقيط الفئات فقط (الإدخال السريع رقم أساس واحد)
   return {
     currency,
     currencyLabel,
@@ -180,11 +202,18 @@ export const deriveReconciliationView = (
     expectedCash,
     cashVarianceInfo,
     salesByCurrency,
-    hasMixedCurrencySales,
+    hasMixedCurrencySales: hasMixedCurrencySalesFlag,
+    cashRows: form.countMode === 'denominations' ? cashResult.rows : [],
+    hasForeignCurrencyCounts: form.countMode === 'denominations' && cashResult.hasForeignCurrency,
+    missingRateCurrencies: form.countMode === 'denominations' ? cashResult.missingRates : [],
+    tolerance,
+    cardVariance,
+    expectedCard,
     isAlreadyClosed,
     isOwner,
     isLocked,
     cashToOwner,
+    netIsNegative: cashToOwner < 0,
   };
 };
 
@@ -193,7 +222,9 @@ export interface CommitPayloadInput {
   summary: DailyDrawerSummary | undefined;
   actualCashCounted: number;
   countMode: CountMode;
-  cashCounts: CashDenominationCounts;
+  cashCountsByCurrency: CashCountsByCurrency;
+  /** أسعار الصرف الظاهرة للمستخدم — تُرسل ليحوّل الخادم الفئات بنفس السعر */
+  cashRates: Record<string, number>;
   actualCard: number;
   floatRetained: number;
   cashToOwner: number;
@@ -211,13 +242,61 @@ export const buildCommitPayload = (
   branch_id: input.branchId,
   opening_float: input.summary?.opening_float ?? 0,
   actual_cash_counted: input.actualCashCounted,
-  cash_denominations: input.countMode === 'denominations' ? input.cashCounts : {},
+  /**
+   * الفئات تُحفظ دائماً بالشكل المتداخل (عملة → فئة → عدد) حتى في الإدخال السريع
+   * بالفئات الفارغة؛ لأنه كان يُحفظ `{}` فيضيع أثر الجرد تماماً في مستند مالي.
+   */
+  cash_denominations:
+    input.countMode === 'denominations' ? input.cashCountsByCurrency : {},
+  /**
+   * الأسعار تُرسل دائماً: الخادم يحوّل الفئات بنفس ما رآه المستخدم بدل رقم
+   * مجاميع محسوب في الواجهة يمكن أن يخالف المستند المحفوظ.
+   */
+  cash_rates: input.cashRates,
   card_terminal_receipt_total: input.actualCard,
   float_retained_for_tomorrow: input.floatRetained,
   cash_handed_to_owner: input.cashToOwner,
   variance_reason: input.varianceReason,
   notes: input.notes,
 });
+
+/**
+ * حواجز الاعتماد المحلية — تُجمع كلها في رسالة واحدة واضحة بدل رحلة خادم مرفوضة:
+ *   1. مبرر الفارق إلزامي خارج حد التسامح (كاش أو شبكة) — شرط الخادم نفسه.
+ *   2. صافي سالب (الفكة أكبر من الكاش) حالة مستحيلة.
+ *   3. عملات عُدّت بلا سعر صرف → تحويلها صفر يفسد المقارنة.
+ */
+export const collectCommitBlockers = (input: {
+  view: ReconciliationView;
+  varianceReason: string;
+}): string[] => {
+  const { view, varianceReason } = input;
+  const blockers: string[] = [];
+
+  if (view.netIsNegative) {
+    blockers.push(
+      `الصافي المسلم للمالك سالب (${formatCurrency(view.cashToOwner, view.currency)}): الفكة المستبقاة أكبر من الكاش المعدود`
+    );
+  }
+
+  if (view.missingRateCurrencies.length > 0) {
+    blockers.push(
+      `لا يوجد سعر صرف صالح للعملات: ${view.missingRateCurrencies.join('، ')} — اضبط السعر قبل الاعتماد`
+    );
+  }
+
+  const cardOutsideTolerance =
+    view.cardVariance !== null && Math.abs(view.cardVariance) > view.tolerance;
+  const cashOutsideTolerance = !view.cashVarianceInfo.isWithinTolerance;
+
+  if ((cashOutsideTolerance || cardOutsideTolerance) && varianceReason.trim().length === 0) {
+    blockers.push(
+      'مبرر الفارق إلزامي: الفارق يتجاوز حد التسامح المسموح، اكتب السبب قبل اعتماد الإقفال'
+    );
+  }
+
+  return blockers;
+};
 
 export interface ReconciliationModalsApi {
   isExpenseModalOpen: boolean;
@@ -231,29 +310,3 @@ export interface ReconciliationModalsApi {
   closeHistoryModal: () => void;
 }
 
-export type VarianceStatus = ReturnType<typeof reconciliationService.calculateVariance>['status'];
-
-/** إطار بطاقة التسوية النهائية حسب حالة الفارق (نفس الأصناف السابقة حرفياً). */
-export const resolveSettlementBannerTone = (status: VarianceStatus): string => {
-  if (status === 'balanced') return 'border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20';
-  if (status === 'surplus') return 'border-amber-500/30 bg-amber-500/5 dark:bg-amber-950/20';
-  return 'border-red-500/30 bg-red-500/5 dark:bg-red-950/20';
-};
-
-/** خلفية أيقونة حالة الفارق حسب الحالة (نفس الأصناف السابقة حرفياً). */
-export const resolveSettlementIconTone = (status: VarianceStatus): string => {
-  if (status === 'balanced') return 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400';
-  if (status === 'surplus') return 'bg-amber-500/20 text-amber-700 dark:text-amber-400';
-  return 'bg-red-500/20 text-red-600 dark:text-red-400';
-};
-
-/** عنوان حالة الدرج بنفس النصوص والتنسيق السابق. */
-export const resolveSettlementHeadline = (
-  status: VarianceStatus,
-  variance: number,
-  currency: string
-): string => {
-  if (status === 'balanced') return 'الدرج متطابق تماماً بنسبة 100%';
-  if (status === 'surplus') return `يوجد فائض بالدرج (+${formatCurrency(variance, currency)})`;
-  return `يوجد عجز بالدرج (${formatCurrency(variance, currency)})`;
-};

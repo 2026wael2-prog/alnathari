@@ -6,6 +6,12 @@ import {
   resolveSummaryCurrency,
   resolveTolerance,
   DEFAULT_TOLERANCE_SAR,
+  convertAmountToBase,
+  calculateMultiCurrencyTotal,
+  normalizeStoredCashCounts,
+  suggestFloatPresets,
+  defaultFloatFor,
+  defaultToleranceFor,
 } from './reconciliationService';
 import type { DailyDrawerSummary } from '../types';
 
@@ -110,6 +116,86 @@ describe('reconciliationService', () => {
       expect(result.status).toBe('shortage');
       expect(result.variance).toBe(-50);
       expect(result.isWithinTolerance).toBe(false);
+    });
+  });
+
+  describe('multi-currency drawer engine', () => {
+    it('labels every currency with its own real denominations (not SAR notes)', () => {
+      const yer = getDenominationsFor('YER').map(d => d.value);
+      expect(yer).toContain(1000);
+      expect(yer).toContain(250);
+      expect(yer).not.toContain(0.5);
+
+      const usd = getDenominationsFor('USD').map(d => d.value);
+      expect(usd).toContain(0.25);
+      expect(usd).not.toContain(500);
+
+      // عملة غير مسجّلة → فئات احتياطية دون انفجار
+      expect(getDenominationsFor('XAF').length).toBeGreaterThan(0);
+    });
+
+    it('converts to base with the same rules as fn_to_base_amount', () => {
+      // العملة = الأساس
+      expect(convertAmountToBase({ amount: 500, currency: 'YER', baseCurrency: 'YER', rate: 1 })).toBe(500);
+      // SAR إلى أساس YER: ضرب بسعر 410
+      expect(convertAmountToBase({ amount: 500, currency: 'SAR', baseCurrency: 'YER', rate: 410 })).toBe(205000);
+      // SAR إلى أساس SAR: كما هي
+      expect(convertAmountToBase({ amount: 500, currency: 'SAR', baseCurrency: 'SAR', rate: 1 })).toBe(500);
+      // YER إلى أساس SAR بمعامل قسمة
+      expect(
+        convertAmountToBase({ amount: 100000, currency: 'YER', baseCurrency: 'SAR', rate: 410 })
+      ).toBe(243.9);
+      // معدل مخزّن مقلوباً (1/410)
+      expect(
+        convertAmountToBase({ amount: 100000, currency: 'YER', baseCurrency: 'SAR', rate: 0.002439 })
+      ).toBe(243.9);
+      // بلا سعر صالح → صفر (يمنع تحويلاً وهمياً)
+      expect(convertAmountToBase({ amount: 100, currency: 'USD', baseCurrency: 'YER', rate: 0 })).toBe(0);
+    });
+
+    it('totals each currency separately and sums the base equivalent', () => {
+      const result = calculateMultiCurrencyTotal(
+        { YER: { '1000': 5, '500': 2 }, SAR: { '100': 3 }, USD: { '1': 4 } },
+        { SAR: 410, USD: 530 },
+        'YER'
+      );
+
+      expect(result.rows.map(row => row.currency)).toEqual(['YER', 'SAR', 'USD']);
+      expect(result.rows[0]?.total).toBe(6000);
+      expect(result.rows[1]?.baseTotal).toBe(123000);
+      expect(result.rows[2]?.baseTotal).toBe(2120);
+      expect(result.baseTotal).toBe(131120);
+      expect(result.hasForeignCurrency).toBe(true);
+      expect(result.missingRates).toEqual([]);
+    });
+
+    it('flags foreign currencies that have no exchange rate instead of silently dropping them', () => {
+      const result = calculateMultiCurrencyTotal({ YER: { '1000': 1 }, SAR: { '100': 1 } }, {}, 'YER');
+
+      expect(result.missingRates).toEqual(['SAR']);
+      expect(result.baseTotal).toBe(1000);
+    });
+
+    it('reads legacy flat saved counts as base-currency counts', () => {
+      expect(normalizeStoredCashCounts({ '500': 2, '100': 1 }, 'YER')).toEqual({
+        YER: { '500': 2, '100': 1 },
+      });
+      expect(normalizeStoredCashCounts({ YER: { '1000': 3 }, SAR: { '50': 1 } }, 'YER')).toEqual({
+        YER: { '1000': 3 },
+        SAR: { '50': 1 },
+      });
+      expect(normalizeStoredCashCounts(null, 'YER')).toEqual({});
+      expect(normalizeStoredCashCounts({ '500': 0, '100': -2 }, 'YER')).toEqual({});
+    });
+
+    it('scales float presets and tolerance to the base currency', () => {
+      expect(suggestFloatPresets('YER')).toEqual([10000, 20000, 50000]);
+      expect(suggestFloatPresets('SAR')).toEqual([200, 300, 500]);
+      expect(suggestFloatPresets('USD')).toEqual([100, 200, 500]);
+      expect(defaultFloatFor('YER')).toBe(20000);
+      expect(defaultFloatFor('KWD')).toBe(20);
+      expect(defaultToleranceFor('YER')).toBe(500);
+      expect(defaultToleranceFor('SAR')).toBe(DEFAULT_TOLERANCE_SAR);
     });
   });
 

@@ -9,6 +9,7 @@ import { useAuthStore } from '../../auth/store';
 import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 import { useFeedbackStore } from '../../feedback/store';
 import { parseError } from '../../../core/utils/errorUtils';
+import { formatCurrency } from '../../../core/utils';
 import { reconciliationApi } from '../api/reconciliationApi';
 import type {
   CommitDailyReconciliationDTO,
@@ -54,14 +55,30 @@ export const useCommitDailyReconciliation = (): UseMutationResult<
     mutationFn: async (payload: CommitDailyReconciliationDTO) => {
       return reconciliationApi.commitReconciliation(payload);
     },
-    onSuccess: data => {
+    onSuccess: (data, variables) => {
       // الخادم يحسب الفارق وحد التسامح بالعملة الأساسية؛ نُبرز خارج التسامح كتحذير
       // بدل رسالة نجاح مسطّحة حتى لا يمر العجز الكبير بصمت.
       const isOutsideTolerance = data.is_within_tolerance === false;
-      showToast(
-        data.message || 'تم إقفال يومية المحل واعتماد المطابقة بنجاح',
-        isOutsideTolerance ? 'warning' : 'success'
-      );
+      const serverCounted = data.actual_cash_counted;
+      const drift =
+        typeof serverCounted === 'number'
+          ? Math.abs(serverCounted - variables.actual_cash_counted)
+          : 0;
+      // الخادم يعيد احتساب المعدود من الفئات: أي انحراف عن رقم الشاشة يُعلن صراحةً
+      const wasRecalculated = data.counted_from_denominations === true && drift > 0.05;
+
+      if (wasRecalculated && typeof serverCounted === 'number') {
+        const currency = data.base_currency ?? 'SAR';
+        showToast(
+          `أُعيد احتساب النقد المعدود من الفئات على الخادم: ${formatCurrency(serverCounted, currency)} بدل ${formatCurrency(variables.actual_cash_counted, currency)} — راجع أسعار الصرف والفئات`,
+          'warning'
+        );
+      } else {
+        showToast(
+          data.message || 'تم إقفال يومية المحل واعتماد المطابقة بنجاح',
+          isOutsideTolerance ? 'warning' : 'success'
+        );
+      }
       void queryClient.invalidateQueries({ queryKey: ['daily_drawer_summary'] });
       void queryClient.invalidateQueries({ queryKey: ['reconciliation_history'] });
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });

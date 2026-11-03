@@ -132,7 +132,7 @@ const CardVarianceCell: React.FC<{ variance: number; currency: string }> = ({
 
 /** صف سجل مطابقة واحد مع حالة فروقات الكاش والشبكة */
 const HistoryRow: React.FC<HistoryRowProps> = ({ row, currency, onSelectDate, onClose }) => (
-  <tr className="transition-colors hover:bg-[var(--app-hover)]">
+  <tr className="transition-colors hover:bg-[var(--app-surface-hover)]">
     <td className="px-3 py-2.5 font-bold text-[var(--app-text)]">
       <div className="flex items-center gap-1.5">
         <Calendar className="h-3.5 w-3.5 text-blue-500" />
@@ -186,7 +186,7 @@ const HistoryTable: React.FC<HistoryTableProps> = ({
   <div className="max-h-[60vh] overflow-x-auto rounded-lg border border-[var(--app-border)]">
     <table className="w-full text-right text-xs">
       <HistoryTableHead />
-      <tbody className="divide-y divide-[var(--app-border)] bg-[var(--app-card-bg)]">
+      <tbody className="divide-y divide-[var(--app-border)] bg-[var(--app-surface)]">
         {isLoading ? (
           <HistoryPlaceholderRow message="جاري تحميل سجل المطابقات..." />
         ) : rows.length === 0 ? (

@@ -2,7 +2,8 @@ import React, { useRef } from 'react';
 import { Printer } from 'lucide-react';
 import Modal from '../../../ui/base/Modal';
 import Button from '../../../ui/base/Button';
-import { currencySymbol, resolveSummaryCurrency } from '../services/reconciliationService';
+import { currencySymbol, resolveSummaryCurrency, type CurrencyCashRow } from '../services/reconciliationService';
+import { formatCurrency } from '../../../core/utils';
 import type { DailyDrawerSummary } from '../types';
 
 interface ReconciliationPrintModalProps {
@@ -14,6 +15,8 @@ interface ReconciliationPrintModalProps {
   floatRetained: number;
   cashToOwner: number;
   shopName?: string;
+  /** تفصيل الجرد حسب العملة — يُطبع سطر لكل عملة */
+  cashBreakdown?: CurrencyCashRow[] | undefined;
 }
 
 interface SummarySectionProps {
@@ -33,8 +36,8 @@ const ReceiptHeader: React.FC<{ shopName: string; date: string }> = ({ shopName,
 const EmployeeBreakdownSection: React.FC<SummarySectionProps> = ({ summary }) => (
   <div className="my-2 border-b border-dashed border-gray-300 pb-2">
     <p className="mb-1 font-bold">مبيعات الموظفين:</p>
-    {summary.employee_breakdown.map((emp, i) => (
-      <div key={i} className="flex justify-between py-0.5">
+    {summary.employee_breakdown.map(emp => (
+      <div key={emp.user_id} className="flex justify-between py-0.5">
         <span>
           {emp.employee_name} ({emp.invoice_count} ف):
         </span>
@@ -203,6 +206,32 @@ const PayoutSection: React.FC<{ floatRetained: number; cashToOwner: number; curr
   </div>
 );
 
+/** تفصيل الجرد الفعلي حسب العملة كما عُدّت في الدرج */
+const CashBreakdownSection: React.FC<{ rows: CurrencyCashRow[] | undefined; baseCurrency: string }> = ({
+  rows,
+  baseCurrency,
+}) => {
+  const visibleRows = (rows ?? []).filter(row => row.total > 0);
+  if (visibleRows.length === 0) return null;
+
+  return (
+    <div className="my-2 border-b border-dashed border-gray-300 pb-2">
+      <p className="mb-1 font-bold">جرد الدرج حسب العملة:</p>
+      {visibleRows.map(row => (
+        <div key={row.currency} className="flex justify-between py-0.5">
+          <span>{row.currency}:</span>
+          <span className="font-bold">
+            {formatCurrency(row.total, row.currency)}
+            {row.currency !== baseCurrency && row.rate > 0 ? (
+              <span className="font-normal"> ≈ {formatCurrency(row.baseTotal, baseCurrency)}</span>
+            ) : null}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 /** توقيعات الموظفين والمستلم أسفل الإيصال */
 const SignatureSection: React.FC = () => (
   <div className="mt-4 space-y-3 pt-2 text-[10px]">
@@ -272,6 +301,7 @@ export const ReconciliationPrintModal: React.FC<ReconciliationPrintModalProps> =
   floatRetained,
   cashToOwner,
   shopName = 'المنشأة',
+  cashBreakdown,
 }) => {
   const printAreaRef = useRef<HTMLDivElement>(null);
 
@@ -295,6 +325,7 @@ export const ReconciliationPrintModal: React.FC<ReconciliationPrintModalProps> =
         >
           <ReceiptHeader shopName={shopName} date={summary.date} />
           <EmployeeBreakdownSection summary={summary} />
+          <CashBreakdownSection rows={cashBreakdown} baseCurrency={currency} />
           <SalesTotalsSection summary={summary} currency={currency} />
           <DrawerSection summary={summary} actualCash={actualCash} actualCard={actualCard} />
           <PayoutSection

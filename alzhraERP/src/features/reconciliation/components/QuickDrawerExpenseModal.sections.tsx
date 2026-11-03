@@ -227,7 +227,7 @@ const ExpensePresetPicker: React.FC<ExpenseSectionProps> = ({ model }) => (
           className={`rounded-full px-2.5 py-1 text-xs font-medium transition-all ${
             model.state.description === preset
               ? 'bg-amber-600 text-white shadow-sm'
-              : 'border border-[var(--app-border)] bg-[var(--app-bg)] text-[var(--app-text)] hover:bg-[var(--app-hover)]'
+              : 'border border-[var(--app-border)] bg-[var(--app-bg)] text-[var(--app-text)] hover:bg-[var(--app-surface-hover)]'
           }`}
         >
           {preset}

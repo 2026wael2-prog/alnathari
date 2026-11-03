@@ -39,7 +39,7 @@ const EmployeeCardHeader: React.FC<EmployeeLineProps & { percentage: number }> =
 }) => (
   <div className="flex items-start justify-between">
     <div className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--app-border)] bg-[var(--app-card-bg)] text-xs font-black text-blue-600 dark:text-blue-400">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] text-xs font-black text-blue-600 dark:text-blue-400">
         {emp.employee_name.slice(0, 2)}
       </div>
       <div>
@@ -64,7 +64,7 @@ const EmployeeCardHeader: React.FC<EmployeeLineProps & { percentage: number }> =
 
 /** شريط نسبة مساهمة الموظف من إجمالي مبيعات اليوم */
 const EmployeeShareBar: React.FC<{ percentage: number }> = ({ percentage }) => (
-  <div className="my-2 h-1.5 w-full overflow-hidden rounded-full border border-[var(--app-border)] bg-[var(--app-card-bg)]">
+  <div className="my-2 h-1.5 w-full overflow-hidden rounded-full border border-[var(--app-border)] bg-[var(--app-bg)]">
     <div
       className="h-full rounded-full bg-blue-600 transition-all duration-500"
       style={{ width: `${String(percentage)}%` }}
@@ -184,7 +184,7 @@ const AccordionHeader: React.FC<AccordionHeaderProps> = ({ count, isExpanded, on
   <button
     type="button"
     onClick={onToggle}
-    className="hover:bg-[var(--app-hover)]/50 flex w-full items-center justify-between rounded-xl p-3.5 text-right transition-colors"
+    className="flex w-full items-center justify-between rounded-xl p-3.5 text-right transition-colors hover:bg-[var(--app-surface-hover)]"
   >
     <div className="flex items-center gap-2.5">
       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -221,7 +221,7 @@ export const EmployeeSalesBreakdownCard: React.FC<EmployeeSalesBreakdownCardProp
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
-    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-bg)] shadow-sm transition-all">
+    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] shadow-sm transition-all">
       <AccordionHeader
         count={breakdown.length}
         isExpanded={isExpanded}
