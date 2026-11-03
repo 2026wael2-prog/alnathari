@@ -7,6 +7,7 @@ import { debtsService } from '../services/debtService';
 import { usePermission } from '../../../core/hooks/usePermission';
 import FollowUpTabs from '../components/FollowUpTabs';
 import FollowUpTable from '../components/FollowUpTable';
+import DebtQueryError from '../components/DebtQueryError';
 import CreateBondModal from '../../bonds/components/CreateBondModal';
 import { useBondMutation } from '../../bonds/hooks';
 import { bucketForDays, getAgingMeta, isAgingKey } from '../lib/aging';
@@ -14,7 +15,7 @@ import { buildCollectionSheetCsv, collectionSheetFileName } from '../lib/collect
 import type { FollowUpDashboardRow, FollowUpTab } from '../types';
 
 const FollowUpPage: React.FC = () => {
-  const { data: rows, isLoading } = useDebtDashboard();
+  const { data: rows, isLoading, isError, refetch } = useDebtDashboard();
   const [tab, setTab] = useState<FollowUpTab>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [currencyFilter, setCurrencyFilter] = useState('all');
@@ -25,6 +26,12 @@ const FollowUpPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const agingParam = searchParams.get('aging');
   const agingFilter = isAgingKey(agingParam) ? agingParam : null;
+
+  // فتح ملف عميل محدد قادم من طابور الأولوية (?party=<uuid>) — كان زر
+  // «فتح الملف» بلا وجهة، فصار له مقصد حقيقي بدل توجيه المستخدم لصفحة كاملة.
+  const partyParam = searchParams.get('party');
+  const partyFilter =
+    partyParam !== null && partyParam.trim() !== '' ? partyParam.trim() : null;
 
   // تحصيل الآن: سند قبض مُعبّأ (يتطلب debts:manage + accounting:create)
   const [collectRow, setCollectRow] = useState<FollowUpDashboardRow | null>(null);
@@ -75,6 +82,11 @@ const FollowUpPage: React.FC = () => {
       result = result.filter(r => bucketForDays(r.days_overdue) === agingFilter);
     }
 
+    // ملف عميل واحد فقط (وصول من زر «الملف» في طابور الأولوية)
+    if (partyFilter !== null) {
+      result = result.filter(r => r.party_id === partyFilter);
+    }
+
     // Currency filter
     if (currencyFilter !== 'all') {
       result = result.filter(
@@ -101,14 +113,15 @@ const FollowUpPage: React.FC = () => {
     });
 
     return result;
-  }, [tabFiltered, searchTerm, currencyFilter, sortBy, sortOrder, agingFilter]);
+  }, [tabFiltered, searchTerm, currencyFilter, sortBy, sortOrder, agingFilter, partyFilter]);
 
   const hasActiveFilters = Boolean(
     (searchTerm && searchTerm.trim() !== '') ||
     currencyFilter !== 'all' ||
     sortBy !== 'amount' ||
     sortOrder !== 'desc' ||
-    agingFilter !== null
+    agingFilter !== null ||
+    partyFilter !== null
   );
 
   const handleResetFilters = () => {
@@ -260,6 +273,23 @@ const FollowUpPage: React.FC = () => {
           </button>
         )}
 
+        {/* ملف عميل محدد (قادم من «الملف» في طابور الأولوية) */}
+        {partyFilter !== null && (
+          <button
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete('party');
+              setSearchParams(next);
+            }}
+            title="عرض كل العملاء بدل عميل واحد"
+            className="flex h-9 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/60 px-2.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-400"
+          >
+            <span>ملف عميل واحد</span>
+            <X size={13} />
+          </button>
+        )}
+
         {/* Field collection sheet (CSV) + print */}
         <button
           type="button"
@@ -284,6 +314,13 @@ const FollowUpPage: React.FC = () => {
           <span>طباعة</span>
         </button>
       </div>
+
+      {isError && (
+        <DebtQueryError
+          message="تعذّرت قراءة جدول المتابعة من الخادم — خلو الجدول الآن سببه فشل القراءة وليس عدم وجود مدينين."
+          onRetry={() => void refetch()}
+        />
+      )}
 
       <FollowUpTable
         rows={finalRows}

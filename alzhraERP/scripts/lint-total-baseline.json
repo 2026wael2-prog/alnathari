@@ -1,7 +1,7 @@
 {
-  "errors": 9616,
-  "warnings": 215,
-  "capturedAt": "2026-09-29",
+  "errors": 9610,
+  "warnings": 214,
+  "capturedAt": "2026-11-03",
   "method": "npx eslint . --report-unused-disable-directives --format json (full scan of repo)",
   "history": [
     { "date": "2026-09-18", "errors": 10482, "note": "initial ceiling measured" },
@@ -91,6 +91,11 @@
       "date": "2026-09-29",
       "errors": 9616,
       "note": "grabbable table scrollbars + bounded quotation lists; lock in quotation ratchet progress (-18)"
+    },
+    {
+      "date": "2026-11-03",
+      "errors": 9610,
+      "note": "debts collection engine: priority-queue card, desktop/push alerting, due-date taxonomy wiring (-6)"
     }
   ]
 }

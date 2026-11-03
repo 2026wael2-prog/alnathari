@@ -30,6 +30,45 @@ export interface AppNotification {
   actions?: AppNotificationAction[] | undefined;
 }
 
+/**
+ * بصمة مختصرة للمحتوى (hash 32-bit مكتوب يدوياً — بلا اعتماد على crypto).
+ * تُضاف إلى وسم إشعار النظام لأن نظام التشغيل يستبدل الإشعارات صامتاً عند
+ * تكرار نفس الوسم؛ الوسم الثابت كان يجعل أي تحديث لاحق غير مرئي.
+ */
+const contentSignature = (title: string, message: string): string => {
+  const input = `${title}|${message}`;
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash * 31 + input.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+};
+
+/** إظهار إشعار النظام مع وسم متغيّر بحسب المحتوى. */
+const dispatchDesktopNotification = (
+  notification: AppNotification,
+  desktopEnabled: boolean
+): void => {
+  if (!desktopEnabled) return;
+  showDesktopNotification({
+    title: notification.title,
+    body: notification.message,
+    link: notification.link,
+    tag:
+      notification.tag !== undefined
+        ? `${notification.tag}:${contentSignature(notification.title, notification.message)}`
+        : undefined,
+    requireInteraction: notification.priority === 'urgent',
+  });
+};
+
+/** نغمة التنبيه بحسب الأولوية (تحترم إعداد الصوت). */
+const playPrioritySound = (priority?: NotificationPriority): void => {
+  const soundStore = useSoundStore.getState();
+  if (!soundStore.isSoundEnabled) return;
+  void soundStore.playNotificationSound(priority);
+};
+
 interface NotificationState {
   notifications: AppNotification[];
   desktopEnabled: boolean;
@@ -137,26 +176,53 @@ export const useNotificationStore = create<NotificationState>()(
           return;
         }
 
-        // Deduplication check by tag: update existing unread notification instead of creating duplicate
+        // ── التكرار في القائمة لا يعني كتم الإشعار ──────────────────────
+        // [FIX] كان هذا الفرع يُرجع قبل الوصول إلى showDesktopNotification،
+        // والوسوم ثابتة (debt_critical_summary / promise_broken_summary) ⇒ أول
+        // تنبيه يظهر ثم يصمت النظام للأبد ما دام غير مقروء، فتضيع التحديثات
+        // الحقيقية (ارتفاع عدد العملاء المتأخرين) تماماً.
+        // الآن: نحدّث الصف، ونرسل إشعار نظام فقط إذا تغيّر المحتوى فعلياً.
         if (notification.tag) {
-          const existingIndex = get().notifications.findIndex(
+          const previous = get().notifications.find(
             n => n.companyId === notification.companyId && n.tag === notification.tag && !n.isRead
           );
-          if (existingIndex !== -1) {
-            set(state => {
-              const updated = [...state.notifications];
-              updated[existingIndex] = {
-                ...updated[existingIndex],
+          if (previous !== undefined) {
+            const contentChanged =
+              previous.title !== notification.title || previous.message !== notification.message;
+
+            // تحديث بـ map بدل فهرسة مصفوفة: يمنع الوصول بالفهرس (security) ويبقي
+            // الترتيب كما هو، ويطابق الصف بمعرّفه لا بموضعه.
+            set(state => ({
+              notifications: state.notifications.map(existing =>
+                existing.id === previous.id
+                  ? {
+                      ...existing,
+                      title: notification.title,
+                      message: notification.message,
+                      timestamp: Date.now(),
+                      actions: notification.actions ?? existing.actions,
+                      link: notification.link ?? existing.link,
+                      type: notification.type,
+                      priority: notification.priority ?? existing.priority,
+                    }
+                  : existing
+              ),
+            }));
+
+            if (contentChanged) {
+              const merged: AppNotification = {
+                ...previous,
                 title: notification.title,
                 message: notification.message,
                 timestamp: Date.now(),
-                actions: notification.actions ?? updated[existingIndex].actions,
-                link: notification.link ?? updated[existingIndex].link,
                 type: notification.type,
-                priority: notification.priority ?? updated[existingIndex].priority,
+                priority: notification.priority ?? previous.priority,
+                link: notification.link ?? previous.link,
+                actions: notification.actions ?? previous.actions,
               };
-              return { notifications: updated };
-            });
+              dispatchDesktopNotification(merged, get().desktopEnabled);
+              playPrioritySound(merged.priority);
+            }
             return;
           }
         }
@@ -177,21 +243,8 @@ export const useNotificationStore = create<NotificationState>()(
         });
 
         // Show native Desktop / Windows Toast Notification above all apps
-        if (get().desktopEnabled) {
-          showDesktopNotification({
-            title: notification.title,
-            body: notification.message,
-            link: notification.link,
-            tag: notification.tag,
-            requireInteraction: notification.priority === 'urgent',
-          });
-        }
-
-        // Play sound if enabled and user has interacted
-        const soundStore = useSoundStore.getState();
-        if (soundStore.isSoundEnabled) {
-          soundStore.playNotificationSound(notification.priority);
-        }
+        dispatchDesktopNotification(newNotif, get().desktopEnabled);
+        playPrioritySound(newNotif.priority);
       },
 
       getCompanyNotifications: (companyId: string) => {

@@ -33,6 +33,8 @@ import type {
   DebtFollowupAction,
   DebtReminderQueueRow,
   DebtTaskQueueRow,
+  DebtPriorityQueueRow,
+  DebtQueueBucket,
   PartyTimelineEntry,
 } from '../types';
 import { optArg } from '@/core/utils/rpcArgs';
@@ -61,6 +63,19 @@ export const DEBT_ENGINE_DEFAULTS = {
   criticalDays: 30,
   reminderWindowDays: 3,
 } as const;
+
+/**
+ * استدعاء RPC غير موجود في الأنواع المولَّدة بعد (دالة أُضيفت على الخادم في
+ * هجرة جديدة). توقيع ضيّق بدل `any`: يبقى التحقق من شكل المخرجات مسؤولية
+ * صريحة في موضع واحد، ولا يتسرّب `any` إلى بقية الملف.
+ */
+interface UntypedRpcResult {
+  data: unknown;
+  error: (Error & { code?: string }) | null;
+}
+type UntypedRpc = (fn: string, args: Record<string, unknown>) => PromiseLike<UntypedRpcResult>;
+
+const untypedRpc: UntypedRpc = (fn, args) => (supabase.rpc as unknown as UntypedRpc)(fn, args);
 
 /** نوافذ محرك المتابعة — تُحل من إعدادات الشركة المحفوظة أو الافتراضي. */
 export interface DebtEngineParams {
@@ -469,6 +484,42 @@ export const debtMessageApi = {
       throw error;
     }
     return data ?? [];
+  },
+
+  /**
+   * طابور الأولوية: نفس التزامات `get_debt_task_queue` لكن مرتّبة بدرجة أهمية
+   * (تخلّف زمني + ثقل مالي بالعملة الأساسية + وعد مكسور + انقطاع تواصل +
+   * تصعيد) مع `next_action` و`score_drivers` لكل صف، و`p_bucket` للتصفية.
+   *
+   * إن لم تكن الدالة مثبّتة على الخادم (قبل تطبيق الهجرة 20261103000004)
+   * نرجع [] بهدوء: النظرة العامة تبقى صالحة للاستخدام بدل أن تنهار شاشة كاملة.
+   */
+  getPriorityQueue: async (
+    companyId: string,
+    options: {
+      branchId?: string | null;
+      collectorId?: string | null;
+      limit?: number;
+      bucket?: DebtQueueBucket | null;
+    } = {}
+  ): Promise<DebtPriorityQueueRow[]> => {
+    const params: Record<string, unknown> = {
+      p_company_id: companyId,
+      p_limit: options.limit ?? 50,
+    };
+    if (options.bucket != null) params.p_bucket = options.bucket;
+    if (options.branchId != null) params.p_branch_id = options.branchId;
+    if (options.collectorId != null) params.p_collector_id = options.collectorId;
+
+    const { data, error } = await untypedRpc('get_debt_priority_queue', params);
+    if (error) {
+      if (error.code === 'PGRST202' || /could not find the function/i.test(error.message ?? '')) {
+        logger.warn('DebtAPI', 'get_debt_priority_queue RPC not found on server', { companyId });
+        return [];
+      }
+      throw error;
+    }
+    return (data ?? []) as DebtPriorityQueueRow[];
   },
 
   /** أعضاء المنشأة القابلون للإسناد (قائمة المحصّلين). */

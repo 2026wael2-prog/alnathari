@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { debtsService, resolveEngineParams } from './debtService';
+import { debtsService, normalizeAnalytics, resolveEngineParams } from './debtService';
 import { DEBT_ENGINE_DEFAULTS } from '../api/debtApi';
-import type { FollowUpDashboardRow } from '../types';
+import type { DebtAnalytics, FollowUpDashboardRow } from '../types';
 
 const row = (partial: Partial<FollowUpDashboardRow>): FollowUpDashboardRow => ({
   party_id: 'p1',
@@ -89,6 +89,43 @@ describe('debtsService.prepareReminder', () => {
     const prepared = debtsService.prepareReminder(row({ party_phone: '' }), 'نص', {});
     expect(prepared.phoneMissing).toBe(true);
     expect(prepared.whatsappLink).toBeNull();
+  });
+});
+
+describe('normalizeAnalytics (M-9: لا بيانات ≠ صفر)', () => {
+  it('returns null when the RPC is missing (server returned null)', () => {
+    expect(normalizeAnalytics(null)).toBeNull();
+  });
+
+  it('returns null for an undefined payload', () => {
+    expect(normalizeAnalytics(undefined)).toBeNull();
+  });
+
+  it('returns null for the empty object the server sends when no branch resolves', () => {
+    // get_debt_analytics_summary returns '{}'::json when get_auth_branches is empty,
+    // which used to render every KPI card as a confident zero.
+    expect(normalizeAnalytics({})).toBeNull();
+  });
+
+  it('passes a real payload through unchanged', () => {
+    const payload = {
+      total_receivables: 1200,
+      overdue_receivables: 300,
+      due_today: 0,
+      total_debtors: 2,
+      aging: [],
+      by_currency: [],
+    };
+    const out = normalizeAnalytics(payload);
+    expect(out).toBe(payload as unknown as DebtAnalytics);
+    expect(out?.total_receivables).toBe(1200);
+  });
+
+  it('keeps an all-zero payload (a real zero is not "unavailable")', () => {
+    const payload = { total_receivables: 0, overdue_receivables: 0, total_debtors: 0 };
+    const out = normalizeAnalytics(payload);
+    expect(out).not.toBeNull();
+    expect(out?.total_receivables).toBe(0);
   });
 });
 

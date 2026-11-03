@@ -135,6 +135,53 @@ export type DebtFollowupAction =
 export type DebtTaskQueueRow =
   Database['public']['Functions']['get_debt_task_queue']['Returns'][number];
 
+/**
+ * بِكِت تصفية طابور الأولوية — مطابق لوسيط `p_bucket` في
+ * `get_debt_priority_queue`. القيم الأخرى يرفضها الخادم بـ 22023.
+ */
+export type DebtQueueBucket =
+  | 'all'
+  | 'overdue'
+  | 'today'
+  | 'week'
+  | 'promises'
+  | 'critical'
+  | 'nocontact';
+
+/**
+ * صف طابور الأولوية (`get_debt_priority_queue`).
+ * مكتوب يدوياً لأن الأنواع المولَّدة تُحدَّث من قاعدة البيانات الحيّة بعد تطبيق
+ * الهجرة 20261103000004 — نطابق ترتيب أعمدة RETURNS TABLE حرفياً.
+ */
+export interface DebtPriorityQueueRow {
+  task_id: string;
+  task_type: string;
+  party_id: string;
+  party_name: string;
+  party_phone: string | null;
+  currency_code: string | null;
+  amount: number | null;
+  reference_info: string | null;
+  urgency: string;
+  priority: string;
+  due_at: string | null;
+  is_overdue: boolean | null;
+  assigned_to: string | null;
+  assigned_name: string | null;
+  escalation_stage: string | null;
+  /** المبلغ محوَّلاً للعملة الأساسية (أساس مقارنة عادلة بين العملات). */
+  amount_base: number;
+  days_late: number;
+  /** أيام منذ آخر تواصل فعلي (رسالة ناجحة أو متابعة منجزة) — null = لا سجل. */
+  days_since_contact: number | null;
+  /** درجة الأهمية 0..100 المحسوبة على الخادم. */
+  priority_score: number;
+  /** الأمر التنفيذي المقترح بالعربية. */
+  next_action: string;
+  /** أسباب الدرجة (متأخر 40 يوماً، وعد مكسور، …) — شفافية الترتيب. */
+  score_drivers: string[] | null;
+}
+
 /** قنوات الإرسال المدعومة في التحصيل. */
 export type DebtChannel = 'whatsapp' | 'sms';
 

@@ -4,6 +4,7 @@ import { useDebtMessageLog, useDebtFailedMessagesCount } from '../hooks/useDebtQ
 import { MESSAGE_STATUS_META } from '../lib/constants';
 import { buildWhatsAppLink } from '../lib/whatsapp';
 import StatusBadge from '../components/StatusBadge';
+import DebtQueryError from '../components/DebtQueryError';
 import MobileCardList, { MobileCardRow } from '../../../ui/base/MobileCardList';
 
 const STATUS_FILTERS: Array<{ value: string; label: string }> = [
@@ -25,7 +26,9 @@ const copyMessageText = (text: string): void => {
 
 const OutboxPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
-  const { data: messages, isLoading } = useDebtMessageLog(statusFilter || undefined);
+  const { data: messages, isLoading, isError, refetch } = useDebtMessageLog(
+    statusFilter || undefined
+  );
   // العدّ من الخادم (HEAD count) — لا يُشتق من الصفحة المحمّلة (حد 200) ولا من الفلتر الحالي.
   const { data: failedCount = 0 } = useDebtFailedMessagesCount();
 
@@ -64,6 +67,11 @@ const OutboxPage: React.FC = () => {
         <div className="p-16 text-center text-sm text-[var(--app-text-secondary)] max-md:p-8">
           جاري التحميل...
         </div>
+      ) : isError ? (
+        <DebtQueryError
+          message="تعذّرت قراءة سجل الرسائل من الخادم — لا تعتبر الشاشة الفارغة دليلاً على عدم إرسال أي تذكير."
+          onRetry={() => void refetch()}
+        />
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border-2 border-dashed border-[var(--app-border)] p-14 text-center text-sm text-[var(--app-text-secondary)] max-md:p-6">
           لا توجد رسائل في هذا التصنيف

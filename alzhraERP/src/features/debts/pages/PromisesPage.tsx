@@ -6,6 +6,7 @@ import { useDebtPromises } from '../hooks/useDebtQueries';
 import { useDebtMutations } from '../hooks/useDebtMutations';
 import { PROMISE_STATUS_META } from '../lib/constants';
 import StatusBadge from '../components/StatusBadge';
+import DebtQueryError from '../components/DebtQueryError';
 import MobileCardList, { MobileCardRow } from '../../../ui/base/MobileCardList';
 import { ConfirmModal } from '../../../ui/base/ConfirmModal';
 import PromiseFormModal from '../components/PromiseFormModal';
@@ -25,7 +26,7 @@ const PromisesPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [confirmBreak, setConfirmBreak] = useState(false);
   const [editingPromise, setEditingPromise] = useState<PaymentPromiseWithParty | null>(null);
-  const { data: promises, isLoading } = useDebtPromises(
+  const { data: promises, isLoading, isError, refetch } = useDebtPromises(
     statusFilter ? { status: statusFilter } : undefined
   );
   const { completePromise, deletePromise, breakOverduePromises, isSaving } = useDebtMutations();
@@ -140,6 +141,11 @@ const PromisesPage: React.FC = () => {
         <div className="p-16 text-center text-sm text-[var(--app-text-secondary)] max-md:p-8">
           جاري التحميل...
         </div>
+      ) : isError ? (
+        <DebtQueryError
+          message="تعذّرت قراءة قائمة الوعود من الخادم — قد تكون هناك وعود قائمة لا تظهر في هذه الشاشة."
+          onRetry={() => void refetch()}
+        />
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border-2 border-dashed border-[var(--app-border)] p-14 text-center text-sm text-[var(--app-text-secondary)] max-md:p-6">
           لا توجد وعود في هذا التصنيف

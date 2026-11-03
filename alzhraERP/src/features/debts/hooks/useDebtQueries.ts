@@ -23,12 +23,21 @@ import type {
   DebtCollector,
   DebtFollowupAction,
   DebtTaskQueueRow,
+  DebtPriorityQueueRow,
+  DebtQueueBucket,
   PartyTimelineEntry,
   PaymentPromiseWithParty,
   TodayTask,
 } from '../types';
 
 const STALE_TIME = 60 * 1000; // 1 min — debt data changes with every payment
+
+/**
+ * فاصل الاستقصاء الموحّد لبيانات التحصيل الحيّة (5 دقائق).
+ * كانت كل استعلامات الديون بلا `refetchInterval` إطلاقاً ⇒ الشاشة لا تعرف أن
+ * عميلاً دفع أو أن وعداً حلّ ما لم يُحدَّث يدوياً.
+ */
+export const DEBT_LIVE_POLL_MS = 5 * 60 * 1000;
 
 const useCompanyId = (): string | undefined => {
   const { user } = useAuthStore();
@@ -50,6 +59,11 @@ interface DebtQuerySpec<T> {
   /** شرط تفعيل إضافي بجانب وجود المنشأة (مثل وجود partyId). */
   enabled?: boolean;
   staleTime?: number;
+  /**
+   * استقصاء دوري (ms). سابقاً كانت كل استعلامات الديون بلا `refetchInterval`
+   * إطلاقاً ⇒ الشاشة لا تعرف أن عميلاً دفع أو أن وعداً حلّ ما لم يُحدَّث يدوياً.
+   */
+  refetchInterval?: number;
 }
 
 /**
@@ -63,6 +77,7 @@ const useDebtQuery = <T>({
   empty,
   enabled = true,
   staleTime = STALE_TIME,
+  refetchInterval,
 }: DebtQuerySpec<T>): UseQueryResult<T> => {
   const companyId = useCompanyId();
   const hasCompany = companyId !== undefined && companyId !== '';
@@ -72,6 +87,7 @@ const useDebtQuery = <T>({
       companyId !== undefined && companyId !== '' ? fetcher(companyId) : Promise.resolve(empty),
     enabled: hasCompany && enabled,
     staleTime,
+    ...(refetchInterval !== undefined ? { refetchInterval } : {}),
   });
 };
 
@@ -81,6 +97,7 @@ export const useDebtDashboard = (): UseQueryResult<FollowUpDashboardRow[]> => {
     scope: 'dashboard',
     extra: [branchId],
     empty: [],
+    refetchInterval: DEBT_LIVE_POLL_MS,
     fetcher: companyId => debtsService.getDashboard(companyId, branchId),
   });
 };
@@ -91,6 +108,7 @@ export const useDebtAnalytics = (): UseQueryResult<DebtAnalytics | null> => {
     scope: 'analytics',
     extra: [branchId],
     empty: null,
+    refetchInterval: DEBT_LIVE_POLL_MS,
     fetcher: companyId => debtsService.getAnalytics(companyId, branchId),
   });
 };
@@ -146,6 +164,29 @@ export const useDebtTaskQueue = (
     staleTime: 30 * 1000,
     fetcher: companyId =>
       debtsService.getTaskQueue(companyId, { branchId, collectorId, windowDays, limit }),
+  });
+};
+
+/**
+ * طابور الأولوية: مهام التحصيل مرتّبة بدرجة أهمية محسوبة على الخادم
+ * (تخلّف زمني + ثقل مالي + وعد مكسور + انقطاع تواصل + تصعيد)، ومصفّاة بـ
+ * `bucket` المطابق لبطاقات KPI في النظرة العامة.
+ *
+ * `refetchInterval`: الشاشة كانت ثابتة تماماً بعد أول تحميل، فلا يعرف المحصّل
+ * أن وعد اليوم حلّ أو أن عميلاً دفع إلا بتحديث الصفحة يدوياً.
+ */
+export const useDebtPriorityQueue = (
+  bucket: DebtQueueBucket = 'all',
+  limit = 50
+): UseQueryResult<DebtPriorityQueueRow[]> => {
+  const { branchId } = useBranchFilter();
+  return useDebtQuery<DebtPriorityQueueRow[]>({
+    scope: 'priority_queue',
+    extra: [branchId, bucket, limit],
+    empty: [],
+    staleTime: 30 * 1000,
+    refetchInterval: DEBT_LIVE_POLL_MS,
+    fetcher: companyId => debtsService.getPriorityQueue(companyId, { branchId, bucket, limit }),
   });
 };
 

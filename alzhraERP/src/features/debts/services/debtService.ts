@@ -29,6 +29,8 @@ import type {
   DebtFollowupAction,
   DebtReminderQueueRow,
   DebtTaskQueueRow,
+  DebtPriorityQueueRow,
+  DebtQueueBucket,
   PartyTimelineEntry,
 } from '../types';
 
@@ -55,6 +57,22 @@ export const resolveEngineParams = (
   reminderWindowDays: config?.reminder_window_days ?? DEBT_ENGINE_DEFAULTS.reminderWindowDays,
 });
 
+/**
+ * تطبيع حمولة تحليلات الديون.
+ *
+ * الخادم يُرجع `'{}'::json` عندما لا تُحلّ فروع المستخدم (لا صلاحية/لا فروع)،
+ * وهو كائن فارغ لا `null` — فكان يمرّ كأنه «بيانات صحيحة» وتُعرض كل بطاقات
+ * المؤشرات أصفاراً كأنها حقيقة. نُعيد هنا الدلالة الموثّقة (M-9):
+ * لا بيانات = null كي تُظهر الواجهة تنبيهاً صريحاً بدل أصفار مضللة.
+ */
+export const normalizeAnalytics = (
+  raw: Record<string, unknown> | null | undefined
+): DebtAnalytics | null => {
+  if (raw === null || raw === undefined) return null;
+  if (Object.keys(raw).length === 0) return null;
+  return raw as unknown as DebtAnalytics;
+};
+
 export const debtsService = {
   /**
    * Follow-up dashboard rows, already classified by the database.
@@ -80,9 +98,9 @@ export const debtsService = {
     branchId?: string | null
   ): Promise<DebtAnalytics | null> => {
     const raw = await debtApi.getAnalytics(companyId, branchId);
-    // M-9: null يعني «الخادم لم يرجع تحليلات» (RPC مفقود) — تفرّقه الواجهة
-    // عن الصفر الحقيقي بدل عرض أصفار كأنها حقيقة.
-    return raw === null ? null : (raw as unknown as DebtAnalytics);
+    // M-9: null أو {} يعني «لا تحليلات» (RPC مفقود / لا فروع مسموحة) — تفرّقه
+    // الواجهة عن الصفر الحقيقي بدل عرض أصفار كأنها حقيقة.
+    return normalizeAnalytics(raw);
   },
 
   getTodayTasks: (companyId: string, branchId?: string | null) =>
@@ -132,6 +150,20 @@ export const debtsService = {
       limit?: number;
     }
   ): Promise<DebtTaskQueueRow[]> => debtMessageApi.getTaskQueue(companyId, options),
+
+  /**
+   * طابور الأولوية المرتّب بالأهمية (يستخدم درجة الخادم 0..100).
+   * `bucket` يطابق بطاقات KPI في النظرة العامة ('overdue'، 'promises'، …).
+   */
+  getPriorityQueue: (
+    companyId: string,
+    options?: {
+      branchId?: string | null;
+      collectorId?: string | null;
+      limit?: number;
+      bucket?: DebtQueueBucket | null;
+    }
+  ): Promise<DebtPriorityQueueRow[]> => debtMessageApi.getPriorityQueue(companyId, options),
 
   /** S2: قائمة المحصّلين (أعضاء المنشأة). */
   getCollectors: (companyId: string): Promise<DebtCollector[]> =>

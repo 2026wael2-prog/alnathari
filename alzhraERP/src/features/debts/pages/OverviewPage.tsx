@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Wallet,
   AlertTriangle,
@@ -11,14 +11,16 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import StatCard from '../../../ui/common/StatCard';
+import { cn } from '../../../core/utils';
 import { formatCurrency } from '../../../core/utils/currencyUtils';
-import { useDebtAnalytics, useDebtTodayTasks } from '../hooks/useDebtQueries';
+import { useDebtAnalytics } from '../hooks/useDebtQueries';
 import { useCompany } from '../../settings/hooks';
-import { TASK_TYPE_META } from '../lib/constants';
 import AIDebtAdvisor from '../components/AIDebtAdvisor';
 import AgingBuckets from '../components/AgingBuckets';
+import DebtQueryError from '../components/DebtQueryError';
 import FollowupActionsCard from '../components/FollowupActionsCard';
-import type { DebtAnalytics, TodayTask } from '../types';
+import PriorityQueueCard from '../components/PriorityQueueCard';
+import type { DebtAnalytics, DebtQueueBucket } from '../types';
 
 /** Safe numeric coercion for values that arrive from a JSON payload. */
 const asNumber = (value: number | undefined): number => {
@@ -39,11 +41,14 @@ interface StatRow {
   iconBgClass: string;
 }
 
-const buildStatRows = (a: DebtAnalytics, baseCurrency: string): StatRow[] => [
+/** عدّاد رقمي كنص — يمنع إقحام أرقام غير مُنمّطة داخل قوالب نصية. */
+const formatCount = (value: number | undefined): string => String(asNumber(value));
+
+const receivableRows = (a: DebtAnalytics, baseCurrency: string): StatRow[] => [
   {
     title: 'إجمالي المديونية',
     value: formatCurrency(asNumber(a.total_receivables), baseCurrency),
-    subtext: `${asNumber(a.total_debtors)} عميل مدين`,
+    subtext: `${formatCount(a.total_debtors)} عميل مدين`,
     icon: Wallet,
     colorClass: 'text-blue-600',
     iconBgClass: 'bg-blue-500',
@@ -64,9 +69,12 @@ const buildStatRows = (a: DebtAnalytics, baseCurrency: string): StatRow[] => [
     colorClass: 'text-amber-600',
     iconBgClass: 'bg-amber-500',
   },
+];
+
+const followUpRows = (a: DebtAnalytics, baseCurrency: string): StatRow[] => [
   {
     title: 'وعود قائمة',
-    value: `${asNumber(a.pending_promises)}`,
+    value: formatCount(a.pending_promises),
     subtext: formatCurrency(asNumber(a.pending_promises_amount), baseCurrency),
     icon: Handshake,
     colorClass: 'text-emerald-600',
@@ -74,7 +82,7 @@ const buildStatRows = (a: DebtAnalytics, baseCurrency: string): StatRow[] => [
   },
   {
     title: 'وعود مخلَفة',
-    value: `${asNumber(a.broken_promises)}`,
+    value: formatCount(a.broken_promises),
     subtext: formatCurrency(asNumber(a.broken_promises_amount), baseCurrency),
     icon: ShieldAlert,
     colorClass: 'text-rose-600',
@@ -82,7 +90,7 @@ const buildStatRows = (a: DebtAnalytics, baseCurrency: string): StatRow[] => [
   },
   {
     title: 'بحاجة تذكير',
-    value: `${asNumber(a.needs_reminder)}`,
+    value: formatCount(a.needs_reminder),
     subtext: 'لم يُذكَّروا خلال النافذة',
     icon: BellRing,
     colorClass: 'text-sky-600',
@@ -90,15 +98,15 @@ const buildStatRows = (a: DebtAnalytics, baseCurrency: string): StatRow[] => [
   },
   {
     title: 'رسائل فاشلة (24 ساعة)',
-    value: `${asNumber(a.failed_messages_24h)}`,
-    subtext: `إجمالي ${asNumber(a.failed_messages)} رسالة فاشلة`,
+    value: formatCount(a.failed_messages_24h),
+    subtext: `إجمالي ${formatCount(a.failed_messages)} رسالة فاشلة`,
     icon: MessageCircleX,
     colorClass: 'text-red-600',
     iconBgClass: 'bg-red-500',
   },
   {
     title: 'رسائل مرسلة',
-    value: `${asNumber(a.sent_messages)}`,
+    value: formatCount(a.sent_messages),
     subtext: 'سجل كامل للتذكيرات',
     icon: Send,
     colorClass: 'text-violet-600',
@@ -106,11 +114,53 @@ const buildStatRows = (a: DebtAnalytics, baseCurrency: string): StatRow[] => [
   },
 ];
 
+const buildStatRows = (a: DebtAnalytics, baseCurrency: string): StatRow[] => [
+  ...receivableRows(a, baseCurrency),
+  ...followUpRows(a, baseCurrency),
+];
+
+/**
+ * ربط بطاقات KPI ببِكِت الطابور: نقرة البطاقة تُصفّي طابور التحصيل.
+ * switch صريح بدل فهرسة كائن بمفتاح متغيّر، وبلا تخمين: البطاقات التي لا
+ * تقابل بِكِتاً حقيقياً (الرسائل) تبقى عرضاً فقط بدل فلتر كاذب.
+ */
+const bucketForTitle = (title: string): DebtQueueBucket | null => {
+  switch (title) {
+    case 'إجمالي المديونية':
+      return 'all';
+    case 'متأخر':
+      return 'overdue';
+    case 'مستحق اليوم':
+      return 'today';
+    case 'وعود قائمة':
+      return 'promises';
+    case 'وعود مخلَفة':
+      return 'promises';
+    case 'بحاجة تذكير':
+      return 'nocontact';
+    default:
+      return null;
+  }
+};
+
+/** شرائح الفلاتر الكاملة — تُغطّي بِكِتات لا تقابلها بطاقة KPI (أسبوع/حرج). */
+const BUCKET_CHIPS: ReadonlyArray<{ bucket: DebtQueueBucket; label: string }> = [
+  { bucket: 'all', label: 'الكل' },
+  { bucket: 'overdue', label: 'متأخر' },
+  { bucket: 'today', label: 'اليوم' },
+  { bucket: 'week', label: 'هذا الأسبوع' },
+  { bucket: 'promises', label: 'الوعود' },
+  { bucket: 'critical', label: 'حرج' },
+  { bucket: 'nocontact', label: 'بلا تواصل' },
+];
+
 const StatsGrid: React.FC<{
   analytics: DebtAnalytics | null;
   isLoading: boolean;
   baseCurrency: string;
-}> = ({ analytics, isLoading, baseCurrency }) => {
+  bucket: DebtQueueBucket;
+  onSelectBucket: (bucket: DebtQueueBucket) => void;
+}> = ({ analytics, isLoading, baseCurrency, bucket, onSelectBucket }) => {
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 gap-3 max-md:gap-1.5 md:grid-cols-3 md:gap-4 xl:grid-cols-4">
@@ -123,67 +173,31 @@ const StatsGrid: React.FC<{
   const rows = buildStatRows(analytics ?? ({} as DebtAnalytics), baseCurrency);
   return (
     <div className="grid grid-cols-2 gap-3 max-md:gap-1.5 md:grid-cols-3 md:gap-4 xl:grid-cols-4">
-      {rows.map(s => (
-        <StatCard
-          key={s.title}
-          title={s.title}
-          value={s.value}
-          subtext={s.subtext}
-          icon={s.icon}
-          colorClass={s.colorClass}
-          iconBgClass={s.iconBgClass}
-        />
-      ))}
+      {rows.map(s => {
+        const targetBucket = bucketForTitle(s.title);
+        return (
+          <StatCard
+            key={s.title}
+            title={s.title}
+            value={s.value}
+            subtext={s.subtext}
+            icon={s.icon}
+            colorClass={s.colorClass}
+            iconBgClass={s.iconBgClass}
+            {...(targetBucket !== null
+              ? {
+                  onClick: () => {
+                    onSelectBucket(bucket === targetBucket ? 'all' : targetBucket);
+                  },
+                  isActive: bucket === targetBucket,
+                }
+              : {})}
+          />
+        );
+      })}
     </div>
   );
 };
-
-const urgencyClass = (urgency: string): string =>
-  urgency === 'critical' ? 'bg-rose-500' : urgency === 'high' ? 'bg-amber-500' : 'bg-sky-500';
-
-const TaskRow: React.FC<{ task: TodayTask }> = ({ task }) => (
-  <li className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-[var(--app-surface-hover)] max-md:px-2.5 max-md:py-2">
-    <div className="flex min-w-0 items-center gap-3">
-      <span className={`h-2 w-2 shrink-0 rounded-full ${urgencyClass(task.urgency)}`} />
-      <div className="min-w-0">
-        <p className="truncate text-xs font-bold text-[var(--app-text)]">{task.party_name}</p>
-        <p className="text-[10px] text-[var(--app-text-secondary)]">
-          {TASK_TYPE_META[task.task_type]?.label ?? task.task_type} · {task.reference_info}
-        </p>
-      </div>
-    </div>
-    <span className="shrink-0 font-mono text-xs font-bold text-[var(--app-text)]">
-      {task.amount != null ? formatCurrency(Number(task.amount), task.currency_code) : '—'}
-    </span>
-  </li>
-);
-
-const TodayTasksCard: React.FC<{ tasks: TodayTask[] }> = ({ tasks }) => (
-  <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] shadow-sm">
-    <div className="flex items-center justify-between border-b border-[var(--app-border)] p-4 max-md:p-2.5">
-      <h3 className="flex items-center gap-2 text-sm font-bold text-[var(--app-text)]">
-        <span className="rounded-lg bg-amber-500 p-1.5 text-white">
-          <CalendarClock size={14} />
-        </span>
-        مهام اليوم
-      </h3>
-      <span className="text-[10px] font-bold text-[var(--app-text-secondary)]">
-        {tasks.length} مهمة
-      </span>
-    </div>
-    {tasks.length === 0 ? (
-      <div className="p-10 text-center text-sm text-[var(--app-text-secondary)] max-md:p-5">
-        لا توجد مهام مستحقة اليوم 🎉
-      </div>
-    ) : (
-      <ul className="divide-y divide-[var(--app-border)]">
-        {tasks.map((task, i) => (
-          <TaskRow key={`${task.task_type}-${task.party_id}-${i}`} task={task} />
-        ))}
-      </ul>
-    )}
-  </div>
-);
 
 const CurrencyBreakdown: React.FC<{ byCurrency: DebtAnalytics['by_currency'] }> = ({
   byCurrency,
@@ -214,43 +228,106 @@ const CurrencyBreakdown: React.FC<{ byCurrency: DebtAnalytics['by_currency'] }> 
   );
 };
 
-const OverviewPage: React.FC = () => {
-  const { data: analytics, isLoading } = useDebtAnalytics();
-  const { data: tasks } = useDebtTodayTasks();
-  const { data: company } = useCompany();
-  const baseCurrency = company?.base_currency || 'SAR';
+interface BucketChipsProps {
+  bucket: DebtQueueBucket;
+  onSelect: (bucket: DebtQueueBucket) => void;
+}
 
+/** شرائح فلترة الطابور — تُغطّي بِكِتات لا تقابلها بطاقة KPI (أسبوع/حرج). */
+const BucketChips: React.FC<BucketChipsProps> = ({ bucket, onSelect }) => (
+  <div className="flex flex-wrap items-center gap-1.5">
+    <span className="text-[10px] font-bold text-[var(--app-text-secondary)]">تصفية الطابور:</span>
+    {BUCKET_CHIPS.map(chip => (
+      <button
+        key={chip.bucket}
+        type="button"
+        onClick={() => {
+          onSelect(chip.bucket);
+        }}
+        className={cn(
+          'rounded-lg px-2.5 py-1 text-[11px] font-bold transition-colors',
+          bucket === chip.bucket
+            ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/25'
+            : 'border border-[var(--app-border)] text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)]'
+        )}
+        aria-pressed={bucket === chip.bucket}
+      >
+        {chip.label}
+      </button>
+    ))}
+  </div>
+);
+
+/** لا نعرض أصفاراً في بطاقات KPI كأنها حقيقة عند فقد التحليلات. */
+const isAnalyticsUnavailable = (
+  isLoading: boolean,
+  isError: boolean,
+  analytics: DebtAnalytics | null | undefined
+): boolean => !isLoading && (isError || analytics === null || analytics === undefined);
+
+/** بديل موحّد: خطأ صريح مع إعادة محاولة، أو تنبيه هادئ عند غياب الدالة. */
+const AnalyticsPlaceholder: React.FC<{ isError: boolean; onRetry: () => void }> = ({
+  isError,
+  onRetry,
+}) => {
+  if (isError) {
+    return (
+      <DebtQueryError
+        message="فشل استدعاء تحليلات الديون، لذا أُخفيت المؤشرات وشرائح التقادم بدل عرض أصفار قد تُقرأ كحقيقة."
+        onRetry={onRetry}
+      />
+    );
+  }
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-amber-300/60 bg-amber-50 p-4 text-amber-800 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 max-md:p-3">
+      <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+      <div>
+        <p className="text-sm font-bold">مؤشرات الديون غير متاحة حالياً</p>
+        <p className="mt-0.5 text-[11px] leading-relaxed">
+          تعذّر جلب تحليلات الديون من الخادم (قد يكون دالة التحليلات غير مثبّتة على هذا الإصدار).
+          المهام والإجراءات أدناه تعمل بشكل طبيعي، لكن الإجماليات وشرائح التقادم لن تُعرض حتى عودة
+          الخدمة.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const OverviewPage: React.FC = () => {
+  const { data: analytics, isLoading, isError, refetch } = useDebtAnalytics();
+  const [bucket, setBucket] = useState<DebtQueueBucket>('all');
+  const { data: company } = useCompany();
+
+  const companyCurrency = company?.base_currency;
+  const baseCurrency = companyCurrency !== undefined && companyCurrency !== '' ? companyCurrency : 'SAR';
   const a = (analytics ?? {}) as DebtAnalytics;
-  // M-9: null يعني أن RPC التحليلات غير متاح على هذا الخادم — لا نعرض أصفاراً
-  // فيبطاقات KPI كأنها حقيقة، بل تنبيهاً صريحاً بأن المؤشرات غير متاحة.
-  const analyticsUnavailable = analytics === null;
+  const analyticsUnavailable = isAnalyticsUnavailable(isLoading, isError, analytics);
+
+  const handleRetry = (): void => {
+    void refetch();
+  };
 
   return (
     <div className="space-y-5 max-md:space-y-3">
       <AIDebtAdvisor />
       {analyticsUnavailable ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-300/60 bg-amber-50 p-4 text-amber-800 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 max-md:p-3">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-bold">مؤشرات الديون غير متاحة حالياً</p>
-            <p className="mt-0.5 text-[11px] leading-relaxed">
-              تعذّر جلب تحليلات الديون من الخادم (قد يكون دالة التحليلات غير مثبّتة على هذا
-              الإصدار). المهام والإجراءات أدناه تعمل بشكل طبيعي، لكن الإجماليات وشرائح التقادم لن
-              تُعرض حتى عودة الخدمة.
-            </p>
-          </div>
-        </div>
+        <AnalyticsPlaceholder isError={isError} onRetry={handleRetry} />
       ) : (
         <>
           <StatsGrid
             analytics={analytics ?? null}
             isLoading={isLoading}
             baseCurrency={baseCurrency}
+            bucket={bucket}
+            onSelectBucket={setBucket}
           />
           <AgingBuckets aging={a.aging} baseCurrency={baseCurrency} />
         </>
       )}
-      <TodayTasksCard tasks={tasks ?? []} />
+      {/* شرائح الفلترة: تُغطّي كل بِكِتات الطابور، وتبقى ظاهرة حتى لو تعذّرت
+          التحليلات — لأن الطابور مصدره مهام التحصيل لا بطاقات KPI. */}
+      <BucketChips bucket={bucket} onSelect={setBucket} />
+      <PriorityQueueCard bucket={bucket} onBucketChange={setBucket} />
       {/* S1: الإجراءات المجدولة (customer_activities.pending) — كانت بلا قارئ */}
       <FollowupActionsCard />
       {!analyticsUnavailable && <CurrencyBreakdown byCurrency={a.by_currency} />}

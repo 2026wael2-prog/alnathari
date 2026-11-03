@@ -12,7 +12,8 @@ import {
 import { cn } from '../../../core/utils';
 import { ROUTES } from '../../../core/routes/paths';
 import { usePermission } from '../../../core/hooks/usePermission';
-import { useDebtAlerts } from '../hooks/useDebtAlerts';
+import { DesktopAlertsBanner } from '../components/DesktopAlertsBanner';
+import { PushAlertsCard } from '../components/PushAlertsCard';
 
 interface ServiceTab {
   to: string;
@@ -43,8 +44,8 @@ const DebtsLayout: React.FC = () => {
   const { hasPermission: canManage, isLoading: permissionLoading } = usePermission('debts:manage');
   const { hasPermission: canRead, isLoading: readLoading } = usePermission('debts:read');
 
-  // تنبيهات الأقساط الحرجة والوعود المخلَفة (وسوم مانعة للتكرار)
-  useDebtAlerts();
+  // ملاحظة: محرك التنبيهات انتقل إلى هيكل التطبيق (App → DebtAlertsRunner)
+  // ليعمل خارج هذا القسم أيضاً؛ استدعاؤه هنا مجدداً كان سيضاعف التسجيل.
 
   // Keep tabs visible while the permission check is loading to avoid flashing.
   const showManage = permissionLoading || canManage;
@@ -105,6 +106,9 @@ const DebtsLayout: React.FC = () => {
           </NavLink>
         ))}
       </nav>
+
+      <DesktopAlertsBanner />
+      <PushAlertsCard />
 
       <Outlet />
     </div>

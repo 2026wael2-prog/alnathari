@@ -1,14 +1,37 @@
 /**
- * تنبيهات تحصيل الديون داخل القسم: أقساط حرجة + وعود مخلَفة.
- * تعمل عند فتح قسم الديون، والوسوم (tags) تمنع تكرار نفس التنبيه.
- * ملاحظة (ADR-018): نقلها إلى دورة فحوص الصحة العامة يحتاج أولاً سداد
- * دين lint القائم في notifications/service.ts (8 مقابل سقف 4).
+ * تنبيهات تحصيل الديون — محرك مركزي يعمل في هيكل التطبيق (App)، لا داخل قسم
+ * الديون فقط: كان `useDebtAlerts` يُستدعى في `DebtsLayout` وحده، فلا يصل أي
+ * تنبيه لمن لم يفتح القسم.
+ *
+ * الوسوم ثابتة لمَنْع تكرار الصف في القائمة، لكن `store.addNotification` يرسل
+ * إشعار نظام عند تغيّر المحتوى فعلياً — لذلك نُضمّن الأرقام في الرسالة كي
+ * يكون التغيّر ملموساً (عدد العملاء + أقصى تأخير) بدل نص ثابت يصمت للأبد.
  */
 import { useEffect } from 'react';
 import { ROUTES } from '../../../core/routes/paths';
 import { useAuthStore } from '../../auth/store';
 import { useNotificationStore } from '../../notifications/store';
 import { useDebtDashboard } from './useDebtQueries';
+import type { FollowUpDashboardRow } from '../types';
+
+/** رسالة الديون الحرجة — خارج الخطّاف لإبقاء تعقيده منخفضاً. */
+const criticalMessage = (rows: FollowUpDashboardRow[]): string => {
+  const maxDays = rows.reduce((max, row) => Math.max(max, row.days_overdue), 0);
+  const topNames = rows
+    .slice(0, 2)
+    .map(row => row.party_name)
+    .join('، ');
+  const maxPart = maxDays > 0 ? ` (أقصى تأخير ${String(maxDays)} يوماً)` : '';
+  const namesPart = topNames.length > 0 ? ` — أبرزهم: ${topNames}` : '';
+  return `${String(rows.length)} عميل تجاوز تأخيرهم الحد الحرج${maxPart}${namesPart}. يرجى بدء التحصيل اليوم.`;
+};
+
+/** رسالة الوعود المخلَفة. */
+const brokenPromiseMessage = (rows: FollowUpDashboardRow[]): string => {
+  const newestName = rows.length > 0 ? rows[0].party_name : '';
+  const namesPart = newestName.length > 0 ? ` — أحدثها: ${newestName}` : '';
+  return `${String(rows.length)} عميل لديهم وعود سداد مخلَفة${namesPart}. تحتاج متابعة وإعادة جدولة.`;
+};
 
 export const useDebtAlerts = (): void => {
   const { user } = useAuthStore();
@@ -17,32 +40,33 @@ export const useDebtAlerts = (): void => {
 
   useEffect(() => {
     const companyId = user?.company_id;
-    if (companyId === undefined || rows === undefined || rows.length === 0) return;
+    if (companyId === undefined || rows === undefined) return;
 
-    const criticalCount = rows.filter(r => r.classification === 'critical').length;
-    if (criticalCount > 0) {
+    const critical = rows.filter(row => row.classification === 'critical');
+    if (critical.length > 0) {
       addNotification({
         companyId,
         tag: 'debt_critical_summary',
         category: 'debt',
-        priority: 'high',
+        // 'urgent' ⇒ requireInteraction في إشعار سطح المكتب، فلا يختفي وحده.
+        priority: 'urgent',
         title: 'ديون حرجة تحتاج تدخلاً فورياً',
-        message: `${String(criticalCount)} عميل تجاوز تأخيرهم الحد الحرج المحدد. يرجى بدء التحصيل اليوم.`,
+        message: criticalMessage(critical),
         type: 'warning',
         link: ROUTES.DASHBOARD.DEBTS_FOLLOWUP,
         actions: [{ label: 'بدء التحصيل', link: ROUTES.DASHBOARD.DEBTS_FOLLOWUP, isPrimary: true }],
       });
     }
 
-    const brokenCount = rows.filter(r => r.has_broken_promise).length;
-    if (brokenCount > 0) {
+    const broken = rows.filter(row => row.has_broken_promise);
+    if (broken.length > 0) {
       addNotification({
         companyId,
         tag: 'promise_broken_summary',
         category: 'debt',
-        priority: 'high',
+        priority: 'urgent',
         title: 'وعود سداد مخلَفة',
-        message: `${String(brokenCount)} عميل لديهم وعود سداد مخلَفة تحتاج متابعة وإعادة جدولة.`,
+        message: brokenPromiseMessage(broken),
         type: 'warning',
         link: ROUTES.DASHBOARD.DEBTS_PROMISES,
         actions: [
