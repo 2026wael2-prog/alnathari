@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { OpenAI } from 'https://esm.sh/openai@4.26.0';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { buildCorsHeaders } from '../_shared/cors.ts';
 
 // ============================================================
 // Edge Function: vin-decode  (vPIC + DB + AI hybrid)
@@ -10,23 +11,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 //   3) AI fallback (OpenRouter / DeepSeek) — LAST resort ONLY
 // ============================================================
 
-const ALLOWED_ORIGINS = [
-  'https://zzthamxjxnxzzpswllid.supabase.co',
-  'https://alzhra-erp.vercel.app',
-  'https://alzhra-erp.netlify.app',
-  'https://alzhra-2030karim2-devs-projects.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-
-const corsHeaders = (origin: string | null) => ({
-  'Access-Control-Allow-Origin':
-    origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-application-name',
-  'Access-Control-Max-Age': '86400',
-});
+// CORS is resolved centrally in `_shared/cors.ts` (production allow-list +
+// loopback dev origins + SITE_URL fallback). The previous local list fell back
+// to ALLOWED_ORIGINS[0] — a foreign project URL — so dev origins were refused.
+const corsHeaders = (origin: string | null) => buildCorsHeaders(origin);
 
 function json(data: unknown, status = 200, headers: Record<string, string>) {
   return new Response(JSON.stringify(data), {

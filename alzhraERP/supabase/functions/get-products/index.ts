@@ -1,25 +1,14 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { buildCorsHeaders } from '../_shared/cors.ts';
 
-// Origin allow-list (mirrors ai-proxy). We never echo arbitrary origins — a
-// non-listed origin receives SITE_URL instead of being reflected.
-const ALLOWED_ORIGINS = [
-  'https://zzthamxjxnxzzpswllid.supabase.co',
-  'https://alzhra-erp.vercel.app',
-  'https://alzhra-erp.netlify.app',
-  'https://alzhra-2030karim2-devs-projects.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-
-const corsHeaders = (req: Request) => {
-  const origin = req.headers.get('Origin');
-  const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : (Deno.env.get('SITE_URL') || ALLOWED_ORIGINS[0]);
-  return {
-    'Access-Control-Allow-Origin': allowed,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  };
-};
+// CORS is resolved centrally in `_shared/cors.ts` (production allow-list +
+// loopback dev origins + SITE_URL fallback). The previous local list fell back
+// to ALLOWED_ORIGINS[0] — a foreign project URL — so dev origins were refused.
+const corsHeaders = (req: Request) =>
+  buildCorsHeaders(req.headers.get('Origin'), {
+    methods: 'GET, POST, OPTIONS',
+    headers: 'authorization, x-client-info, apikey, content-type',
+  });
 
 const jsonResponse = (body: unknown, status: number, req: Request) =>
   new Response(JSON.stringify(body), {

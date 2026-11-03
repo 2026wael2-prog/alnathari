@@ -8,22 +8,12 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { buildCorsHeaders } from '../_shared/cors.ts';
 
-const ALLOWED_ORIGINS = [
-  'https://zzthamxjxnxzzpswllid.supabase.co',
-  'https://alzhra-erp.vercel.app',
-  'https://alzhra-erp.netlify.app',
-  'https://alzhra-2030karim2-devs-projects.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-
-const corsHeaders = (origin: string | null) => ({
-  'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-  'Access-Control-Max-Age': '86400',
-});
+// CORS is resolved centrally in `_shared/cors.ts` (production allow-list +
+// loopback dev origins + SITE_URL fallback). The previous local list fell back
+// to ALLOWED_ORIGINS[0] — a foreign project URL — so dev origins were refused.
+const corsHeaders = (origin: string | null) => buildCorsHeaders(origin);
 
 const FAPI_BASE_URL = "https://fapi.iisis.ru/fapi/v2";
 function getFapiKey(): string { return Deno.env.get("FAPI_API_KEY") ?? ""; }
