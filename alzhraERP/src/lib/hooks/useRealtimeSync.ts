@@ -216,7 +216,7 @@ const setupCompanyRealtimeChannel = (companyId: string, queryClient: QueryClient
 
   const channel = bindChannelListeners(supabase.channel(channelId), queryClient);
 
-  channel.subscribe(status => {
+  channel.subscribe((status, err) => {
     const { setRealtimeStatus } = useConnectionStore.getState();
     if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
       logger.debug('Realtime', '✅ Realtime Connection Active');
@@ -226,7 +226,12 @@ const setupCompanyRealtimeChannel = (companyId: string, queryClient: QueryClient
       logger.debug('Realtime', `ℹ️ Realtime channel closed: ${status}`);
       setRealtimeStatus('disconnected');
     } else {
-      logger.warn('Realtime', `⚠️ Realtime channel status: ${status}`);
+      // سبب الرفض الحقيقي من الخادم (Unauthorized / topic already exists / timeout…)
+      // ضروري للتشخيص: بدونه لا يظهر سوى CHANNEL_ERROR بلا تفاصيل.
+      logger.warn('Realtime', `⚠️ Realtime channel status: ${status}`, {
+        channel: channelId,
+        reason: err?.message ?? 'unknown',
+      });
       setRealtimeStatus('disconnected');
       startFallbackPolling(channelId, queryClient);
     }

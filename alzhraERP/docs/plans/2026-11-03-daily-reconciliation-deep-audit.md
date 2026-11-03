@@ -382,3 +382,55 @@ src/features/reconciliation/
 **معدّلة (خادم):** `supabase/migrations/20261104000001_…` — `get_daily_drawer_summary`, `commit_daily_reconciliation`, `commit_expense_v2` + 4 دوال مساعدة + أعمدة لقطة.
 **معدّلة (واجهة):** `services/reconciliationService.ts` (+ محرّك العملات)، `pages/DailyReconciliationPage.helpers.ts` (`cashRates` في الحمولة)، `pages/useReconciliationPageController.ts` (أسعار الخادم تسبق الإعدادات)، `hooks/useDailyReconciliation.ts` (تحذير إعادة الاحتساب)، `api/reconciliationApi.ts` (`p_cash_rates`)، `types/index.ts` (`cash_rates`/`tx_by_currency`/`counted_*`)، `components/{WhatsAppShareButton,ReconciliationPrintModal,ReconciliationHistoryModal,EmployeeSalesBreakdownCard,QuickDrawerExpenseModal.sections}.tsx`، `pages/DailyReconciliationPage.tsx`.
 
+---
+
+## 🔥 إصلاح عاجل (2026-11-04): `commit_expense_v2` يُسقط كل مصروف بالكود 400
+
+### العرض
+في متصفح الإنتاج ظهرت ثلاث محاولات فاشلة متتالية:
+```
+POST .../rest/v1/rpc/commit_expense_v2 → 400 (×3)
+```
+لا شيء في الواجهة يشرح السبب؛ الرسالة الحقيقية موجودة على الخادم فقط.
+
+### السبب الجذري (نمط posted-first — سجل ADR-005/006/007)
+الهجرة `20261104000001` أعادت تعريف `commit_expense_v2` لتصحيح تحويل عملة الأساس، لكن جسم الدالة
+أُخذ من ملف هجرة **أقدم** (`20261001000001`) — وهو يسبق إصلاح `20260907000005`، فعاد إدراج رأس
+`journal_entries` بحالة `'posted'` **قبل** إدراج بنود `journal_entry_lines`، فيمنعه الـ trigger الحي
+`trg_journal_entry_lines_immutability` (`prevent_posted_journal_line_modification`):
+
+```
+23514: Cannot add lines to a posted journal entry (Entry: b2273c87-…). Use reversal.
+CONTEXT: prevent_posted_journal_line_modification() line 13
+         commit_expense_v2(uuid,uuid,jsonb) line 198
+```
+
+> **الدليل على أنه انحدار:** آخر مصروف ناجح في القاعدة `2026-11-02 20:43` (إيصال 308، مع قيد posted وبندين)،
+> أي أن الإنشاء كان يعمل قبل الهجرة. وأُعيد إنتاج الفشل حياً باستدعاء الدالة داخل معاملة أُرجعت، بنفس الخطأ حرفياً.
+
+### الإصلاح
+هجرة `20261104000002_fix_commit_expense_v2_draft_first_posting.sql`:
+- جسم الدالة مأخوذ **حرفياً من التعريف الحي** (`pg_get_functiondef`) — لا من ملف هجرة قديم — مع تعديل
+  ترتيب الترحيل فقط: `draft` → بنود → `UPDATE status='posted'`، بنفس نمط `20260907000005` و`fn_auto_post_payment_journal` في `20261103000008`.
+- التوقيع `(uuid, uuid, jsonb)` والصلاحيات كما هي: `authenticated` + `service_role` فقط، `anon` = `false`.
+- idempotent (CREATE OR REPLACE + REVOKE/GRANT).
+
+### التحقق
+| الاختبار | النتيجة |
+|---|---|
+| إعادة سيناريو SAR (100 ر.س) داخل معاملة أُرجعت | ✅ `status=posted`، `base_amount=100`، قيد مربوط |
+| إعادة سيناريو YER (100 ر.ي بمعدل 410 على أساس SAR) | ✅ `base_amount=0.2439` (100 ÷ 410) مطابق لـ `rate_to_base=0.002439` |
+| صلاحيات التنفيذ | ✅ `anon=false`، `authenticated=true`، `service_role=true` |
+| مسح بقية الدوال | ✅ `post_monthly_rent_and_payroll` يعمل أصلاً draft-first؛ لا دوال أخرى بنمط posted-first |
+| `tsc --noEmit` + اختبارات المطابقة | ✅ 0 أخطاء، 35/35 |
+
+### الدرس (قاعدة ملزمة)
+**أي هجرة تعيد تعريف دالة قائمة يجب أن تنطلق من التعريف الحي في القاعدة، لا من نسخة ملف هجرة أقدم.**
+الملفات لا تعكس الترتيب الحقيقي للتطبيق على القاعدة، والانطلاق منها يُحيي أخطاءً أُصلحت لاحقاً بصمت.
+
+### إضافة تشخيصية (Realtime)
+سجل المتصفح كان يكرر `Realtime channel status: CHANNEL_ERROR` بلا سبب. الخادم سليم (تم التحقق: `phx_join` يعيد
+`status: ok` لنفس إعدادات القناة، و`HTTP 400/500` غير موجودة على مسار websocket)، والاستقصاء يحتاج سبب الرفض
+الحقيقي — لذا صار `useRealtimeSync` يسجّل `reason` القادم من `subscribe(status, err)` مع اسم القناة.
+
+
