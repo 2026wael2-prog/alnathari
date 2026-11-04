@@ -58,15 +58,6 @@ const renderStep = (initialValues: Record<string, unknown> = {}) => {
   });
 };
 
-const selectInvoice = () => {
-  const trigger =
-    screen.queryByText('اضغط لاختيار الفاتورة...') ||
-    screen.queryByText('اختر الفاتورة الأصلية...');
-  if (trigger) fireEvent.click(trigger);
-  const invOption = screen.queryByText('INV-001');
-  if (invOption) fireEvent.click(invOption);
-};
-
 describe('ReturnItemsStep', () => {
   it('زر "إرجاع كامل المنتجات بالفاتورة" يحدد كل الأصناف بالكميات الكاملة وتظهر في الحقول', () => {
     renderStep({ invoiceId: 'inv-1' });

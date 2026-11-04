@@ -17,7 +17,8 @@ describe('partySearch with Arabic numerals support', () => {
   });
 
   describe('matchParty and filterPartiesSmart', () => {
-    const mockParties: Party[] = [
+    // مُصنِّع بيانات اختبار: حقول السجل الكاملة (39 حقلًا) غير لازمة لهذه الحالة
+    const mockParties = [
       {
         id: '1',
         company_id: 'comp-1',
@@ -40,7 +41,7 @@ describe('partySearch with Arabic numerals support', () => {
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       },
-    ];
+    ] as unknown as Party[];
 
     it('matches party by phone when search query is in Arabic digits', () => {
       const match = matchParty(mockParties[0], '٠٥٠١٢٣٤٥٦٧');

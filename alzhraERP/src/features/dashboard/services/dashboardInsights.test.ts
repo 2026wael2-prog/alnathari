@@ -304,7 +304,7 @@ describe('Resilience to partial data', () => {
       totalPurchases: 0, totalExpenses: 0, netProfit: 0,
       totalSupplierDebts: 0, salesChartData: [],
       // overdueInvoices deliberately omitted (stale cache shape)
-    } as Parameters<typeof calculateDashboardInsights>[0]);
+    } as unknown as Parameters<typeof calculateDashboardInsights>[0]);
 
     expect(result.alerts.some(a => a.id === 'overdue-invoices')).toBe(false);
     expect(Number.isNaN(result.targets.salesProgress)).toBe(false);
@@ -316,7 +316,7 @@ describe('Resilience to partial data', () => {
       totalPurchases: 0, totalExpenses: 0, netProfit: 0,
       totalSupplierDebts: 0, salesChartData: [], overdueInvoices: [],
       // lowStockProducts deliberately omitted
-    } as Parameters<typeof calculateDashboardInsights>[0]);
+    } as unknown as Parameters<typeof calculateDashboardInsights>[0]);
 
     expect(result.alerts.some(a => a.id === 'low-stock')).toBe(false);
   });
@@ -333,7 +333,7 @@ describe('Resilience to partial data', () => {
   });
 
   it('does not crash when all dashboard fields are missing', () => {
-    const result = calculateDashboardInsights({} as Parameters<typeof calculateDashboardInsights>[0]);
+    const result = calculateDashboardInsights({} as unknown as Parameters<typeof calculateDashboardInsights>[0]);
 
     expect(result.targets.salesProgress).toBe(0);
     expect(Number.isNaN(result.salesTrend)).toBe(false);

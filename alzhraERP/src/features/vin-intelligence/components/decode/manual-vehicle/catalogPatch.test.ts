@@ -3,7 +3,7 @@ import type { ExtractedCatalogVehicle } from '../../../utils/catalogTextExtracto
 import { buildDraftPatch } from './catalogPatch';
 
 function vehicle(patch: Partial<ExtractedCatalogVehicle> = {}): ExtractedCatalogVehicle {
-  return { confidenceScore: 90, extractedFieldsCount: 3, ...patch };
+  return { rawText: '', confidenceScore: 90, extractedFieldsCount: 3, ...patch };
 }
 
 describe('buildDraftPatch', () => {

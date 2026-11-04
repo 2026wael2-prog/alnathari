@@ -7,6 +7,7 @@ import type { AuthUser } from '../auth/types';
 import { useFeedbackStore } from '../feedback/store';
 import { assertOwner } from '../../core/hooks/usePermission';
 import { logger } from '../../core/utils/logger';
+import { parseError } from '../../core/utils/errorUtils';
 import { formatLocalDate } from '../../core/utils/dateUtils';
 import type {
   CompanyFormData,
@@ -216,8 +217,8 @@ export const useCurrencyMutation = () => {
       await queryClient.invalidateQueries({ queryKey: ['exchange_rates'] });
       showToast('تم تحديث سعر الصرف بنجاح', 'success');
     },
-    onError: (error: any) => {
-      showToast(error?.message || 'فشل تحديث سعر الصرف', 'error');
+    onError: (error: unknown) => {
+      showToast(`فشل تحديث سعر الصرف: ${parseError(error).message}`, 'error');
     },
   });
 
@@ -248,8 +249,8 @@ export const useCurrencyMutation = () => {
       await queryClient.invalidateQueries({ queryKey: ['exchange_rates'] });
       showToast('تم تحديث أسعار الصرف من السوق بنجاح', 'success');
     },
-    onError: (error: any) => {
-      showToast(error.message || 'فشل تحديث الأسعار من السوق', 'error');
+    onError: (error: unknown) => {
+      showToast(`فشل تحديث الأسعار من السوق: ${parseError(error).message}`, 'error');
     },
   });
 
@@ -300,8 +301,8 @@ export const useBackupActions = () => {
       setTimeout(() => {
         window.location.reload();
       }, 1500);
-    } catch (err: any) {
-      showToast(err.message, 'error');
+    } catch (err: unknown) {
+      showToast(`فشل استيراد البيانات: ${parseError(err).message}`, 'error');
     }
   };
 
@@ -332,8 +333,8 @@ export const useBranchMutations = () => {
       await queryClient.invalidateQueries({ queryKey: ['branches'] });
       showToast('تمت إضافة الفرع الجديد بنجاح', 'success');
     },
-    onError: (err: any) => {
-      showToast(err.message || 'خطأ في إضافة الفرع', 'error');
+    onError: (err: unknown) => {
+      showToast(`خطأ في إضافة الفرع: ${parseError(err).message}`, 'error');
     },
   });
 
@@ -344,8 +345,8 @@ export const useBranchMutations = () => {
       await queryClient.invalidateQueries({ queryKey: ['branches'] });
       showToast('تم تحديث بيانات الفرع بنجاح', 'success');
     },
-    onError: (err: any) => {
-      showToast(err.message || 'خطأ في تحديث الفرع', 'error');
+    onError: (err: unknown) => {
+      showToast(`خطأ في تحديث الفرع: ${parseError(err).message}`, 'error');
     },
   });
 
@@ -355,8 +356,8 @@ export const useBranchMutations = () => {
       await queryClient.invalidateQueries({ queryKey: ['branches'] });
       showToast('تم حذف الفرع', 'info');
     },
-    onError: (err: any) => {
-      showToast(err.message || 'خطأ في حذف الفرع', 'error');
+    onError: (err: unknown) => {
+      showToast(`خطأ في حذف الفرع: ${parseError(err).message}`, 'error');
     },
   });
 
@@ -396,8 +397,8 @@ export const useInvitationMutations = () => {
       await queryClient.invalidateQueries({ queryKey: ['invitations'] });
       showToast('تم إرسال الدعوة بنجاح', 'success');
     },
-    onError: (err: any) => {
-      showToast(err.message || 'فشل إرسال الدعوة', 'error');
+    onError: (err: unknown) => {
+      showToast(`فشل إرسال الدعوة: ${parseError(err).message}`, 'error');
     },
   });
 
@@ -407,8 +408,8 @@ export const useInvitationMutations = () => {
       await queryClient.invalidateQueries({ queryKey: ['invitations'] });
       showToast('تم إلغاء الدعوة', 'info');
     },
-    onError: (err: any) => {
-      showToast(err.message || 'خطأ في إلغاء الدعوة', 'error');
+    onError: (err: unknown) => {
+      showToast(`خطأ في إلغاء الدعوة: ${parseError(err).message}`, 'error');
     },
   });
 

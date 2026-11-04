@@ -1,4 +1,5 @@
 import React from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { useFinancials } from '../../hooks/index';
 import { formatCurrency } from '../../../../core/utils';
 import {
@@ -10,6 +11,7 @@ import {
   FileText,
   Package,
 } from 'lucide-react';
+import type { TrialBalanceItem } from '../../types';
 import { cn } from '../../../../core/utils';
 import ShareButton from '../../../../ui/common/ShareButton';
 
@@ -17,10 +19,25 @@ interface Props {
   dateRange: { from: string; to: string };
 }
 
+/**
+ * ⚠️ اتفاقية الإشارات (لا تُغيَّر): `net_balance` سالب = قيد عكسي على الحساب.
+ * القاعدة قد تُرجع `NULL` لصف بلا حركة، لذلك يُحوَّل إلى صفر **دون** `Math.abs()`
+ * أو قلب الإشارة، وإلا تضاعفت أرقام القوائم.
+ */
+const toAmount = (value: number | null | undefined): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
+/**
+ * بند تكلفة البضاعة المباعة: علامة `is_cogs` من تقرير SQL، أو الكود 5100/51xx.
+ * (نفس المنطق المستخدم في reportService — يُمنع خلط COGS بالمصاريف التشغيلية.)
+ */
+const isCogsAccount = (account: TrialBalanceItem): boolean =>
+  account.is_cogs === true || account.code === '5100' || account.code.startsWith('51');
+
 const FinancialReportBlock: React.FC<{
   title: string;
-  icon: any;
-  data: any[];
+  icon: LucideIcon;
+  data: TrialBalanceItem[];
   total: number;
   color: 'emerald' | 'rose' | 'amber';
 }> = ({ title, icon: Icon, data, total, color }) => {
@@ -117,19 +134,15 @@ const IncomeStatement: React.FC<Props> = ({ dateRange }) => {
       </div>
     );
 
-  const { revenues, expenses, netIncome, totalRevenue: serverRevenue } = financials.incomeStatement;
-  const totalRevenue =
-    serverRevenue ?? revenues.reduce((s: number, r: any) => s + (r.net_balance || 0), 0);
+  // ⚠️ إجمالي الإيرادات يأتي محسوباً من الخدمة بنفس قائمة الحسابات (بلا Math.abs)،
+  // فلا نُعيد جمعه هنا — إعادة الجمع كانت تُخفي أي فرق بين المصدرين.
+  const { revenues, expenses, netIncome, totalRevenue } = financials.incomeStatement;
 
-  const cogsList = expenses.filter(
-    (r: any) => r.is_cogs || r.code === '5100' || String(r.code).startsWith('51')
-  );
-  const operatingExpensesList = expenses.filter(
-    (r: any) => !(r.is_cogs || r.code === '5100' || String(r.code).startsWith('51'))
-  );
-  const totalCogs = cogsList.reduce((s: number, r: any) => s + (r.net_balance || 0), 0);
+  const cogsList = expenses.filter(isCogsAccount);
+  const operatingExpensesList = expenses.filter(row => !isCogsAccount(row));
+  const totalCogs = cogsList.reduce((sum, row) => sum + toAmount(row.net_balance), 0);
   const totalOperatingExpenses = operatingExpensesList.reduce(
-    (s: number, r: any) => s + (r.net_balance || 0),
+    (sum, row) => sum + toAmount(row.net_balance),
     0
   );
   const grossProfit = totalRevenue - totalCogs;

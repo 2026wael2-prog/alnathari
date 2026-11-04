@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * ⇒ أي تحديث لاحق للحالة نفسها لا يُظهر إشعار نظام إطلاقاً.
  */
 
-const showDesktopNotification = vi.fn(() => null);
+const showDesktopNotification = vi.fn((_payload?: unknown) => null);
 
 vi.mock('./desktopNotificationService', () => ({
   showDesktopNotification: (...args: unknown[]) => showDesktopNotification(...args),

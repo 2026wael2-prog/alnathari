@@ -150,6 +150,7 @@ export const STORAGE_KEYS = {
   THEME: 'theme',
   LANGUAGE: 'language',
   SIDEBAR_COLLAPSED: 'sidebar_collapsed',
+  CLASSIC_RIBBON_COLLAPSED: 'classic_ribbon_collapsed',
   LAST_INVOICE_NUMBER: 'last_invoice_number',
   AUTO_BACKUP: 'alz_auto_backup',
   BACKUP_LOGS: 'alz_backup_logs',

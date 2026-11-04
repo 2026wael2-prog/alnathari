@@ -33,11 +33,13 @@ vi.mock('jspdf', async importOriginal => {
         return pdf;
       });
 
-      pdf.addImage = vi.fn((...args2: Parameters<typeof pdf.addImage>) => {
-        const [, , , y, width, height] = args2;
+      pdf.addImage = vi.fn((...args2: unknown[]) => {
+        const y = Number(args2[3]);
+        const width = Number(args2[4]);
+        const height = Number(args2[5]);
         images.push({ pageIndex, offsetY: y, imageWidth: width, imageHeight: height });
         return pdf;
-      }) as unknown as typeof pdf.addImage;
+      });
 
       pdf.save = vi.fn((fileName: string) => {
         mocks.files.push({

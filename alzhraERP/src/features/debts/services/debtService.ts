@@ -43,9 +43,9 @@ export interface PreparedReminder {
 
 /** شكل مرن لإعدادات المحرك — يقبل صف الإعدادات الكامل أو قيماً جزئية. */
 export interface DebtEngineConfigLike {
-  due_soon_days?: number | null;
-  critical_days?: number | null;
-  reminder_window_days?: number | null;
+  due_soon_days?: number | null | undefined;
+  critical_days?: number | null | undefined;
+  reminder_window_days?: number | null | undefined;
 }
 
 /** يدمج إعدادات الشركة المحفوظة مع الافتراضي — دالة نقية قابلة للاختبار. */

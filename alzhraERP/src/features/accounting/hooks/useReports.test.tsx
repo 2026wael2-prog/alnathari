@@ -104,7 +104,11 @@ describe('useTrialBalance', () => {
 
 describe('useFinancials', () => {
   it('fetches financials (P&L + balance sheet) for the user company', async () => {
-    vi.mocked(accountingService.getFinancials).mockResolvedValue(null);
+    // الحالة المقصودة: استجابة ناجحة (isSuccess) — الشكل التفصيلي مُغطّى في reportService.test
+    const emptyFinancials = null as unknown as Awaited<
+      ReturnType<typeof accountingService.getFinancials>
+    >;
+    vi.mocked(accountingService.getFinancials).mockResolvedValue(emptyFinancials);
 
     const { result } = renderHook(() => useFinancials('2026-01-01', '2026-08-19'), {
       wrapper: createWrapper(),
@@ -124,7 +128,14 @@ describe('useFinancials', () => {
 
 describe('useAuditJournals', () => {
   it('stays disabled until enabled=true', async () => {
-    vi.mocked(reportsApi.getAuditJournals).mockResolvedValue({ data: [], error: null });
+    vi.mocked(reportsApi.getAuditJournals).mockResolvedValue({
+      data: [],
+      error: null,
+      success: true,
+      count: 0,
+      status: 200,
+      statusText: 'OK',
+    });
 
     const { result } = renderHook(() => useAuditJournals(false), { wrapper: createWrapper() });
 
@@ -135,7 +146,22 @@ describe('useAuditJournals', () => {
   });
 
   it('fetches non-void journals when enabled', async () => {
-    vi.mocked(reportsApi.getAuditJournals).mockResolvedValue({ data: [{ id: 'j1' }], error: null });
+    vi.mocked(reportsApi.getAuditJournals).mockResolvedValue({
+      data: [
+        {
+          id: 'j1',
+          entry_date: '2026-01-01',
+          description: null,
+          status: 'posted',
+          journal_entry_lines: [],
+        },
+      ],
+      error: null,
+      success: true,
+      count: 1,
+      status: 200,
+      statusText: 'OK',
+    });
 
     const { result } = renderHook(() => useAuditJournals(true), { wrapper: createWrapper() });
 

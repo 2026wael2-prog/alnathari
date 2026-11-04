@@ -12,24 +12,26 @@ import {
   urgencyRank,
 } from './taskQueue';
 
-const row = (overrides: Partial<DebtTaskQueueRow> = {}): DebtTaskQueueRow => ({
-  amount: 100,
-  assigned_name: null,
-  assigned_to: null,
-  currency_code: 'SAR',
-  due_at: '2026-09-23T00:00:00Z',
-  escalation_stage: 'monitor',
-  is_overdue: false,
-  party_id: 'p1',
-  party_name: 'عميل 1',
-  party_phone: '777123456',
-  priority: 'medium',
-  reference_info: 'INV-1',
-  task_id: 'inv:1',
-  task_type: 'due_today',
-  urgency: 'high',
-  ...overrides,
-});
+// RPC يعيد قيمًا فارغة فعليًا (LEFT JOIN) رغم أن الأنواع المولَّدة تعلنها غير قابلة للعدم
+const row = (overrides: Partial<Record<keyof DebtTaskQueueRow, unknown>> = {}): DebtTaskQueueRow =>
+  ({
+    amount: 100,
+    assigned_name: null,
+    assigned_to: null,
+    currency_code: 'SAR',
+    due_at: '2026-09-23T00:00:00Z',
+    escalation_stage: 'monitor',
+    is_overdue: false,
+    party_id: 'p1',
+    party_name: 'عميل 1',
+    party_phone: '777123456',
+    priority: 'medium',
+    reference_info: 'INV-1',
+    task_id: 'inv:1',
+    task_type: 'due_today',
+    urgency: 'high',
+    ...overrides,
+  }) as unknown as DebtTaskQueueRow;
 
 describe('taskTypeLabel', () => {
   it('labels every known queue task type', () => {

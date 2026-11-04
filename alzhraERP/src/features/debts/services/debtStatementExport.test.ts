@@ -30,7 +30,7 @@ const makeRow = (partial: Partial<FollowUpDashboardRow> = {}): FollowUpDashboard
   invoice_count: 2,
   opening_balance: 0,
   ...partial,
-});
+}) as unknown as FollowUpDashboardRow;
 
 const makeMovement = (partial: Partial<StatementMovement> = {}): StatementMovement => ({
   id: 'm1',

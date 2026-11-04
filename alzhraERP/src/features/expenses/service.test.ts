@@ -82,9 +82,8 @@ describe('expensesService.getCategoryBreakdown', () => {
   });
 
   it('falls back to "أخرى" when a category name is missing', () => {
-    const expenses = [
-      makeExpense({ id: '1', category_id: 'c1', category_name: undefined, amount: 10 }),
-    ];
+    // الحقل غائب تماماً (لا `undefined` صريح) — وهو ما يحدث فعلاً مع صفوف بلا تصنيف
+    const expenses = [makeExpense({ id: '1', category_id: 'c1', amount: 10 })];
     const breakdown = expensesService.getCategoryBreakdown(expenses);
     expect(breakdown.find(b => b.name === 'أخرى')?.value).toBe(10);
   });

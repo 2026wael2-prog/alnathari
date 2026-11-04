@@ -31,7 +31,9 @@ export interface InvoiceItem {
   quantity: number;
   unit_price: number;
   total: number;
-  cost_price?: number;
+  // القاعدة تُرجع NULL لسعر التكلفة في بعض البنود القديمة، وطبقة التحويل قد
+  // تُمرّر undefined صريحاً — كلاهما يُعامَل كـ 0 في buildReturnItem.
+  cost_price?: number | null | undefined;
   name?: string;
   product?: {
     id?: string;

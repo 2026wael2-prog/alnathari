@@ -26,7 +26,7 @@ const row = (partial: Partial<FollowUpDashboardRow>): FollowUpDashboardRow => ({
   invoice_count: 1,
   opening_balance: 0,
   ...partial,
-});
+}) as unknown as FollowUpDashboardRow;
 
 describe('debtsService.filterByTab', () => {
   const rows: FollowUpDashboardRow[] = [

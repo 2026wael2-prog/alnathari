@@ -216,6 +216,7 @@ describe('Purchases Store Logic', () => {
       name: 'قطع غيار أصلية',
       sku: 'PARTS-01',
       selling_price: 300,
+      sale_price: 300,
       cost_price: 200,
       stock_quantity: 50,
       min_stock_level: 5,

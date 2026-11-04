@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import PricingSection from './PricingSection';
@@ -18,9 +17,18 @@ describe('PricingSection', () => {
   });
 
   const stubNavigation = (): void => {
+    // بديل صريح عن Location الحقيقي: المكوّن يكتب href فقط عند باقة المؤسسات،
+    // ونسخ كائن Location بالـ spread يُفقد دواله (class instance) فيرفضه eslint.
     Object.defineProperty(window, 'location', {
       configurable: true,
-      value: { ...originalLocation, href: '', assign: vi.fn() },
+      value: {
+        href: '',
+        pathname: '/',
+        search: '',
+        hash: '',
+        assign: vi.fn(),
+        replace: vi.fn(),
+      },
     });
   };
 

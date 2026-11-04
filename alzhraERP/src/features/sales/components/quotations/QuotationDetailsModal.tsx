@@ -6,6 +6,7 @@
 // (يوفّر الطباعة وتصدير PDF وتغيير التخطيط واللون)، وترسل نصاً مقروءاً عبر واتساب.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { FC, ReactElement, RefObject } from 'react';
 import {
   ArrowRightLeft,
@@ -153,25 +154,42 @@ const applyQuotationToCart = (quotation: QuotationDetailRow): void => {
 interface QuotationState {
   quotation: QuotationDetailRow | null;
   loading: boolean;
+  /** رسالة خطأ عربية جاهزة للعرض (null = لا خطأ). */
+  error: string | null;
   reload: () => Promise<void>;
 }
 
+/**
+ * تحميل تفاصيل عرض السعر عبر `useQuery`.
+ *
+ * سبب التغيير: كان الطلب داخل `useEffect` ويتجاهل الحقل `error` القادم من
+ * Supabase، فأي فشل (شبكة/صلاحيات RLS/سجل محذوف) ينتهي بشاشة «تعذّر تحميل عرض
+ * السعر» بلا سبب ولا إمكانية إعادة محاولة — أي فشل صامت يخفي العطل الحقيقي.
+ * الآن: الخطأ يُحوَّل بـ`parseError` ويُعرض نصّه، والبيانات تُدار بمخزن
+ * الاستعلامات (تخزين مؤقت + إعادة جلب + منع الطلبات المتكررة).
+ */
 const useQuotationDetails = (quotationId: string): QuotationState => {
-  const [quotation, setQuotation] = useState<QuotationDetailRow | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { data, isPending, error, refetch } = useQuery({
+    queryKey: ['sales-quotation-details', quotationId],
+    queryFn: async (): Promise<QuotationDetailRow> => {
+      const result = await salesQuotationsApi.getQuotationDetails(quotationId);
+      if (result.error !== null) throw result.error;
+      if (result.data === null) throw new Error('لم يُعثر على عرض السعر المطلوب');
+      return result.data;
+    },
+    enabled: quotationId !== '',
+  });
 
   const reload = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    const { data } = await salesQuotationsApi.getQuotationDetails(quotationId);
-    setQuotation(data);
-    setLoading(false);
-  }, [quotationId]);
+    await refetch();
+  }, [refetch]);
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  return { quotation, loading, reload };
+  return {
+    quotation: data ?? null,
+    loading: isPending,
+    error: error === null ? null : parseError(error).message,
+    reload,
+  };
 };
 
 /** سياق بيانات المنشأة لملف الإكسل (لون التمييز الافتراضي كحلي ملكي). */
@@ -551,10 +569,34 @@ const QuotationFooter = ({
   </div>
 );
 
+interface BodyFallbackProps {
+  message: string;
+  onRetry: () => void | Promise<void>;
+}
+
+/** شاشة الفشل/الفراغ لتفاصيل العرض مع إمكانية إعادة المحاولة. */
+const QuotationBodyFallback = ({ message, onRetry }: BodyFallbackProps): ReactElement => (
+  <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+    <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{message}</p>
+    <button
+      type="button"
+      onClick={() => {
+        void onRetry();
+      }}
+      className="rounded-lg bg-indigo-600 px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-indigo-700"
+    >
+      إعادة المحاولة
+    </button>
+  </div>
+);
+
 interface BodyProps {
   loading: boolean;
   quotation: QuotationDetailRow | null;
-  exportPdf: () => void;
+  /** رسالة فشل التحميل (تُعرض مع زر إعادة المحاولة). */
+  errorText: string | null;
+  onRetry: () => void | Promise<void>;
+  exportPdf: () => void | Promise<void>;
   isExporting: boolean;
   printRef: RefObject<HTMLDivElement | null>;
 }
@@ -562,6 +604,8 @@ interface BodyProps {
 const QuotationBody = ({
   loading,
   quotation,
+  errorText,
+  onRetry,
   exportPdf,
   isExporting,
   printRef,
@@ -575,9 +619,10 @@ const QuotationBody = ({
   }
   if (quotation === null) {
     return (
-      <div className="flex items-center justify-center py-16 text-sm text-gray-500">
-        تعذّر تحميل عرض السعر
-      </div>
+      <QuotationBodyFallback
+        message={errorText ?? 'تعذّر تحميل عرض السعر'}
+        onRetry={onRetry}
+      />
     );
   }
   return (
@@ -586,7 +631,9 @@ const QuotationBody = ({
         <div className="w-full max-w-4xl shrink-0 rounded-xl border border-slate-300 bg-white p-2 shadow-lg">
           <PrintableQuotation
             quotation={quotation}
-            onExportPDF={exportPdf}
+            onExportPDF={() => {
+              void exportPdf();
+            }}
             isExporting={isExporting}
           />
         </div>
@@ -725,7 +772,7 @@ const QuotationDetailsModal: FC<QuotationDetailsModalProps> = ({
   onConvertToInvoice,
   initialAction,
 }) => {
-  const { quotation, loading, reload } = useQuotationDetails(quotationId);
+  const { quotation, loading, error, reload } = useQuotationDetails(quotationId);
   const share = useQuotationShareFor(quotation);
   const pdf = useQuotationPdf(quotation);
   const { busy, run } = useQuotationAction({
@@ -758,9 +805,9 @@ const QuotationDetailsModal: FC<QuotationDetailsModalProps> = ({
       <QuotationBody
         loading={loading}
         quotation={quotation}
-        exportPdf={() => {
-          void pdf.exportPdf();
-        }}
+        errorText={error}
+        onRetry={reload}
+        exportPdf={pdf.exportPdf}
         isExporting={pdf.isExporting}
         printRef={pdf.printRef}
       />

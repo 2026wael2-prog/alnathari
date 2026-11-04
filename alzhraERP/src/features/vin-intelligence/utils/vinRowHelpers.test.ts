@@ -77,17 +77,17 @@ describe('pickAltManufacturer', () => {
   };
 
   it('prefers the alternative brand', () => {
-    const alt: PartAlternative = { partNumber: 'X', brand: 'BOSCH' };
+    const alt: PartAlternative = { partNumber: 'X', brand: 'BOSCH', confidence: 'medium', confidenceScore: 60 };
     expect(pickAltManufacturer(alt, intel, vehicle)).toBe('BOSCH');
   });
 
   it('falls back to intelligence manufacturer', () => {
-    const alt: PartAlternative = { partNumber: 'X' };
+    const alt: PartAlternative = { partNumber: 'X', confidence: 'medium', confidenceScore: 60 };
     expect(pickAltManufacturer(alt, intel, vehicle)).toBe('DENSO');
   });
 
   it('falls back to vehicle make', () => {
-    const alt: PartAlternative = { partNumber: 'X' };
+    const alt: PartAlternative = { partNumber: 'X', confidence: 'medium', confidenceScore: 60 };
     expect(pickAltManufacturer(alt, null, vehicle)).toBe('Toyota');
   });
 });

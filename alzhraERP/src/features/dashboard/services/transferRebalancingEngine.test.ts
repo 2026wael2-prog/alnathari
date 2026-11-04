@@ -5,9 +5,33 @@ import type { Branch } from '../../settings/types';
 
 describe('transferRebalancingEngine — محرك اقتراح المناقلات اللوجستية الذكي', () => {
   const mockBranches: Branch[] = [
-    { id: 'b-wael', name: 'فرع وائل', company_id: 'c1', integration_mode: 'full_integration' },
-    { id: 'b-ghamdan', name: 'فرع غمدان', company_id: 'c1', integration_mode: 'full_integration' },
-    { id: 'b-mohammed', name: 'فرع محمد', company_id: 'c1', integration_mode: 'inventory_only' },
+    {
+      id: 'b-wael',
+      name: 'فرع وائل',
+      company_id: 'c1',
+      integration_mode: 'full_integration',
+      status: 'active',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    },
+    {
+      id: 'b-ghamdan',
+      name: 'فرع غمدان',
+      company_id: 'c1',
+      integration_mode: 'full_integration',
+      status: 'active',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    },
+    {
+      id: 'b-mohammed',
+      name: 'فرع محمد',
+      company_id: 'c1',
+      integration_mode: 'inventory_only',
+      status: 'active',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    },
   ];
 
   const mockWarehouses: Warehouse[] = [
@@ -17,6 +41,8 @@ describe('transferRebalancingEngine — محرك اقتراح المناقلات
       company_id: 'c1',
       branch_id: 'b-wael',
       is_primary: true,
+      location: null,
+      status: 'active',
     },
     {
       id: 'w-ghamdan',
@@ -24,6 +50,8 @@ describe('transferRebalancingEngine — محرك اقتراح المناقلات
       company_id: 'c1',
       branch_id: 'b-ghamdan',
       is_primary: true,
+      location: null,
+      status: 'active',
     },
     {
       id: 'w-mohammed',
@@ -31,6 +59,8 @@ describe('transferRebalancingEngine — محرك اقتراح المناقلات
       company_id: 'c1',
       branch_id: 'b-mohammed',
       is_primary: true,
+      location: null,
+      status: 'active',
     },
   ];
 
@@ -51,6 +81,7 @@ describe('transferRebalancingEngine — محرك اقتراح المناقلات
     unit: 'pcs',
     specifications: '',
     size: '',
+    created_at: '2026-01-01T00:00:00Z',
     ...overrides,
   });
 

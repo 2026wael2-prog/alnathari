@@ -21,7 +21,7 @@ const createInsertRecorder = (final: { data: unknown; error: unknown }) => {
     const target = () => {
       return undefined;
     };
-    (target as Record<string, unknown>).then = (resolve: (v: unknown) => unknown) =>
+    (target as unknown as Record<string, unknown>).then = (resolve: (v: unknown) => unknown) =>
       Promise.resolve(final).then(resolve);
     return new Proxy(target, {
       get: (_target, prop): unknown => {

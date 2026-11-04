@@ -28,7 +28,7 @@ const makeRow = (partial: Partial<FollowUpDashboardRow>): FollowUpDashboardRow =
   invoice_count: 2,
   opening_balance: 0,
   ...partial,
-});
+}) as unknown as FollowUpDashboardRow;
 
 describe('debtRowId', () => {
   it('combines the party with its currency so one party can hold many balances', () => {

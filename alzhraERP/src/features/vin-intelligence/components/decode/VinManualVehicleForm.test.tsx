@@ -1,4 +1,3 @@
-import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { VinManualVehicleForm, type ManualVehicleDraft } from './VinManualVehicleForm';
@@ -68,9 +67,9 @@ describe('VinManualVehicleForm behavior', () => {
 
   it('resets the model only when selecting a make preset', () => {
     const { onChange } = setup({ make: 'Toyota', model: 'Corolla' });
-    fireEvent.click(screen.getByRole('button', { name: 'نيسان', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: /^نيسان$/ }));
     expect(onChange.mock.calls).toEqual([[{ make: 'Nissan' }], [{ model: '' }]]);
-    fireEvent.click(screen.getByRole('button', { name: 'كورولا', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: /^كورولا$/ }));
     expect(onChange).toHaveBeenLastCalledWith({ model: 'Corolla' });
   });
 

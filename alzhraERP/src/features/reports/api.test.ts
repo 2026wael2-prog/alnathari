@@ -17,13 +17,13 @@ describe('reportsApi.getDebtAgingInvoices', () => {
     const isFilter = vi.fn(() => ({ not: notFilter }));
     const eqType = vi.fn(() => ({ is: isFilter }));
     const eqCompany = vi.fn(() => ({ eq: eqType }));
-    const select = vi.fn(() => ({ eq: eqCompany }));
+    const select = vi.fn((_columns: string) => ({ eq: eqCompany }));
     mockFrom.mockReturnValue({ select });
 
     const result = await reportsApi.getDebtAgingInvoices('c1');
 
     expect(mockFrom).toHaveBeenCalledWith('invoices');
-    const selectArg = select.mock.calls[0][0] as string;
+    const selectArg = select.mock.calls[0][0];
     expect(selectArg).toContain('due_date');
     expect(selectArg).toContain('issue_date');
     expect(eqCompany).toHaveBeenCalledWith('company_id', 'c1');

@@ -25,7 +25,7 @@ const makeRow = (partial: Partial<FollowUpDashboardRow>): FollowUpDashboardRow =
   invoice_count: 2,
   opening_balance: 0,
   ...partial,
-});
+}) as unknown as FollowUpDashboardRow;
 
 describe('buildCollectionSheetCsv', () => {
   it('starts with a UTF-8 BOM and a header row', () => {

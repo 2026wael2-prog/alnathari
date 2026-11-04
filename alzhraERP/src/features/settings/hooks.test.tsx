@@ -38,7 +38,11 @@ describe('useCompany', () => {
   });
 
   it('returns the company row when found (no profile refresh triggered)', async () => {
-    vi.mocked(settingsService.fetchCompany).mockResolvedValue({ id: 'stale-comp', name_ar: 'شركتي' });
+    // صف شركة جزئي: الاختبار يهمه الهوية فقط لا بقية الأعمدة الإلزامية
+    vi.mocked(settingsService.fetchCompany).mockResolvedValue({
+      id: 'stale-comp',
+      name_ar: 'شركتي',
+    } as unknown as Awaited<ReturnType<typeof settingsService.fetchCompany>>);
 
     const { result } = renderHook(() => useCompany(), { wrapper: createWrapper() });
 

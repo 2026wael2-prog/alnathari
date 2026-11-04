@@ -9,10 +9,53 @@ import type {
 
 // 🔒 lazy-loader محلي (مستقل): excelEngine يقرأ ويكتب بأنماط خاصة (sheet_to_json/read)
 // ولا يشارك بنية التنسيق مع excelExporterBase — تُرك هنا حتى لا يخلط أنظمتها.
-let xlsxPromise: Promise<any> | null = null;
-const loadXLSX = (): Promise<any> => {
-  xlsxPromise ??= import('xlsx-js-style').then((m: any) => m.default ?? m);
+
+/**
+ * `xlsx-js-style` لا يُوزّع ملفات تعريف أنواع (`@types/…`)، وبدل تمرير `any`
+ * نوصف الحد الأدنى من الواجهة التي نستهلكها فعلياً (نمط `excelExporterBase`).
+ */
+type XlsxSheet = Record<string, unknown>;
+
+interface XlsxWorkbook {
+  SheetNames: string[];
+  Sheets: Record<string, XlsxSheet | undefined>;
+  Workbook?: { Views?: Array<{ RTL?: boolean }> };
+}
+
+/** خلية منسّقة بصيغة SheetJS: `{ v: value, s: style }` أو `{}` لتخطي الخلية. */
+type XlsxStyledCell = Record<string, unknown>;
+
+interface XlsxApi {
+  utils: {
+    book_new(): XlsxWorkbook;
+    aoa_to_sheet(rows: XlsxStyledCell[][]): XlsxSheet;
+    book_append_sheet(workbook: XlsxWorkbook, sheet: XlsxSheet, sheetName: string): void;
+    sheet_to_json(sheet: XlsxSheet, options: { header: 1 }): unknown[][];
+  };
+  read(data: ArrayBuffer, options?: Record<string, unknown>): XlsxWorkbook;
+  writeFile(workbook: XlsxWorkbook, filename: string): void;
+}
+
+let xlsxPromise: Promise<XlsxApi> | null = null;
+const loadXLSX = (): Promise<XlsxApi> => {
+  xlsxPromise ??= import('xlsx-js-style').then(module => {
+    const namespace = module as { default?: XlsxApi };
+    return namespace.default ?? (module as unknown as XlsxApi);
+  });
   return xlsxPromise;
+};
+
+/**
+ * قراءة خلية كشف Excel كنص مُشذّب. الخلية قد تكون `undefined`/`null`/رقم/تاريخ/
+ * قيمة منطقية، و`String(unknown)` يُحوّل الأجسام إلى `[object Object]` ويُخفي
+ * الأخطاء، لذلك نُسمح فقط بالأنواع القابلة للعرض كنص مالي/وصفي.
+ */
+export const readExcelCell = (value: unknown): string => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (value instanceof Date) return formatLocalDate(value);
+  return '';
 };
 
 /**
@@ -112,7 +155,7 @@ export const exportQuotationToExcel = async (
   };
 
   // Build Sheet Data Array
-  const wsData: any[][] = [];
+  const wsData: XlsxStyledCell[][] = [];
 
   // Row 1: Title Header
   wsData.push([
@@ -291,7 +334,7 @@ export const exportProductCatalogToExcel = async (
     numFmt: '#,##0.00',
   };
 
-  const wsData: any[][] = [];
+  const wsData: XlsxStyledCell[][] = [];
   wsData.push([
     { v: sanitizeExcelValue(`كتالوج الأصناف المعتمدة - ${options.companyName}`), s: titleStyle },
   ]);
@@ -378,7 +421,7 @@ export const parseQuotationExcel = async (
     throw new Error('الملف فارغ أو لا يحتوي على أوراق صالحة.');
   }
 
-  const rawRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+  const rawRows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
   if (rawRows.length < 2) {
     throw new Error('الملف لا يحتوي على بيانات كافية.');
   }
@@ -390,7 +433,7 @@ export const parseQuotationExcel = async (
     if (row && Array.isArray(row)) {
       const rowText = row
         .map(cell =>
-          String(cell || '')
+          readExcelCell(cell)
             .toLowerCase()
             .replace(/[\u064B-\u065F]/g, '')
         )
@@ -418,7 +461,7 @@ export const parseQuotationExcel = async (
     headerIndex = 0;
   }
 
-  const headers = rawRows[headerIndex].map((h: any) => String(h || '').trim());
+  const headers = rawRows[headerIndex].map(readExcelCell);
   const dataRows = rawRows.slice(headerIndex + 1);
 
   // Column Index Mappers with Arabic normalization
@@ -436,6 +479,9 @@ export const parseQuotationExcel = async (
         return normalizedH.includes(normalizedK);
       });
     });
+
+  /** قراءة خلية بفهرس عمود (الفهرس السالب = العمود غير موجود في الكشف). */
+  const cellAt = (row: unknown[], col: number): string => (col >= 0 ? readExcelCell(row[col]) : '');
 
   const idCol = findCol(['معرف', 'product_id', 'id']);
   const nameCol = findCol(['اسم', 'name', 'product', 'item', 'وصف', 'description']);
@@ -456,10 +502,10 @@ export const parseQuotationExcel = async (
     const r = dataRows[i];
     if (!r || r.length === 0) continue;
 
-    const rowId = idCol >= 0 ? String(r[idCol] || '').trim() : '';
-    const rowName = nameCol >= 0 ? String(r[nameCol] || '').trim() : '';
-    const rowOem = oemCol >= 0 ? String(r[oemCol] || '').trim() : '';
-    const rowSku = skuCol >= 0 ? String(r[skuCol] || '').trim() : '';
+    const rowId = cellAt(r, idCol);
+    const rowName = cellAt(r, nameCol);
+    const rowOem = cellAt(r, oemCol);
+    const rowSku = cellAt(r, skuCol);
 
     // Ignore fully empty rows
     if (!rowId && !rowName && !rowOem && !rowSku) continue;
@@ -499,12 +545,7 @@ export const parseQuotationExcel = async (
       );
     }
 
-    const availabilityRaw =
-      availCol >= 0
-        ? String(r[availCol] || '')
-            .trim()
-            .toLowerCase()
-        : '';
+    const availabilityRaw = cellAt(r, availCol).toLowerCase();
     const validAvailability: ItemAvailability =
       availabilityRaw === 'on_order' ||
       availabilityRaw === 'unavailable' ||
@@ -528,7 +569,8 @@ export const parseQuotationExcel = async (
     if (rowOem) rowObj.rawPartNumber = rowOem;
     if (rowSku) rowObj.rawVendorSku = rowSku;
     if (rowName) rowObj.rawProductName = rowName;
-    if (notesCol >= 0 && r[notesCol]) rowObj.notes = String(r[notesCol]).trim();
+    const notesText = cellAt(r, notesCol);
+    if (notesText !== '') rowObj.notes = notesText;
     if (matchedProduct) {
       rowObj.matchedProduct = {
         id: matchedProduct.product_id,
