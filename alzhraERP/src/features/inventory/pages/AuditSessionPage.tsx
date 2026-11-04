@@ -1,94 +1,72 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+/**
+ * صفحة جلسة الجرد.
+ *
+ * سبب التقسيم: كانت هذه الصفحة 634 سطراً و133 تحذيراً/خطأ ESLint، تخلط جلب
+ * البيانات، وإدارة النموذج، وتعديل الأصناف، وإنشاء المنتجات، وعرض الواجهة.
+ * الآن تنسّق فقط بين أربع وحدات مستقلة (كل منها قابل للاختبار وحده):
+ *  • `useAuditSessionForm`   — مزامنة النموذج ↔ المسودة ↔ الخادم (+ إصلاح B4).
+ *  • `useAuditItemActions`   — إضافة/زيادة/حذف الأصناف وتراجعاتها.
+ *  • `useAuditProductCreation` — إنشاء منتج جديد وإضافته للجلسة.
+ *  • `AuditSessionWorkspace` — العرض (إحصاءات + مرشّحات + جدول).
+ */
+import React, { useCallback, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { useDebounce } from 'use-debounce';
 import {
   useAuditSession,
-  useInventoryMutations,
   useInventoryCategories,
+  useInventoryMutations,
 } from '../hooks/useInventoryManagement';
-import { useSearchProducts, useProductMutations } from '../hooks/useProducts';
-import { inventoryService } from '../service';
+import { useProductMutations, useSearchProducts } from '../hooks/useProducts';
 import { useInventorySession } from '../hooks/useInventorySession';
+import { useAuditSessionForm } from '../hooks/useAuditSessionForm';
+import { useAuditItemActions } from '../hooks/useAuditItemActions';
+import { useAuditProductCreation } from '../hooks/useAuditProductCreation';
+import { useAuditProgressPersistence } from '../hooks/useAuditProgressPersistence';
 import { useAuthStore } from '../../auth/store';
-import AuditStats from '../components/audit/AuditStats';
-import AuditItemsTable, {
-  type AuditItemTarget,
-  type AuditStatusFilter,
-} from '../components/audit/AuditItemsTable';
-import { AuditCategoryFilterBar } from '../components/audit/AuditCategoryFilterBar';
-import { AuditSessionSearchDropdown } from '../components/audit/AuditSessionSearchDropdown';
-import { AuditSessionHeader } from '../components/audit/AuditSessionHeader';
-import { AuditStatusFilterBar } from '../components/audit/AuditStatusFilterBar';
-import { AuditSessionModals } from '../components/audit/AuditSessionModals';
-import { useForm } from 'react-hook-form';
-import { useDebounce } from 'use-debounce';
-import { useFeedbackStore } from '../../feedback/store';
+import { inventoryService } from '../service';
 import { calculateAuditStats } from '../utils/auditStats';
-import type { Product, ProductFormData } from '../types';
+import { AuditSessionLayout } from '../components/audit/AuditSessionLayout';
+import type { AuditStatusFilter } from '../components/audit/AuditItemsTable';
 import type { SearchResultProduct } from '../services/productService';
+import type { Product, ProductFormData } from '../types';
 
-/** Shape of audit progress items (matches inventoryService.saveAuditProgress). */
-interface AuditProgressItem {
-  id?: string;
-  product_id: string;
-  counted_quantity: number | null;
-}
-
-/* eslint-disable security/detect-object-injection, @typescript-eslint/restrict-template-expressions, @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/strict-boolean-expressions, @typescript-eslint/explicit-function-return-type */
-/** Efficient compact signature for detecting count modifications without allocating megabytes of JSON string */
-function computeItemsSignature(items: Array<Record<string, unknown>>): string {
-  let sig = String(items.length) + ':';
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    if (typeof it === 'object' && it !== null) {
-      const pid = String(it.product_id ?? it.id ?? i);
-      const cq = it.counted_quantity;
-      if (cq !== undefined && cq !== null && cq !== '') {
-        sig += pid + '=' + String(cq) + ';';
-      }
-    }
-  }
-  return sig;
-}
-/* eslint-enable security/detect-object-injection, @typescript-eslint/restrict-template-expressions, @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/strict-boolean-expressions, @typescript-eslint/explicit-function-return-type */
+const isManagementRole = (role: string | undefined): boolean =>
+  role === 'owner' || role === 'admin' || role === 'manager';
 
 const AuditSessionPage: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { showToast } = useFeedbackStore();
   const { data, isLoading, isError } = useAuditSession(sessionId);
+  const { data: categories } = useInventoryCategories();
+  const { saveProduct, isSaving: isSavingProduct } = useProductMutations();
   const {
     saveAuditProgress,
-    isSavingProgress,
     finalizeAudit,
-    isFinalizing,
     addItemToAudit,
-    isAddingItem,
     removeItemFromAudit,
+    isSavingProgress,
+    isFinalizing,
+    isAddingItem,
     isRemovingItem,
     populateWarehouseItems,
     isPopulatingWarehouse,
   } = useInventoryMutations();
-  const { data: categories } = useInventoryCategories();
 
-  const [filter, setFilter] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<AuditStatusFilter>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [debouncedFilter] = useDebounce(filter, 300);
-  const [showResults, setShowResults] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<AuditItemTarget | null>(null);
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const { saveProduct, isSaving: isSavingProduct } = useProductMutations();
 
-  const { data: searchResults, isLoading: isLoadingSearch } = useSearchProducts(debouncedFilter);
-
-  const isCompleted = data?.session?.status === 'completed';
-  const canManageAudit =
-    user?.role === 'owner' || user?.role === 'admin' || user?.role === 'manager';
+  const session = data?.session;
+  const serverItems = useMemo(() => data?.items ?? [], [data?.items]);
+  const isCompleted = session?.status === 'completed';
+  const canManageAudit = isManagementRole(user?.role);
+  const warehouseId = (session as { warehouse_id?: string } | undefined)?.warehouse_id;
 
   const {
     items: sessionItems,
@@ -99,382 +77,104 @@ const AuditSessionPage: React.FC = () => {
     clearSession,
   } = useInventorySession({
     sessionId: sessionId ?? '',
-    ...(data?.session?.warehouse_id
-      ? { warehouseId: (data.session as { warehouse_id?: string }).warehouse_id! }
-      : {}),
-    initialItems: data?.items ?? [],
+    ...(warehouseId === undefined ? {} : { warehouseId }),
+    initialItems: serverItems,
     isCompleted,
   });
 
-  const { register, reset, getValues } = useForm({
-    defaultValues: { items: [] as Array<Record<string, unknown>> },
-    shouldUnregister: false,
+  const {
+    register,
+    getValues,
+    displayItems,
+    syncItemsMutation,
+    lastSyncedRef,
+  } = useAuditSessionForm({
+    serverItems,
+    sessionItems,
+    isCompleted,
+    isRestoring,
+    updateItems,
+    mergeWithServer,
   });
 
-  const lastSyncedRef = useRef<string>('');
-  const hasLoadedServerItemsRef = useRef(false);
+  const { prepareProgressItems, handleSaveProgress } = useAuditProgressPersistence({
+    sessionId,
+    isCompleted,
+    getValues,
+    displayItems,
+    serverItems,
+    updateItems,
+    lastSyncedRef,
+  });
 
-  // Sync server items to form on load.
-  // Preserves draft quantities if already restored from local storage.
-  useEffect(() => {
-    if (data?.items && data.items.length > 0 && !hasLoadedServerItemsRef.current) {
-      hasLoadedServerItemsRef.current = true;
-      const itemsToReset =
-        sessionItems.length > 0
-          ? data.items.map(serverItem => {
-              const serverProductId =
-                (serverItem as Record<string, unknown>).product_id ||
-                (serverItem as Record<string, unknown>).id;
-              const local = sessionItems.find(s => (s.product_id || s.id) === serverProductId);
-              return local != null &&
-                local.counted_quantity !== null &&
-                local.counted_quantity !== undefined
-                ? { ...serverItem, counted_quantity: local.counted_quantity }
-                : serverItem;
-            })
-          : data.items;
+  const actions = useAuditItemActions({
+    sessionId,
+    isCompleted,
+    warehouseId,
+    getValues,
+    syncItems: syncItemsMutation,
+    addItemToAudit,
+    removeItemFromAudit,
+  });
 
-      const serialized = computeItemsSignature(itemsToReset);
-      lastSyncedRef.current = serialized;
-      reset({ items: itemsToReset });
-    }
-  }, [data?.items, sessionItems, reset]);
-
-  const watchedItems = getValues('items');
-
-  const displayItems = useMemo(() => {
-    if (isCompleted) {
-      return data?.items || [];
-    }
-    return sessionItems.length > 0 ? sessionItems : watchedItems;
-  }, [isCompleted, data?.items, sessionItems, watchedItems]);
-
+  const [debouncedFilter] = useDebounce(actions.filter, 300);
+  const { data: searchResults, isLoading: isLoadingSearch } = useSearchProducts(debouncedFilter);
   const stats = useMemo(() => calculateAuditStats(displayItems), [displayItems]);
 
-  const prepareProgressItems = useCallback((): AuditProgressItem[] => {
-    const formItems = getValues('items') || [];
-    const sourceList = displayItems.length > 0 ? displayItems : data?.items || [];
-    return sourceList.map(item => {
-      const rawItem = item as Record<string, unknown>;
-      const targetProductId = String(rawItem.product_id || rawItem.id || '');
-      const matched = formItems.find(f => String(f.product_id || f.id || '') === targetProductId);
-      const formVal = matched?.counted_quantity;
-      const counted = formVal !== undefined && formVal !== '' ? formVal : rawItem.counted_quantity;
-      let finalCounted: number | null = null;
-      if (counted !== null && counted !== undefined && counted !== '') {
-        const parsed = Number(counted);
-        finalCounted = Number.isNaN(parsed) ? null : parsed;
-      } else if (
-        rawItem.counted_quantity !== null &&
-        rawItem.counted_quantity !== undefined &&
-        rawItem.counted_quantity !== ''
-      ) {
-        const parsed = Number(rawItem.counted_quantity);
-        finalCounted = Number.isNaN(parsed) ? null : parsed;
-      }
+  const closeAddProduct = useCallback((): void => {
+    setShowAddProduct(false);
+  }, []);
 
-      const res: AuditProgressItem = {
-        product_id: targetProductId,
-        counted_quantity: finalCounted,
-      };
-      if (typeof rawItem.id === 'string' && rawItem.id.length > 0) {
-        res.id = rawItem.id;
-      }
-      return res;
-    });
-  }, [displayItems, data?.items, getValues]);
+  const createProduct = useAuditProductCreation({
+    companyId: user?.company_id ?? '',
+    saveProduct,
+    onCreated: actions.handleAddItem,
+    onClose: closeAddProduct,
+  });
 
-  // When sessionItems change (from useInventorySession), sync to form if not completed
-  useEffect(() => {
-    if (!isCompleted && sessionItems.length > 0) {
-      const serialized = computeItemsSignature(sessionItems);
-      if (serialized !== lastSyncedRef.current) {
-        lastSyncedRef.current = serialized;
-        reset({ items: sessionItems });
-      }
-    }
-  }, [sessionItems, isCompleted, reset]);
-
-  // Periodically sync form → session
-  const handleSaveProgress = useCallback(() => {
-    if (isCompleted) return;
-    const formItems = getValues('items');
-    if (formItems && formItems.length > 0) {
-      const serialized = computeItemsSignature(formItems);
-      if (serialized !== lastSyncedRef.current) {
-        lastSyncedRef.current = serialized;
-        updateItems(formItems);
-      }
-    }
-  }, [getValues, isCompleted, updateItems]);
-
-  // On page unload or SPA unmount, force-save current form state
-  useEffect(() => {
-    if (isCompleted) return;
-    const handleBeforeUnload = () => {
-      const formItems = getValues('items');
-      if (formItems && formItems.length > 0) {
-        updateItems(formItems);
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // SPA Navigation unmount save: update session draft and trigger database save
-      const formItems = getValues('items');
-      if (formItems && formItems.length > 0) {
-        updateItems(formItems);
-        if (sessionId) {
-          const itemsToSave = prepareProgressItems();
-          if (itemsToSave.length > 0) {
-            void inventoryService.saveAuditProgress({ sessionId, items: itemsToSave });
-          }
-        }
-      }
-    };
-  }, [getValues, isCompleted, updateItems, sessionId, prepareProgressItems]);
-
-  // When server data updates (realtime), merge with local state if not completed.
-  // Guard with !isRestoring so we don't race against the draft restoration in useInventorySession.
-  useEffect(() => {
-    if (
-      !isCompleted &&
-      !isRestoring &&
-      data?.items &&
-      data.items.length > 0 &&
-      hasLoadedServerItemsRef.current
-    ) {
-      mergeWithServer(data.items);
-    }
-  }, [data?.items, isCompleted, isRestoring, mergeWithServer]);
-
-  const handleSave = () => {
+  const handleSave = useCallback((): void => {
     const itemsToSave = prepareProgressItems();
-    if (sessionId) {
-      saveAuditProgress({ sessionId, items: itemsToSave });
-    } else {
+    if (sessionId === undefined) {
       saveAuditProgress(itemsToSave);
+      return;
     }
-  };
+    saveAuditProgress({ sessionId, items: itemsToSave });
+  }, [prepareProgressItems, sessionId, saveAuditProgress]);
 
-  const executeFinalize = () => {
-    if (sessionId) {
-      const itemsToFinalize = prepareProgressItems();
-      finalizeAudit(
-        { sessionId, items: itemsToFinalize },
-        {
-          onSuccess: () => {
-            clearSession();
-            setShowFinalizeConfirm(false);
-            navigate('/inventory');
-          },
-        }
-      );
-    }
-  };
+  const executeFinalize = useCallback((): void => {
+    if (sessionId === undefined) return;
+    finalizeAudit(
+      { sessionId, items: prepareProgressItems() },
+      {
+        onSuccess: () => {
+          clearSession();
+          setShowFinalizeConfirm(false);
+          void navigate('/inventory');
+        },
+      }
+    );
+  }, [sessionId, prepareProgressItems, finalizeAudit, clearSession, navigate]);
 
-  const handleFinalize = () => {
+  const handleFinalize = useCallback((): void => {
     if (stats.pending > 0) {
       setShowFinalizeConfirm(true);
       return;
     }
     executeFinalize();
-  };
+  }, [stats.pending, executeFinalize]);
 
-  const handleScan = (barcode: string) => {
-    setFilter(barcode);
-    setShowResults(true);
-    setIsScannerOpen(false);
-  };
+  const { setFilter, setShowResults } = actions;
+  const handleScan = useCallback(
+    (barcode: string): void => {
+      setFilter(barcode);
+      setShowResults(true);
+      setIsScannerOpen(false);
+    },
+    [setFilter, setShowResults]
+  );
 
-  const handleAddItem = async (product: Product) => {
-    if (data?.session?.status === 'completed') return;
-
-    const currentItems = getValues('items');
-    const existingIndex = currentItems.findIndex(
-      i =>
-        (i.product_id || i.id) === product.id || (i.products as { id?: string })?.id === product.id
-    );
-
-    // Barcode Accumulator: If item already in audit session, increment counted quantity by +1
-    if (existingIndex >= 0) {
-      const newItems = [...currentItems];
-      const existingItem = { ...newItems[existingIndex] };
-      const currentQty =
-        existingItem.counted_quantity !== null &&
-        existingItem.counted_quantity !== undefined &&
-        existingItem.counted_quantity !== ''
-          ? Number(existingItem.counted_quantity)
-          : 0;
-      const nextQty = currentQty + 1;
-      existingItem.counted_quantity = nextQty;
-      newItems.splice(existingIndex, 1);
-      newItems.unshift(existingItem);
-      lastSyncedRef.current = computeItemsSignature(newItems);
-      reset({ items: newItems });
-      updateItems(newItems);
-      setFilter('');
-      setShowResults(false);
-      showToast(
-        `تم زيادة كمية "${(existingItem.products as { name?: string })?.name || product.name_ar || 'الصنف'}" إلى (${nextQty})`,
-        'info',
-        { hideAfter: 1500 }
-      );
-      return;
-    }
-
-    if (!sessionId) return;
-
-    const warehouseId = (data?.session as { warehouse_id?: string })?.warehouse_id;
-    let expectedQuantity = 0;
-    if (product.warehouse_distribution) {
-      const stockInfo = product.warehouse_distribution.find(w => w.warehouse_id === warehouseId);
-      if (stockInfo) {
-        expectedQuantity = Number(stockInfo.quantity) || 0;
-      }
-    } else if (product.stock_quantity !== undefined) {
-      expectedQuantity = Number(product.stock_quantity) || 0;
-    }
-
-    // Optimistic addition for instant UI response (no delay)
-    const optimisticItem = {
-      product_id: product.id,
-      expected_quantity: expectedQuantity,
-      counted_quantity: null, // Starts uncounted until counted or scanned again
-      products: {
-        id: product.id,
-        name: product.name_ar || product.name || 'بدون اسم',
-        name_ar: product.name_ar || product.name || 'بدون اسم',
-        sku: product.sku || '---',
-        part_number: product.part_number || null,
-        brand: product.brand || null,
-        size: product.size || null,
-        category: (product as unknown as { category?: string }).category || 'عام',
-      },
-    };
-
-    const newItems = [optimisticItem, ...currentItems];
-    lastSyncedRef.current = computeItemsSignature(newItems);
-    reset({ items: newItems });
-    updateItems(newItems);
-    setFilter('');
-    setShowResults(false);
-    showToast(`تمت إضافة "${product.name_ar || product.name}" إلى مسودة الجرد`, 'success', {
-      hideAfter: 1500,
-    });
-
-    addItemToAudit(
-      { sessionId, productId: product.id, expectedQuantity },
-      {
-        onSuccess: (res: unknown) => {
-          const realId = (res as { id?: string })?.id;
-          if (realId) {
-            const current = getValues('items');
-            const updated = current.map(item =>
-              (item.product_id || (item as { products?: { id?: string } }).products?.id) ===
-              product.id
-                ? { ...item, id: realId, audit_item_id: realId }
-                : item
-            );
-            lastSyncedRef.current = computeItemsSignature(updated);
-            reset({ items: updated });
-            updateItems(updated);
-          }
-        },
-        onError: () => {
-          const reverted = getValues('items').filter(i => i.product_id !== product.id);
-          lastSyncedRef.current = computeItemsSignature(reverted);
-          reset({ items: reverted });
-          updateItems(reverted);
-        },
-      }
-    );
-  };
-
-  const confirmRemoveItem = () => {
-    if (itemToDelete && sessionId) {
-      const targetId = itemToDelete.id;
-      const targetProductId = itemToDelete.productId;
-
-      const current = getValues('items');
-      const filtered = current.filter(
-        i =>
-          (!targetId || (i.id !== targetId && i.audit_item_id !== targetId)) &&
-          (!targetProductId || i.product_id !== targetProductId)
-      );
-      lastSyncedRef.current = computeItemsSignature(filtered);
-      reset({ items: filtered });
-      updateItems(filtered);
-      setItemToDelete(null);
-
-      removeItemFromAudit(
-        {
-          ...(targetId ? { itemId: targetId } : {}),
-          productId: targetProductId,
-          sessionId,
-        },
-        {
-          onError: () => {
-            lastSyncedRef.current = computeItemsSignature(current);
-            reset({ items: current });
-            updateItems(current);
-          },
-        }
-      );
-    }
-  };
-
-  const newProductInitialData = useMemo(() => {
-    const trimmed = filter.trim();
-    if (!trimmed) return null;
-    const isBarcode = /^\d{6,}$/.test(trimmed);
-    return {
-      name: !isBarcode ? trimmed : '',
-      name_ar: !isBarcode ? trimmed : '',
-      barcode: isBarcode ? trimmed : '',
-      sku: isBarcode ? '' : trimmed,
-    } as unknown as Product;
-  }, [filter]);
-
-  const handleCreateNewProduct = async (formData: ProductFormData) => {
-    try {
-      const created = await saveProduct({ data: formData });
-      setShowAddProduct(false);
-      showToast('تمت إضافة المنتج الجديد بنجاح', 'success');
-
-      if (created) {
-        const rawCreated = created as Record<string, unknown>;
-        const productToAdd = {
-          id: String(rawCreated.id || ''),
-          name: String(rawCreated.name_ar || rawCreated.name || ''),
-          name_ar: String(rawCreated.name_ar || rawCreated.name || ''),
-          sku: String(rawCreated.sku || ''),
-          part_number: String(rawCreated.part_number || ''),
-          brand: String(rawCreated.brand || ''),
-          category: String(rawCreated.category || ''),
-          unit: String(rawCreated.unit || 'piece'),
-          cost_price: Number(rawCreated.cost_price || 0),
-          selling_price: Number(rawCreated.sale_price ?? rawCreated.selling_price ?? 0),
-          purchase_price: Number(rawCreated.cost_price || 0),
-          stock_quantity: 0,
-          min_stock_level: Number(rawCreated.min_stock_level || 0),
-          is_core: Boolean(rawCreated.is_core),
-          created_at: String(rawCreated.created_at || new Date().toISOString()),
-          updated_at: String(rawCreated.updated_at || new Date().toISOString()),
-          company_id: String(rawCreated.company_id || user?.company_id || ''),
-        } as unknown as Product;
-        await handleAddItem(productToAdd);
-        setFilter('');
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'فشل في إضافة المنتج';
-      showToast(msg, 'error');
-    }
-  };
-
-  // Atomic bulk warehouse population
-  const handleBulkAddWarehouseProducts = useCallback(async () => {
-    if (!sessionId) return;
+  const handleBulkAddWarehouseProducts = useCallback(async (): Promise<void> => {
+    if (sessionId === undefined) return;
     const currentItems = getValues('items');
     if (currentItems.length > 0) {
       const itemsToSave = prepareProgressItems();
@@ -482,7 +182,6 @@ const AuditSessionPage: React.FC = () => {
         await inventoryService.saveAuditProgress({ sessionId, items: itemsToSave });
       }
     }
-
     populateWarehouseItems(sessionId, {
       onSuccess: () => {
         setShowBulkConfirm(false);
@@ -493,141 +192,129 @@ const AuditSessionPage: React.FC = () => {
     });
   }, [sessionId, getValues, prepareProgressItems, populateWarehouseItems]);
 
-  if (isLoading || isError) {
-    if (isLoading)
-      return (
-        <div className="flex h-64 items-center justify-center p-20 text-center">
-          <Loader2 className="animate-spin text-blue-500" size={32} />
-        </div>
-      );
+  const newProductInitialData = useMemo(() => {
+    const trimmed = actions.filter.trim();
+    if (trimmed === '') return null;
+    const isBarcode = /^\d{6,}$/.test(trimmed);
+    return {
+      name: isBarcode ? '' : trimmed,
+      name_ar: isBarcode ? '' : trimmed,
+      barcode: isBarcode ? trimmed : '',
+      sku: isBarcode ? '' : trimmed,
+    } as unknown as Product;
+  }, [actions.filter]);
+
+  const handleCreateProduct = useCallback(
+    (formData: ProductFormData): void => {
+      void createProduct(formData);
+    },
+    [createProduct]
+  );
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center p-20 text-center">
+        <Loader2 className="animate-spin text-blue-500" size={32} />
+      </div>
+    );
+  }
+
+  if (isError) {
     return <div className="p-8 text-center text-rose-500">حدث خطأ أثناء تحميل بيانات الجرد.</div>;
   }
 
-  const session = data?.session;
-
   return (
-    <div className="flex h-full flex-col bg-gray-50 dark:bg-slate-950">
-      <AuditSessionHeader
-        title={(session?.title as string) || 'جلسة جرد'}
-        isCompleted={isCompleted}
-        isRestoring={isRestoring}
-        saveStatus={saveStatus}
-        canManageAudit={canManageAudit}
-        isSavingProgress={isSavingProgress}
-        isFinalizing={isFinalizing}
-        isPopulatingWarehouse={isPopulatingWarehouse}
-        onOpenAddProduct={() => {
+    <AuditSessionLayout
+      header={{
+        title: typeof session?.title === 'string' ? session.title : 'جلسة جرد',
+        isCompleted,
+        isRestoring,
+        saveStatus,
+        canManageAudit,
+        isSavingProgress,
+        isFinalizing,
+        isPopulatingWarehouse,
+        onOpenAddProduct: () => {
           setShowAddProduct(true);
-        }}
-        onOpenBulkConfirm={() => {
+        },
+        onOpenBulkConfirm: () => {
           setShowBulkConfirm(true);
-        }}
-        onSave={handleSave}
-        onFinalize={handleFinalize}
-      />
-
-      {/* Search and Scan Bar */}
-      {!isCompleted && (
-        <AuditSessionSearchDropdown
-          filter={filter}
-          setFilter={setFilter}
-          showResults={showResults}
-          setShowResults={setShowResults}
-          isLoadingSearch={isLoadingSearch}
-          isAddingItem={isAddingItem}
-          searchResults={searchResults as unknown as SearchResultProduct[] | undefined}
-          onAddItem={product => {
-            void handleAddItem(product);
-          }}
-          onOpenScanner={() => {
-            setIsScannerOpen(true);
-          }}
-          onOpenAddProduct={() => {
-            setShowAddProduct(true);
-          }}
-        />
-      )}
-
-      <div
-        className="custom-scrollbar flex-1 overflow-y-auto p-4 pb-16"
-        onClick={() => {
-          setShowResults(false);
-        }}
-        onKeyDown={e => {
-          if (e.key === 'Escape') setShowResults(false);
-        }}
-        role="button"
-        tabIndex={0}
-      >
-        <div className="mx-auto max-w-[1600px] space-y-4">
-          <AuditStats stats={stats} session={session ?? {}} />
-
-          {/* Category & Status Filter Bars */}
-          <div className="space-y-2">
-            <AuditCategoryFilterBar
-              categories={categories}
-              selectedCategory={selectedCategory}
-              onSelectCategory={setSelectedCategory}
-            />
-
-            <AuditStatusFilterBar
-              statusFilter={statusFilter}
-              onSelectStatusFilter={setStatusFilter}
-              stats={stats}
-            />
-          </div>
-
-          <AuditItemsTable
-            items={displayItems}
-            register={register}
-            filter={debouncedFilter}
-            category={selectedCategory}
-            statusFilter={statusFilter}
-            isCompleted={isCompleted}
-            onRemoveItem={setItemToDelete}
-            onSave={handleSaveProgress}
-          />
-        </div>
-      </div>
-
-      <AuditSessionModals
-        isScannerOpen={isScannerOpen}
-        onScan={handleScan}
-        onCloseScanner={() => {
+        },
+        onSave: handleSave,
+        onFinalize: handleFinalize,
+      }}
+      search={
+        isCompleted
+          ? null
+          : {
+              filter: actions.filter,
+              setFilter: actions.setFilter,
+              showResults: actions.showResults,
+              setShowResults: actions.setShowResults,
+              isLoadingSearch,
+              isAddingItem,
+              searchResults: searchResults as unknown as SearchResultProduct[] | undefined,
+              onAddItem: actions.handleAddItem,
+              onOpenScanner: () => {
+                setIsScannerOpen(true);
+              },
+              onOpenAddProduct: () => {
+                setShowAddProduct(true);
+              },
+            }
+      }
+      workspace={{
+        stats,
+        session: session ?? {},
+        categories,
+        selectedCategory,
+        onSelectCategory: setSelectedCategory,
+        statusFilter,
+        onSelectStatusFilter: setStatusFilter,
+        items: displayItems,
+        register,
+        debouncedFilter,
+        isCompleted,
+        onRemoveItem: actions.setItemToDelete,
+        onSave: handleSaveProgress,
+        onBackgroundClick: () => {
+          actions.setShowResults(false);
+        },
+      }}
+      modals={{
+        isScannerOpen,
+        onScan: handleScan,
+        onCloseScanner: () => {
           setIsScannerOpen(false);
-        }}
-        itemToDelete={itemToDelete}
-        onCloseDeleteModal={() => {
-          setItemToDelete(null);
-        }}
-        onConfirmDelete={confirmRemoveItem}
-        isRemovingItem={isRemovingItem}
-        showBulkConfirm={showBulkConfirm}
-        onCloseBulkConfirm={() => {
+        },
+        itemToDelete: actions.itemToDelete,
+        onCloseDeleteModal: () => {
+          actions.setItemToDelete(null);
+        },
+        onConfirmDelete: actions.confirmRemoveItem,
+        isRemovingItem,
+        showBulkConfirm,
+        onCloseBulkConfirm: () => {
           setShowBulkConfirm(false);
-        }}
-        onConfirmBulkAdd={() => {
+        },
+        onConfirmBulkAdd: () => {
           void handleBulkAddWarehouseProducts();
-        }}
-        isPopulatingWarehouse={isPopulatingWarehouse}
-        showFinalizeConfirm={showFinalizeConfirm}
-        onCloseFinalizeConfirm={() => {
+        },
+        isPopulatingWarehouse,
+        showFinalizeConfirm,
+        onCloseFinalizeConfirm: () => {
           setShowFinalizeConfirm(false);
-        }}
-        onConfirmFinalize={executeFinalize}
-        isFinalizing={isFinalizing}
-        pendingCount={stats.pending}
-        showAddProduct={showAddProduct}
-        onCloseAddProduct={() => {
-          setShowAddProduct(false);
-        }}
-        onCreateProduct={formData => {
-          void handleCreateNewProduct(formData);
-        }}
-        isSavingProduct={isSavingProduct}
-        newProductInitialData={newProductInitialData}
-      />
-    </div>
+        },
+        onConfirmFinalize: executeFinalize,
+        isFinalizing,
+        pendingCount: stats.pending,
+        showAddProduct,
+        onCloseAddProduct: closeAddProduct,
+        onCreateProduct: handleCreateProduct,
+        isSavingProduct,
+        newProductInitialData,
+      }}
+    />
   );
 };
 

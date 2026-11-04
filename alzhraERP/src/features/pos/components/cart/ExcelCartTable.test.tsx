@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
+
 import { ExcelCartTable } from './ExcelCartTable';
 import type { SalesCartItem } from '../../../sales/store';
 
@@ -66,15 +66,15 @@ describe('ExcelCartTable', () => {
 
     // Initial focus on row 0
     const rowHeaders = container.querySelectorAll('tbody tr td:first-child');
-    expect(rowHeaders[0]?.className).toContain('bg-blue-600');
+    expect(rowHeaders[0].className).toContain('bg-blue-600');
 
     // Move to row 1
     fireEvent.keyDown(tableContainer, { key: 'ArrowDown' });
-    expect(rowHeaders[1]?.className).toContain('bg-blue-600');
+    expect(rowHeaders[1].className).toContain('bg-blue-600');
 
     // Move back up to row 0
     fireEvent.keyDown(tableContainer, { key: 'ArrowUp' });
-    expect(rowHeaders[0]?.className).toContain('bg-blue-600');
+    expect(rowHeaders[0].className).toContain('bg-blue-600');
   });
 
   it('handles + and - keys to increment and decrement quantity', () => {

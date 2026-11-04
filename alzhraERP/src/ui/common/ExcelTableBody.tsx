@@ -29,7 +29,6 @@ interface ExcelTableBodyProps<T> {
   editingCell: { row: number; col: number } | null;
   handleCellClick: (row: number, col: number, shiftKey: boolean) => void;
   handleMouseDownCell: (e: React.MouseEvent, row: number, col: number) => void;
-  handleMouseEnterCell: () => void;
   onRowDoubleClick?: ((row: T) => void) | undefined;
   startEditing: (row: number, col: number) => void;
   editValue: string;
@@ -96,7 +95,6 @@ export function ExcelTableBody<T>({
   editingCell,
   handleCellClick,
   handleMouseDownCell,
-  handleMouseEnterCell,
   onRowDoubleClick,
   startEditing,
   editValue,
@@ -282,9 +280,6 @@ export function ExcelTableBody<T>({
                   }}
                   onMouseDown={e => {
                     handleMouseDownCell(e, rowIdx, colIdx);
-                  }}
-                  onMouseEnter={() => {
-                    handleMouseEnterCell();
                   }}
                   onDoubleClick={() => {
                     onRowDoubleClick?.(row);

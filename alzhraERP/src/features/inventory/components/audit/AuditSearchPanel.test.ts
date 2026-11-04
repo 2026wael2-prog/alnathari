@@ -27,7 +27,8 @@ describe('getWarehouseStock — كمية الصنف في المستودع الم
   });
 
   it('يتعامل مع غياب التوزيع بدون انفجار', () => {
-    const noDist: SearchResult = { ...base, warehouse_distribution: undefined };
+    const noDist: SearchResult = { ...base };
+    delete noDist.warehouse_distribution;
     expect(getWarehouseStock(noDist, 'w1')).toBe(0);
   });
 

@@ -1,10 +1,13 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { GripVertical } from 'lucide-react';
-import { cn, normalizeSearch } from '../../core/utils';
+import { cn } from '../../core/utils';
 import { useTableKeyboardNavigation } from './useTableKeyboardNavigation';
 import { useTableDragDrop } from './hooks/useTableDragDrop';
 import { useTableSelection } from './hooks/useTableSelection';
 import { useColumnResize } from './hooks/useColumnResize';
+import { useExcelTableData, type TableSortConfig } from './hooks/useExcelTableData';
+import { useTableDrag } from './hooks/useTableDrag';
+import { useTableWrapperResize } from './hooks/useTableWrapperResize';
 import {
   buildDefaultColumnWidths,
   getColumnIds,
@@ -15,6 +18,7 @@ import {
 import { ExcelTableHeader } from './ExcelTableHeader';
 import { ExcelTableBody } from './ExcelTableBody';
 import { ExcelTablePagination } from './ExcelTablePagination';
+import { ExcelTableResizeHandles } from './ExcelTableResizeHandles';
 import FullscreenContainer from '../base/FullscreenContainer';
 import ExcelTableToolbar from './ExcelTableToolbar';
 import { EXCEL_TABLE_THEMES, type ExcelTableColorTheme } from './excelTableThemes';
@@ -91,24 +95,10 @@ function ExcelTable<T>({
   resizeStorageKey,
   isLoading = false,
 }: ExcelTableProps<T>) {
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(
-    null
-  );
-  const [internalSearch, setInternalSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const isMainSearch = !!onSearchChange;
-  const effectiveSearch = isMainSearch ? (searchValue ?? '') : internalSearch;
+  const [sortConfig, setSortConfig] = useState<TableSortConfig | null>(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const tableWrapperRef = useRef<HTMLDivElement>(null);
-  const [isMouseDown, setIsMouseDown] = useState(false);
-  const [customSize, setCustomSize] = useState<{ width?: string; height?: string }>({});
-  const [originalSize, setOriginalSize] = useState<{ width?: string; height?: string }>({});
-
-  // Drag state
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [position, setPosition] = useState({ x: 0, y: 0 });
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -118,24 +108,25 @@ function ExcelTable<T>({
     setItemsPerPage(pageSize);
   }, [pageSize]);
 
-  // Debounce internal search for smoother typing
-  useEffect(() => {
-    if (isMainSearch) return;
-    const timer = setTimeout(() => {
-      setDebouncedSearch(internalSearch);
-    }, 150);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [internalSearch, isMainSearch]);
+  // ── الفلترة + الفرز (معزولة في هوك مع اختبارات مستقلة) ────────────
+  const { effectiveSearch, handleSearchInput, searchTerm, processedData } = useExcelTableData({
+    data,
+    columns,
+    searchValue,
+    onSearchChange,
+    sortConfig,
+  });
 
-  // ⚡ The external ("main") search box used to feed its RAW value straight into
-  // the copy + sort + filter pipeline, so every keystroke blocked the main thread
-  // on the whole dataset (up to thousands of rows × all columns). Deferring the
-  // value keeps typing at full speed while React prioritises the heavy pass.
-  // The internal search box was already debounced (150ms).
-  const deferredMainSearch = useDeferredValue(searchValue ?? '');
-  const searchTermForFilter = isMainSearch ? deferredMainSearch : debouncedSearch;
+  // ── سحب الجدول وتغيير حجمه (مستمعات `document` منظَّفة دائماً) ────
+  const { isDragging, position, handleTableDragStart, resetPosition } = useTableDrag({
+    enableDrag,
+    isZoomed,
+  });
+  const {
+    customSize,
+    handleWrapperResizeStart,
+    resetSize: resetWrapperSize,
+  } = useTableWrapperResize({ tableWrapperRef });
 
   const currentTheme = EXCEL_TABLE_THEMES[colorTheme];
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -169,149 +160,11 @@ function ExcelTable<T>({
     [colWidths, columnIds]
   );
 
-  // ⚡ Filtering only. Sorting moved to its own memo further down: previously one
-  // keystroke re-sorted the whole dataset and a sort click re-ran the whole filter.
-  const filteredItems = useMemo(() => {
-    let items = data;
-    if (!isMainSearch && searchTermForFilter) {
-      const term = normalizeSearch(searchTermForFilter);
-      if (!term) return items;
-
-      // Helper to recursively extract text from any React element or primitive
-      const getStringContent = (val: unknown): string => {
-        if (val === null || val === undefined) return '';
-        if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
-          return String(val);
-        }
-        if (Array.isArray(val)) {
-          return val.map(getStringContent).join(' ');
-        }
-        if (typeof val === 'object') {
-          const obj = val as { props?: { children?: unknown }; $$typeof?: unknown; then?: unknown };
-          if (obj.props && obj.props.children !== undefined) {
-            return getStringContent(obj.props.children);
-          }
-          if (!obj.$$typeof && typeof obj.then !== 'function') {
-            try {
-              return Object.values(obj as Record<string, unknown>)
-                .map(getStringContent)
-                .join(' ');
-            } catch {
-              return '';
-            }
-          }
-        }
-        return '';
-      };
-
-      items = items.filter(item => {
-        // ⚡ Fast path 1: check direct primitive fields of the item first (avoids virtual DOM creation)
-        if (item && typeof item === 'object') {
-          const rec = item as Record<string, unknown>;
-          for (const key in rec) {
-            const v = rec[key];
-            if (v === null || v === undefined) continue;
-            if (typeof v === 'string' || typeof v === 'number') {
-              if (normalizeSearch(String(v)).includes(term)) return true;
-            }
-          }
-        }
-
-        // ⚡ Fast path 2: check column accessorKeys if specified
-        for (let i = 0; i < columns.length; i++) {
-          const key = columns[i].accessorKey;
-          if (key && typeof item === 'object' && item !== null) {
-            const val = (item as Record<string, unknown>)[key as string];
-            if (
-              val !== null &&
-              val !== undefined &&
-              (typeof val === 'string' || typeof val === 'number')
-            ) {
-              if (normalizeSearch(String(val)).includes(term)) return true;
-            }
-          }
-        }
-
-        // 3. Fallback to evaluating column accessors (catches custom rendered elements/badges)
-        const accessorMatches = columns.some(col => {
-          try {
-            const val = col.accessor(item);
-            const content = getStringContent(val);
-            if (content) {
-              return normalizeSearch(content).includes(term);
-            }
-          } catch {
-            // Ignore errors in custom accessors
-          }
-          return false;
-        });
-        if (accessorMatches) return true;
-
-        // 4. Fallback to recursive deep search of the item object's nested values
-        const deepSearch = (val: unknown): boolean => {
-          if (val === null || val === undefined) return false;
-          if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
-            return normalizeSearch(String(val)).includes(term);
-          }
-          if (typeof val === 'object') {
-            const obj = val as { $$typeof?: unknown; then?: unknown };
-            if (obj.$$typeof || typeof obj.then === 'function') return false;
-            try {
-              return Object.values(obj as Record<string, unknown>).some(deepSearch);
-            } catch {
-              return false;
-            }
-          }
-          return false;
-        };
-        return deepSearch(item);
-      });
-    }
-    return items;
-  }, [data, searchTermForFilter, columns, isMainSearch]);
-
-  /**
-   * ⚡ Sorting in its own memo (was appended to the filter memo): the dataset is
-   * copied only when a sort is actually active, and changing the sort no longer
-   * re-runs the filtering pass.
-   */
-  const processedData = useMemo(() => {
-    if (!sortConfig) return filteredItems;
-
-    const getNestedValue = (obj: unknown, path: string): unknown => {
-      if (!obj || typeof obj !== 'object') return undefined;
-      if (path in obj) return (obj as Record<string, unknown>)[path];
-      return path.split('.').reduce((acc: unknown, part) => {
-        return acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[part] : undefined;
-      }, obj);
-    };
-
-    return [...filteredItems].sort((a, b) => {
-      const aVal = getNestedValue(a, sortConfig.key);
-      const bVal = getNestedValue(b, sortConfig.key);
-
-      // Handle undefined/null cases
-      if (aVal === bVal) return 0;
-      if (aVal === undefined || aVal === null) return sortConfig.direction === 'asc' ? 1 : -1;
-      if (bVal === undefined || bVal === null) return sortConfig.direction === 'asc' ? -1 : 1;
-
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        const comp = aVal.localeCompare(bVal, 'ar', { numeric: true, sensitivity: 'base' });
-        return sortConfig.direction === 'asc' ? comp : -comp;
-      }
-
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-
-      return sortConfig.direction === 'asc' ? (aVal > bVal ? 1 : -1) : aVal < bVal ? 1 : -1;
-    });
-  }, [filteredItems, sortConfig]);
 
   // Reset page when search/data changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTermForFilter, data.length]);
+  }, [searchTerm, data.length]);
 
   const paginatedData = useMemo(() => {
     if (!enablePagination) return processedData;
@@ -368,104 +221,12 @@ function ExcelTable<T>({
     setSortConfig({ key, direction });
   };
 
-  // Reset size to original
-  const handleResetSize = () => {
-    setCustomSize({});
+  const handleResetSize = useCallback((): void => {
+    resetWrapperSize();
+    resetPosition();
     setIsZoomed(false);
-    setPosition({ x: 0, y: 0 });
     resetWidths();
-  };
-
-  // Save original size before resize
-  const saveOriginalSize = useCallback(() => {
-    if (tableWrapperRef.current && Object.keys(originalSize).length === 0) {
-      setOriginalSize({
-        width: tableWrapperRef.current.style.width || '',
-        height: tableWrapperRef.current.style.height || '',
-      });
-    }
-  }, [originalSize]);
-
-  // Handle wrapper resize start (for full table resize)
-  const handleWrapperResizeStart = (direction: string, e: React.MouseEvent) => {
-    if (!enableResize) return;
-    e.stopPropagation();
-    saveOriginalSize();
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startWidth = tableWrapperRef.current?.offsetWidth || 0;
-    const startHeight = tableWrapperRef.current?.offsetHeight || 0;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!tableWrapperRef.current) return;
-
-      const deltaX = moveEvent.clientX - startX;
-      const deltaY = moveEvent.clientY - startY;
-
-      let newWidth = startWidth;
-      let newHeight = startHeight;
-
-      if (direction.includes('e')) {
-        newWidth = Math.max(400, startWidth + deltaX);
-      }
-      if (direction.includes('w')) {
-        newWidth = Math.max(400, startWidth - deltaX);
-      }
-      if (direction.includes('s')) {
-        newHeight = Math.max(200, startHeight + deltaY);
-      }
-      if (direction.includes('n')) {
-        newHeight = Math.max(200, startHeight - deltaY);
-      }
-
-      setCustomSize({ width: `${newWidth}px`, height: `${newHeight}px` });
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.body.style.cursor = `${direction}-resize`;
-    document.body.style.userSelect = 'none';
-  };
-
-  // Handle drag start
-  const handleTableDragStart = (e: React.MouseEvent) => {
-    if (!enableDrag || isZoomed) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-
-    const rect = tableWrapperRef.current?.getBoundingClientRect();
-    if (rect) {
-      setDragOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-    }
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const newX = moveEvent.clientX - dragOffset.x;
-      const newY = moveEvent.clientY - dragOffset.y;
-      setPosition({ x: newX, y: newY });
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.body.style.cursor = 'grabbing';
-    document.body.style.userSelect = 'none';
-  };
+  }, [resetWrapperSize, resetPosition, resetWidths]);
 
   const handleEditInputKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -502,12 +263,6 @@ function ExcelTable<T>({
       handleCellClick(rowIdx, colIdx, true);
     } else {
       startSelection(rowIdx, colIdx);
-    }
-  };
-
-  const handleMouseEnterCell = () => {
-    if (isMouseDown) {
-      // Selection is being made - handled by startSelection/updateSelection
     }
   };
 
@@ -555,7 +310,7 @@ function ExcelTable<T>({
           currentTheme={currentTheme}
           showSearch={showSearch}
           internalSearch={effectiveSearch}
-          setInternalSearch={isMainSearch ? onSearchChange : setInternalSearch}
+          setInternalSearch={handleSearchInput}
           isRTL={isRTL}
           onExport={onExport ?? handleExport}
           enableResize={enableResize}
@@ -580,63 +335,8 @@ function ExcelTable<T>({
           }}
           onMouseDown={handleTableDragStart}
         >
-          {/* Resize Handles */}
           {enableResize && !isZoomed && (
-            <>
-              {/* Top */}
-              <div
-                className="absolute left-0 right-0 top-0 z-10 h-1.5 cursor-n-resize transition-colors hover:bg-blue-500/30"
-                onMouseDown={e => {
-                  handleWrapperResizeStart('n', e);
-                }}
-              />
-              {/* Bottom */}
-              <div
-                className="absolute bottom-0 left-0 right-0 z-10 h-1.5 cursor-s-resize transition-colors hover:bg-blue-500/30"
-                onMouseDown={e => {
-                  handleWrapperResizeStart('s', e);
-                }}
-              />
-              {/* Left */}
-              <div
-                className="absolute bottom-0 left-0 top-0 z-10 w-1.5 cursor-w-resize transition-colors hover:bg-blue-500/30"
-                onMouseDown={e => {
-                  handleWrapperResizeStart('w', e);
-                }}
-              />
-              {/* Right */}
-              <div
-                className="absolute bottom-0 right-0 top-0 z-10 w-1.5 cursor-e-resize transition-colors hover:bg-blue-500/30"
-                onMouseDown={e => {
-                  handleWrapperResizeStart('e', e);
-                }}
-              />
-              {/* Corners */}
-              <div
-                className="absolute left-0 top-0 z-10 h-3 w-3 cursor-nw-resize transition-colors hover:bg-blue-500/30"
-                onMouseDown={e => {
-                  handleWrapperResizeStart('nw', e);
-                }}
-              />
-              <div
-                className="absolute right-0 top-0 z-10 h-3 w-3 cursor-ne-resize transition-colors hover:bg-blue-500/30"
-                onMouseDown={e => {
-                  handleWrapperResizeStart('ne', e);
-                }}
-              />
-              <div
-                className="absolute bottom-0 left-0 z-10 h-3 w-3 cursor-sw-resize transition-colors hover:bg-blue-500/30"
-                onMouseDown={e => {
-                  handleWrapperResizeStart('sw', e);
-                }}
-              />
-              <div
-                className="absolute bottom-0 right-0 z-10 h-3 w-3 cursor-se-resize transition-colors hover:bg-blue-500/30"
-                onMouseDown={e => {
-                  handleWrapperResizeStart('se', e);
-                }}
-              />
-            </>
+            <ExcelTableResizeHandles onResizeStart={handleWrapperResizeStart} />
           )}
           {/* Drag Handle in Title */}
           {enableDrag && !isZoomed && (
@@ -648,17 +348,8 @@ function ExcelTable<T>({
             ref={tableRef}
             tabIndex={0}
             className="custom-scrollbar scroll-x-hint-surface min-h-0 flex-1 overflow-auto overscroll-contain outline-none"
-            onMouseDown={() => {
-              setIsMouseDown(true);
-            }}
-            onMouseUp={() => {
-              setIsMouseDown(false);
-              endSelection();
-            }}
-            onMouseLeave={() => {
-              setIsMouseDown(false);
-              endSelection();
-            }}
+            onMouseUp={endSelection}
+            onMouseLeave={endSelection}
           >
             <table
               role="table"
@@ -729,7 +420,6 @@ function ExcelTable<T>({
                 editingCell={editingCell}
                 handleCellClick={handleCellClick}
                 handleMouseDownCell={handleMouseDownCell}
-                handleMouseEnterCell={handleMouseEnterCell}
                 onRowDoubleClick={onRowDoubleClick}
                 startEditing={startEditing}
                 editValue={editValue}
