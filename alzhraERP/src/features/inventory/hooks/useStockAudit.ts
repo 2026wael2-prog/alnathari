@@ -40,6 +40,28 @@ export const useAuditSessions = () => {
 };
 
 /**
+ * [PERF-FIX — عاصفة إبطال] كان كل حدث Realtime على `audit_items` يُطلق
+ * `invalidateQueries` فوراً. وحفظ جرد من 88 صنفاً يُولّد 88 حدثاً ⇒ 88 إعادة
+ * جلب كاملة، وكل إعادة جلب تُنفّذ استعلامين ثقيلين (جلسة + أصناف مع
+ * `products(*)`). النتيجة: تجمّد الواجهة، بطء واضح، وانقطاعات اتصال.
+ * الآن تُجمَّع أحداث كل جلسة في إبطال واحد مؤجّل (trailing debounce).
+ */
+const AUDIT_INVALIDATE_DEBOUNCE_MS = 600;
+const pendingAuditInvalidations = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleAuditSessionInvalidation(queryClient: QueryClient, sessionId: string): void {
+  const pending = pendingAuditInvalidations.get(sessionId);
+  if (pending !== undefined) clearTimeout(pending);
+
+  const timer = setTimeout(() => {
+    pendingAuditInvalidations.delete(sessionId);
+    void queryClient.invalidateQueries({ queryKey: ['audit_session', sessionId] });
+  }, AUDIT_INVALIDATE_DEBOUNCE_MS);
+
+  pendingAuditInvalidations.set(sessionId, timer);
+}
+
+/**
  * إنشاء قناة Realtime لأصناف جلسة الجرد — مُستخرجة من الـ effect
  * لإبقاء تعقيد الوظيفة تحت الحد المعتمد.
  */
@@ -59,8 +81,10 @@ function createAuditItemsChannel(
         filter: `session_id=eq.${sessionId}`,
       },
       (payload: Record<string, unknown>) => {
-        logger.debug('Audit item changed:', JSON.stringify(payload));
-        void queryClient.invalidateQueries({ queryKey: ['audit_session', sessionId] });
+        // لا نُسلسل الحمولة كاملة في كل حدث (تكلفة CPU على مسار سريع).
+        const eventType = typeof payload.eventType === 'string' ? payload.eventType : 'change';
+        logger.debug('Audit', `audit_items ${eventType} → ${channelKey}`);
+        scheduleAuditSessionInvalidation(queryClient, sessionId);
       }
     )
     .subscribe(status => {
@@ -86,6 +110,11 @@ export const useAuditSession = (sessionId: string | undefined) => {
         ? inventoryService.getAuditSessionDetails(sessionId)
         : Promise.reject(new Error('No session ID')),
     enabled: !!sessionId,
+    // [PERF-FIX] الجلسة ثقيلة (أصناف + منتجات كاملة)، لذلك نمنع إعادة الجلب
+    // عند مجرّد العودة إلى التبويب ونُبقي البيانات «طازجة» لفترة قصيرة قبل
+    // أي إعادة تحقق تلقائية.
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
@@ -339,6 +368,10 @@ export const useInventoryMutations = () => {
     finalizeAudit: finalize.mutate,
     isFinalizing: finalize.isPending,
     saveAuditProgress: saveProgress.mutate,
+    // [LAYERS-FIX] الصفحة تحتاج انتظار الحفظ قبل تعبئة أصناف المستودع، وكانت
+    // تنادي `inventoryService.saveAuditProgress` مباشرة (خرق طبقة + بلا معالجة
+    // خطأ). الآن تُنتظر نفس الـmutation التي تعالج الرسائل ووضع عدم الاتصال.
+    saveAuditProgressAsync: saveProgress.mutateAsync,
     isSavingProgress: saveProgress.isPending,
     quickAdjustStock: quickAdjust.mutate,
     isQuickAdjusting: quickAdjust.isPending,

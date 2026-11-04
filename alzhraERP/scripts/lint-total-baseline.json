@@ -1,5 +1,5 @@
 {
-  "errors": 9251,
+  "errors": 9186,
   "warnings": 206,
   "capturedAt": "2026-11-04",
   "method": "npx eslint . --report-unused-disable-directives --format json (full scan of repo)",
@@ -138,6 +138,16 @@
       "date": "2026-11-04",
       "errors": 9257,
       "note": "fix crash: single shared realtime presence channel per company (ref-counted + serialized removal) so remounts never add presence handlers post-subscribe; + regression suite (-42)"
+    },
+    {
+      "date": "2026-11-04",
+      "errors": 9205,
+      "note": "field audit stability: save-progress no-op guard + AND-ed trgm search RPC, ref-stable audit persistence hooks, memoized audit table/header, non-shifting connection banner (-46)"
+    },
+    {
+      "date": "2026-11-04",
+      "errors": 9186,
+      "note": "audit correctness wave: single source for counted quantities (NaN-free), unblocked financial impact via cost_price, live diff while typing, normalized table filter, bulk-populate through mutation (-19)"
     }
   ]
 }

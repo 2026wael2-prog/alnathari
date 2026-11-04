@@ -17,11 +17,14 @@ interface AuditItemInput {
 }
 
 interface AuditProductRow {
+  id?: string;
   name_ar?: string;
   sku?: string | null;
   part_number?: string | null;
   brand?: string | null;
   size?: string | null;
+  cost_price?: number | string | null;
+  purchase_price?: number | string | null;
   product_categories?: { name?: string } | null;
 }
 
@@ -200,12 +203,18 @@ export const auditService = {
         return {
           ...i,
           products: {
+            id: p?.id ?? null,
             name: p?.name_ar || 'بدون اسم',
             sku: p?.sku || '---',
             part_number: p?.part_number || null,
             brand: p?.brand || null,
             size: p?.size || null,
             category: p?.product_categories?.name || 'عام',
+            // [FIX — الأثر المالي] كان هذا الكائن يُبنى بـ6 حقول فقط، فيقرأ
+            // `calculateAuditStats` تكلفة صفرية دائماً وتظهر بلاطة «صافي الأثر
+            // المالي» = 0 ر.ي لكل جلسة. الحقلان للعرض فقط ولا يُكتبان في القاعدة.
+            cost_price: p?.cost_price ?? null,
+            purchase_price: p?.purchase_price ?? null,
           },
         };
       }),

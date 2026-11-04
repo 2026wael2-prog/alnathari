@@ -45,4 +45,34 @@ describe('calculateAuditStats', () => {
       ]).discrepancyValue
     ).toBe(1.24);
   });
+
+  it('treats NaN/Infinity counted quantities as not counted (never poisons totals)', () => {
+    const stats = calculateAuditStats([
+      { counted_quantity: Number.NaN, expected_quantity: 3, products: { cost_price: 10 } },
+      { counted_quantity: Number.POSITIVE_INFINITY, expected_quantity: 3 },
+      { counted_quantity: '   ', expected_quantity: 3 },
+      { counted_quantity: 4, expected_quantity: 3, products: { cost_price: 5 } },
+    ]);
+    expect(stats).toEqual({
+      total: 4,
+      counted: 1,
+      pending: 3,
+      discrepancies: 1,
+      matched: 0,
+      discrepancyValue: 5,
+    });
+    expect(Number.isNaN(stats.discrepancyValue)).toBe(false);
+  });
+
+  it('falls back to zero when expected quantity or unit cost is not finite', () => {
+    expect(
+      calculateAuditStats([
+        {
+          counted_quantity: 5,
+          expected_quantity: Number.NaN,
+          products: { cost_price: 'غير رقمي' },
+        },
+      ])
+    ).toMatchObject({ counted: 1, discrepancies: 1, discrepancyValue: 0 });
+  });
 });

@@ -60,7 +60,9 @@ const StatBox: React.FC<StatBoxProps> = ({ icon: Icon, label, value, color, form
 
 const AuditStats: React.FC<Props> = ({ stats, session }) => {
   const hasValue = stats.discrepancyValue !== undefined;
-  const val = stats.discrepancyValue ?? 0;
+  // [FIX — NaN] أي قيمة غير منتهية تُعرض صفراً بدل نص `NaN` في البلاطة.
+  const rawVal = stats.discrepancyValue ?? 0;
+  const val = Number.isFinite(rawVal) ? rawVal : 0;
   const valFormatted = `${val > 0 ? '+' : ''}${formatNumberDisplay(val)} ${stats.currency || 'ر.ي'}`;
   const valColor = val > 0 ? 'text-emerald-500' : val < 0 ? 'text-rose-500' : 'text-gray-400';
 
@@ -99,4 +101,7 @@ const AuditStats: React.FC<Props> = ({ stats, session }) => {
   );
 };
 
-export default AuditStats;
+/** [PERF-FIX] يمنع إعادة رسم البلاطات مع كل تغيّر غير متعلّق بالإحصاءات. */
+const MemoizedAuditStats = React.memo(AuditStats);
+
+export default MemoizedAuditStats;

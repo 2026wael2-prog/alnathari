@@ -25,7 +25,6 @@ import { useAuditItemActions } from '../hooks/useAuditItemActions';
 import { useAuditProductCreation } from '../hooks/useAuditProductCreation';
 import { useAuditProgressPersistence } from '../hooks/useAuditProgressPersistence';
 import { useAuthStore } from '../../auth/store';
-import { inventoryService } from '../service';
 import { calculateAuditStats } from '../utils/auditStats';
 import { AuditSessionLayout } from '../components/audit/AuditSessionLayout';
 import type { AuditStatusFilter } from '../components/audit/AuditItemsTable';
@@ -44,6 +43,7 @@ const AuditSessionPage: React.FC = () => {
   const { saveProduct, isSaving: isSavingProduct } = useProductMutations();
   const {
     saveAuditProgress,
+    saveAuditProgressAsync,
     finalizeAudit,
     addItemToAudit,
     removeItemFromAudit,
@@ -86,6 +86,7 @@ const AuditSessionPage: React.FC = () => {
     register,
     getValues,
     displayItems,
+    statsItems,
     syncItemsMutation,
     lastSyncedRef,
   } = useAuditSessionForm({
@@ -119,7 +120,7 @@ const AuditSessionPage: React.FC = () => {
 
   const [debouncedFilter] = useDebounce(actions.filter, 300);
   const { data: searchResults, isLoading: isLoadingSearch } = useSearchProducts(debouncedFilter);
-  const stats = useMemo(() => calculateAuditStats(displayItems), [displayItems]);
+  const stats = useMemo(() => calculateAuditStats(statsItems), [statsItems]);
 
   const closeAddProduct = useCallback((): void => {
     setShowAddProduct(false);
@@ -179,7 +180,14 @@ const AuditSessionPage: React.FC = () => {
     if (currentItems.length > 0) {
       const itemsToSave = prepareProgressItems();
       if (itemsToSave.length > 0) {
-        await inventoryService.saveAuditProgress({ sessionId, items: itemsToSave });
+        try {
+          // [FIX] كان النداء المباشر بلا try/catch: عند الفشل يستمر التنفيذ إلى
+          // تعبئة المستودع فتضيع الكميات المكتوبة بصمت. الآن نتوقف ورسالة الخطأ
+          // تصل من الـmutation (parseError + وضع عدم الاتصال).
+          await saveAuditProgressAsync({ sessionId, items: itemsToSave });
+        } catch {
+          return;
+        }
       }
     }
     populateWarehouseItems(sessionId, {
@@ -190,7 +198,7 @@ const AuditSessionPage: React.FC = () => {
         setShowBulkConfirm(false);
       },
     });
-  }, [sessionId, getValues, prepareProgressItems, populateWarehouseItems]);
+  }, [sessionId, getValues, prepareProgressItems, saveAuditProgressAsync, populateWarehouseItems]);
 
   const newProductInitialData = useMemo(() => {
     const trimmed = actions.filter.trim();

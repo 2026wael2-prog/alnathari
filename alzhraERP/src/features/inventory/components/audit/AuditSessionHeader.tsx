@@ -38,16 +38,15 @@ export const AuditSessionHeader: React.FC<AuditSessionHeaderProps> = ({
       icon={ClipboardCheck}
       actions={
         <div className="flex items-center gap-1 sm:gap-2">
-          {isRestoring && (
-            <span className="ml-2 hidden animate-pulse self-center text-[10px] text-blue-500 md:inline">
-              استعادة...
-            </span>
-          )}
-          {saveStatus === 'saving' && (
-            <span className="ml-2 hidden self-center text-[10px] text-amber-500 md:inline">
-              حفظ...
-            </span>
-          )}
+          {/* خانة ثابتة العرض لحالة الحفظ — تمنع قفز أزرار الرأس أفقياً عند
+              تبدّل النص بين «استعادة...» و«حفظ...» و«لا شيء». */}
+          <span className="ml-2 hidden w-14 select-none self-center text-center text-[10px] md:inline-block">
+            {isRestoring ? (
+              <span className="animate-pulse text-blue-500">استعادة...</span>
+            ) : saveStatus === 'saving' ? (
+              <span className="text-amber-500">حفظ...</span>
+            ) : null}
+          </span>
 
           {!isCompleted && (
             <Button

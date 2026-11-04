@@ -72,6 +72,9 @@ export const buildOptimisticItem = (product: Product, expectedQuantity: number):
       brand: product.brand ?? null,
       size: product.size ?? null,
       category: firstFilled(toText((product as unknown as { category?: unknown }).category), 'عام'),
+      // التكلفة تصل من نتيجة البحث إن وُجدت، وتُستكمل من الخادم بعد إعادة الجلب.
+      cost_price: toNumber(product.cost_price),
+      purchase_price: product.purchase_price === undefined ? null : toNumber(product.purchase_price),
     },
   };
 };

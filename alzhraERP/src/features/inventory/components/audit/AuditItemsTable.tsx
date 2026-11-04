@@ -3,6 +3,8 @@ import type { UseFormRegister } from 'react-hook-form';
 import { Trash2, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
 import { formatNumberDisplay } from '../../../../core/utils';
 import { cn } from '../../../../core/utils';
+import { normalizeSearch } from '../../../../core/utils/search';
+import { parseCountedInput, toCountedQuantity } from '../../utils/auditQuantity';
 
 export interface AuditItemTarget {
   id?: string;
@@ -33,60 +35,79 @@ const AuditItemsTable: React.FC<Props> = ({
   onRemoveItem,
   onSave,
 }) => {
-  const filteredFields = items
-    .map((item, index) => ({ ...item, index }))
-    .filter(field => {
-      const product = field.products;
-      if (!product) return false;
-      const term = filter.toLowerCase();
-      const matchesSearch =
-        !filter ||
-        product.name?.toLowerCase().includes(term) ||
-        product.sku?.toLowerCase().includes(term) ||
-        product.part_number?.toLowerCase().includes(term);
-      const matchesCategory = !category || product.category === category;
+  // [PERF-FIX] كانت التصفية والمجاميع تُحسب عند كل رسم (3 مرات على الأقل
+  // للمصفوفة نفسها). الآن تُحسب مرة واحدة وتُخزَّن حتى تتغيّر الأصناف أو
+  // المرشّحات، مع مرور واحد لحساب كل المجاميع.
+  const filteredFields = React.useMemo(
+    () =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- أصناف الجرد تصل كصفوف legacy من الخدمة (`any[]`) ولم تُنمذج بعد
+      items
+        .map((item, index) => ({ ...item, index }))
+        .filter(field => {
+          const product = field.products;
+          if (!product) return false;
+          // [FIX — تطبيع عربي] كانت التصفية تقارن `toLowerCase` الخام، بينما بحث
+          // القاعدة مطبَّع (همزات/تاء مربوطة/أرقام عربية)، فيظهر «لا توجد أصناف
+          // مطابقة» رغم وجود النتائج. الآن نفس تطبيع `normalizeSearch` وبكل كلمة.
+          const searchTokens = normalizeSearch(filter).split(/\s+/).filter(Boolean);
+          const haystack = normalizeSearch(
+            [product.name, product.sku, product.part_number].filter(Boolean).join(' ')
+          );
+          const matchesSearch = searchTokens.every(token => haystack.includes(token));
+          const matchesCategory = !category || product.category === category;
 
-      // Status filter
-      const isCounted =
-        field.counted_quantity !== null &&
-        field.counted_quantity !== undefined &&
-        field.counted_quantity !== '';
-      const isDiscrepancy =
-        isCounted && Number(field.counted_quantity) !== Number(field.expected_quantity);
-      const isMatched =
-        isCounted && Number(field.counted_quantity) === Number(field.expected_quantity);
+          // Status filter — أي قيمة غير منتهية (NaN/فراغ) تعني «غير مجرود».
+          const counted = toCountedQuantity(field.counted_quantity);
+          const isCounted = counted !== null;
+          const expected = toCountedQuantity(field.expected_quantity) ?? 0;
+          const isDiscrepancy = counted !== null && counted !== expected;
+          const isMatched = counted !== null && counted === expected;
 
-      let matchesStatus = true;
-      if (statusFilter === 'discrepancy') matchesStatus = isDiscrepancy;
-      else if (statusFilter === 'matched') matchesStatus = isMatched;
-      else if (statusFilter === 'uncounted') matchesStatus = !isCounted;
+          let matchesStatus = true;
+          if (statusFilter === 'discrepancy') matchesStatus = isDiscrepancy;
+          else if (statusFilter === 'matched') matchesStatus = isMatched;
+          else if (statusFilter === 'uncounted') matchesStatus = !isCounted;
 
-      return matchesSearch && matchesCategory && matchesStatus;
-    });
+          return matchesSearch && matchesCategory && matchesStatus;
+        }),
+    [items, filter, category, statusFilter]
+  );
+
+  const stats = React.useMemo(() => {
+    let totalExpected = 0;
+    let totalCounted = 0;
+    let totalDiff = 0;
+    let countedCount = 0;
+    let discrepancyCount = 0;
+
+    for (const field of filteredFields) {
+      const expected = toCountedQuantity(field.expected_quantity) ?? 0;
+      totalExpected += expected;
+
+      const counted = toCountedQuantity(field.counted_quantity);
+      if (counted === null) continue;
+
+      const difference = counted - expected;
+      totalCounted += counted;
+      totalDiff += difference;
+      countedCount += 1;
+      if (difference !== 0) discrepancyCount += 1;
+    }
+
+    return {
+      totalExpected,
+      totalCounted,
+      totalDiff,
+      countedCount,
+      pendingCount: filteredFields.length - countedCount,
+      discrepancyCount,
+    };
+  }, [filteredFields]);
+
+  const { totalExpected, totalCounted, totalDiff, countedCount, pendingCount, discrepancyCount } =
+    stats;
 
   const showActions = !isCompleted && !!onRemoveItem;
-
-  // Footer stats
-  const totalExpected = filteredFields.reduce(
-    (sum, f) => sum + (Number(f.expected_quantity) || 0),
-    0
-  );
-  const totalCounted = filteredFields.reduce((sum, f) => {
-    const v = f.counted_quantity;
-    return v !== null && v !== undefined && v !== '' ? sum + Number(v) : sum;
-  }, 0);
-  const totalDiff = filteredFields.reduce((sum, f) => {
-    const v = f.counted_quantity;
-    if (v !== null && v !== undefined && v !== '') {
-      return sum + (Number(v) - Number(f.expected_quantity));
-    }
-    return sum;
-  }, 0);
-  const countedCount = filteredFields.filter(
-    f =>
-      f.counted_quantity !== null && f.counted_quantity !== undefined && f.counted_quantity !== ''
-  ).length;
-  const pendingCount = filteredFields.length - countedCount;
 
   if (filteredFields.length === 0) {
     return (
@@ -138,13 +159,10 @@ const AuditItemsTable: React.FC<Props> = ({
           <tbody className="divide-y dark:divide-slate-800">
             {filteredFields.map((field, index) => {
               const product = field.products;
-              const isCounted =
-                field.counted_quantity !== null &&
-                field.counted_quantity !== undefined &&
-                field.counted_quantity !== '';
-              const diff = isCounted
-                ? Number(field.counted_quantity) - Number(field.expected_quantity)
-                : null;
+              const expectedQty = toCountedQuantity(field.expected_quantity) ?? 0;
+              const countedQty = toCountedQuantity(field.counted_quantity);
+              const isCounted = countedQty !== null;
+              const diff = countedQty === null ? null : countedQty - expectedQty;
 
               return (
                 <tr
@@ -209,17 +227,13 @@ const AuditItemsTable: React.FC<Props> = ({
                     </span>
                   </td>
                   <td className="border-l bg-blue-50/30 p-2 text-center font-mono text-sm font-black text-blue-600 dark:border-slate-800 dark:bg-blue-900/5 dark:text-blue-400 sm:p-3 sm:text-lg">
-                    {formatNumberDisplay(field.expected_quantity)}
+                    {formatNumberDisplay(expectedQty)}
                   </td>
                   <td className="border-l bg-emerald-50/20 p-1 text-center dark:border-slate-800 dark:bg-emerald-900/5 sm:p-2">
                     {isCompleted ? (
                       <div className="py-1 text-center sm:py-2">
                         <span className="font-mono text-base font-black text-emerald-600 dark:text-emerald-400 sm:text-2xl">
-                          {field.counted_quantity !== null &&
-                          field.counted_quantity !== undefined &&
-                          field.counted_quantity !== ''
-                            ? formatNumberDisplay(field.counted_quantity)
-                            : '—'}
+                          {countedQty === null ? '—' : formatNumberDisplay(countedQty)}
                         </span>
                       </div>
                     ) : (
@@ -227,9 +241,14 @@ const AuditItemsTable: React.FC<Props> = ({
                         key={`qty-${field.id || field.audit_item_id || field.product_id}`}
                         type="number"
                         min={0}
-                        defaultValue={field.counted_quantity ?? ''}
+                        inputMode="numeric"
+                        aria-label={`الكمية الفعلية للصنف ${String(product?.name_ar || product?.name || '')}`}
+                        defaultValue={countedQty === null ? '' : countedQty}
                         {...register(`items.${field.index}.counted_quantity`, {
-                          valueAsNumber: true,
+                          // [FIX — NaN] الحقل الفارغ كان يُرجع `NaN` (valueAsNumber)
+                          // فيظهر «NaN» في الفرق ويُرسل `null` يمسح الكمية المحفوظة.
+                          // الآن الفراغ = `null` صريح، وأي رقم صالح يبقى كما هو.
+                          setValueAs: parseCountedInput,
                           onBlur: () => {
                             if (onSave) onSave();
                           },
@@ -271,6 +290,7 @@ const AuditItemsTable: React.FC<Props> = ({
                         }}
                         className="rounded-lg border border-transparent p-1.5 text-rose-400 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 active:scale-95 dark:hover:border-rose-900/40 dark:hover:bg-rose-900/20"
                         title="إزالة من الجلسة"
+                        aria-label={`إزالة ${String(product?.name_ar || product?.name || 'الصنف')} من الجلسة`}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -324,7 +344,7 @@ const AuditItemsTable: React.FC<Props> = ({
                       : 'text-gray-400'
                 )}
               >
-                {totalDiff > 0 ? `+${totalDiff}` : totalDiff !== 0 ? totalDiff : '—'}
+                {totalDiff > 0 ? `+${String(totalDiff)}` : totalDiff !== 0 ? totalDiff : '—'}
               </td>
               {showActions && <td />}
             </tr>
@@ -333,28 +353,11 @@ const AuditItemsTable: React.FC<Props> = ({
       </div>
 
       {/* Mobile: discrepancy summary */}
-      {filteredFields.some(f => {
-        const v = f.counted_quantity;
-        return (
-          v !== null && v !== undefined && v !== '' && Number(v) !== Number(f.expected_quantity)
-        );
-      }) && (
+      {discrepancyCount > 0 && (
         <div className="flex items-center gap-2 border-t border-slate-100 bg-rose-50/30 p-3 dark:border-slate-800 dark:bg-rose-900/5">
           <AlertTriangle size={14} className="shrink-0 text-rose-500" />
           <p className="text-[10px] font-bold text-rose-600 dark:text-rose-400">
-            يوجد فروقات في{' '}
-            {
-              filteredFields.filter(f => {
-                const v = f.counted_quantity;
-                return (
-                  v !== null &&
-                  v !== undefined &&
-                  v !== '' &&
-                  Number(v) !== Number(f.expected_quantity)
-                );
-              }).length
-            }{' '}
-            صنف — راجع الأرقام قبل الإغلاق
+            يوجد فروقات في {discrepancyCount} صنف — راجع الأرقام قبل الإغلاق
           </p>
         </div>
       )}
@@ -362,4 +365,7 @@ const AuditItemsTable: React.FC<Props> = ({
   );
 };
 
-export default AuditItemsTable;
+/** [PERF-FIX] يمنع إعادة رسم الجدول عند تغيّر حالة الأب غير المتعلقة بالأصناف. */
+const MemoizedAuditItemsTable = React.memo(AuditItemsTable);
+
+export default MemoizedAuditItemsTable;

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { inventoryService } from '../service';
 import { useAuthStore } from '../../auth/store';
@@ -319,16 +319,25 @@ export const useProductMutations = (): ProductMutations => {
 export const useSearchProducts = (searchTerm: string): UseQueryResult<Product[]> => {
   const { user } = useAuthStore();
   const companyId = user?.company_id;
+  // [PERF-FIX] كان مفتاح الاستعلام يستخدم النص الخام، فكل مسافة أو حرف زائد
+  // يُنشئ مدخلاً جديداً في الكاش ويجعل القائمة تومض. الآن نستخدم النص بعد
+  // trim، ونُبقي نتائج البحث السابق معروضة أثناء جلب التالي
+  // (`keepPreviousData`) لتفادي وميض القائمة وانطفائها مع كل حرف.
+  const normalizedTerm = searchTerm.trim();
+  const isSearchable = companyId !== undefined && companyId !== '' && normalizedTerm.length > 1;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SearchResultProduct is a runtime subset of Product; full Product type expected by consumers
   return useQuery({
-    queryKey: ['products_search', companyId, searchTerm],
+    queryKey: ['products_search', companyId, normalizedTerm],
     queryFn: () =>
-      companyId !== undefined && companyId !== '' && searchTerm.length > 1
-        ? inventoryService.searchProducts(companyId, searchTerm)
+      companyId !== undefined && companyId !== '' && normalizedTerm.length > 1
+        ? inventoryService.searchProducts(companyId, normalizedTerm)
         : Promise.resolve([]),
-    enabled: companyId !== undefined && companyId !== '' && searchTerm.length > 1,
+    enabled: isSearchable,
     staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   }) as unknown as UseQueryResult<Product[]>;
 };
 
