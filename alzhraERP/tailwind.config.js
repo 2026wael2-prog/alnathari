@@ -37,9 +37,26 @@ export default {
       },
       colors: {
         accent: 'var(--accent, #10b981)',
+        /**
+         * لوحة slate مربوطة بمتغيرات CSS (انظر MIZAN_NIGHT_SLATE).
+         * القيمة الاحتياطية = لون Tailwind الأصلي، فلا يتغيّر شكل أي ثيم آخر.
+         * الصيغة `rgb(R G B / <alpha>)` ضرورية كي تعمل مُعدِّلات الشفافية
+         * (dark:bg-slate-800/40) وتعمل معها تلوينات الثيم (ليل الميزان).
+         */
         slate: {
-          750: '#293548',
-          850: '#172033',
+          50: 'rgb(var(--slate-50, 248 250 252) / <alpha-value>)',
+          100: 'rgb(var(--slate-100, 241 245 249) / <alpha-value>)',
+          200: 'rgb(var(--slate-200, 226 232 240) / <alpha-value>)',
+          300: 'rgb(var(--slate-300, 203 213 225) / <alpha-value>)',
+          400: 'rgb(var(--slate-400, 148 163 184) / <alpha-value>)',
+          500: 'rgb(var(--slate-500, 100 116 139) / <alpha-value>)',
+          600: 'rgb(var(--slate-600, 71 85 105) / <alpha-value>)',
+          700: 'rgb(var(--slate-700, 51 65 85) / <alpha-value>)',
+          750: 'rgb(var(--slate-750, 41 53 72) / <alpha-value>)',
+          800: 'rgb(var(--slate-800, 30 41 59) / <alpha-value>)',
+          850: 'rgb(var(--slate-850, 23 32 51) / <alpha-value>)',
+          900: 'rgb(var(--slate-900, 15 23 42) / <alpha-value>)',
+          950: 'rgb(var(--slate-950, 2 6 23) / <alpha-value>)',
         },
         // Theme-aware colors using CSS variables with better fallbacks for day mode
         'app-text': 'var(--app-text, #1f2937)',

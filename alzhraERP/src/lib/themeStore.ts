@@ -1,8 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { THEME_PRESETS } from '../features/appearance/constants';
+import { APP_BORDER_TIER_VARS, CLASSIC_CHROME_VARS, MIZAN_NIGHT_SLATE_VARS } from '../features/appearance/classicTokens';
+import type { ThemeCSSVars } from '../features/appearance/types';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
+
+/**
+ * شكل الهيكل العام للواجهة:
+ * - 'auto'    : يتبع ما يقترحه الثيم النشط (ThemePreset.layout) — الافتراضي.
+ * - 'modern'  : شريط جانبي + ترويسة (الشكل الحالي دائماً).
+ * - 'classic' : قوائم + شريط أوامر مكتبي (يُطبَّق على lg = 1024px فأعلى فقط).
+ */
+export type UiLayout = 'auto' | 'modern' | 'classic';
 
 interface ThemeSettings {
   accentColor: string;
@@ -29,8 +39,11 @@ interface ThemeState {
 
   draftSettings: ThemeSettings;
 
+  uiLayout: UiLayout;
+
   setMode: (mode: ThemeMode) => void;
   setPreset: (id: string) => void;
+  setUiLayout: (layout: UiLayout) => void;
 
   setDraftAccentColor: (color: string) => void;
   setDraftFont: (font: string) => void;
@@ -92,7 +105,8 @@ let themeMediaQueryCleanup: (() => void) | null = null;
  */
 const deriveDarkThemeFromPreset = (preset: (typeof THEME_PRESETS)[0]) => {
   const accent = preset.accent || (preset.colors && preset.colors[0]) || '#10b981';
-  const category = (preset as any).category || 'classic';
+  // category معرّف أصلاً في ThemePreset — لا حاجة لأي cast
+  const category = preset.category ?? 'classic';
 
   if (category === 'beige') {
     return {
@@ -154,6 +168,41 @@ const deriveDarkThemeFromPreset = (preset: (typeof THEME_PRESETS)[0]) => {
   };
 };
 
+// مفاتيح اختيارية لا يحددها كل ثيم — تُمسح قبل كل تطبيق لمنع تسرّب قيم الثيم السابق.
+// ملاحظة: لا تُضمَّن --glass-* هنا لأنها تُدار من إعدادات المستخدم (applyGlassBlur/Opacity)
+// ولا يعرّفها أي ثيم، ومسحها هنا يفقد إعداد الزجاج عند تبديل الوضع.
+const OPTIONAL_VARS = [
+  '--app-card',
+  '--app-grid',
+  '--app-zebra',
+  '--brand-500',
+  '--brand-ink',
+  // درجات الحدود (خفيف / فاصل / عنصر تحكّم) — تُمسح كي تسقط الثيمات الأخرى
+  // إلى --app-border فلا ترث ثقل حدود الميزان أو خفّتها.
+  ...APP_BORDER_TIER_VARS,
+  // توكنات قشرة الميزان الكلاسيكي — تُمسح أيضاً كي تسقط إلى قيمها الافتراضية في CSS
+  ...CLASSIC_CHROME_VARS,
+  // جسر لوحة slate الليلية — يُمسح كي تعود أصناف dark:bg-slate-* الحرفية
+  // إلى ألوان Tailwind الأصلية عند الانتقال لثيم آخر (لا تسرّب دفء الميزان).
+  ...MIZAN_NIGHT_SLATE_VARS,
+] as const;
+
+/**
+ * يطبّق متغيرات الثيم مع سقوط تلقائي للمفاتيح الموسّعة:
+ * --app-card ← --app-surface ، --app-grid ← --app-border
+ */
+const writeVars = (root: HTMLElement, vars: object) => {
+  const entries = vars as Partial<ThemeCSSVars>;
+  Object.entries(entries).forEach(([prop, value]) => {
+    if (typeof value === 'string' && value.length > 0) root.style.setProperty(prop, value);
+  });
+
+  const surface = entries['--app-surface'];
+  const border = entries['--app-border'];
+  if (surface) root.style.setProperty('--app-card', entries['--app-card'] ?? surface);
+  if (border) root.style.setProperty('--app-grid', entries['--app-grid'] ?? border);
+};
+
 // تطبيق CSS variables الخاصة بالثيم على DOM
 const applyPresetCSSVars = (presetId: string, currentTheme: 'light' | 'dark') => {
   if (typeof document === 'undefined') return;
@@ -163,41 +212,37 @@ const applyPresetCSSVars = (presetId: string, currentTheme: 'light' | 'dark') =>
 
   const root = document.documentElement;
 
+  // منع تسّرُب القيم الاختيارية من الثيم السابق (تبديل ثيمات متتالٍ)
+  OPTIONAL_VARS.forEach(prop => root.style.removeProperty(prop));
+  // شكل الزوايا (كلاسيكي = شبه مربعة) يُدار عبر [data-corners] في index.css
+  root.dataset.corners = preset.corners ?? 'rounded';
+
   if (preset.light && preset.dark) {
     // اختيار المتغيرات بناءً على الوضع الحالي للباقات التي تدعم كلا الوضعين
-    const vars = currentTheme === 'dark' ? preset.dark : preset.light;
-    Object.entries(vars).forEach(([prop, value]) => {
-      root.style.setProperty(prop, value);
-    });
+    writeVars(root, currentTheme === 'dark' ? preset.dark : preset.light);
   } else if (preset.isDark) {
     // للباقات المخصصة للوضع الليلي
     if (currentTheme === 'dark') {
-      Object.entries(preset.cssVars).forEach(([prop, value]) => {
-        root.style.setProperty(prop, value);
-      });
+      writeVars(root, preset.cssVars);
     } else {
       // وضع نهاري أنيق للباقات الليلية عند التحويل للنهاري مع الحفاظ على لون التمييز
-      const accent = preset.accent || '#10b981';
-      root.style.setProperty('--app-bg', '#f8fafc');
-      root.style.setProperty('--app-surface', '#ffffff');
-      root.style.setProperty('--app-surface-hover', '#f1f5f9');
-      root.style.setProperty('--app-border', '#e2e8f0');
-      root.style.setProperty('--app-text', '#0f172a');
-      root.style.setProperty('--app-text-secondary', '#475569');
-      root.style.setProperty('--accent', accent);
+      writeVars(root, {
+        '--app-bg': '#f8fafc',
+        '--app-surface': '#ffffff',
+        '--app-surface-hover': '#f1f5f9',
+        '--app-border': '#e2e8f0',
+        '--app-text': '#0f172a',
+        '--app-text-secondary': '#475569',
+        '--accent': preset.accent || '#10b981',
+      });
     }
   } else {
     // للباقات النهارية
     if (currentTheme === 'light') {
-      Object.entries(preset.cssVars).forEach(([prop, value]) => {
-        root.style.setProperty(prop, value);
-      });
+      writeVars(root, preset.cssVars);
     } else {
       // تطبيق درجات ليلية متناسقة مع طبيعة وألوان الثيم المختار
-      const darkVars = deriveDarkThemeFromPreset(preset);
-      Object.entries(darkVars).forEach(([prop, value]) => {
-        root.style.setProperty(prop, value);
-      });
+      writeVars(root, deriveDarkThemeFromPreset(preset));
     }
   }
 };
@@ -215,6 +260,7 @@ export const useThemeStore = create<ThemeState>()(
       shadowStrength: 0.05,
       glassBlur: 10,
       glassOpacity: 0.1,
+      uiLayout: 'auto',
       draftSettings: {
         accentColor: '#10b981',
         font: 'Cairo',
@@ -320,6 +366,10 @@ export const useThemeStore = create<ThemeState>()(
         });
       },
 
+      setUiLayout: layout => {
+        set({ uiLayout: layout });
+      },
+
       setDraftAccentColor: color => {
         applyAccent(color);
         set(state => ({ draftSettings: { ...state.draftSettings, accentColor: color } }));
@@ -406,6 +456,7 @@ export const useThemeStore = create<ThemeState>()(
         shadowStrength: state.shadowStrength,
         glassBlur: state.glassBlur,
         glassOpacity: state.glassOpacity,
+        uiLayout: state.uiLayout,
       }),
       onRehydrateStorage: persistedState => {
         if (persistedState) {

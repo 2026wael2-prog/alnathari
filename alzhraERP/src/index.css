@@ -15,6 +15,43 @@
     --app-text: #1e293b;
     --app-text-secondary: #64748b;
     --accent: #3b82f6;
+
+    /* ────────────────────────────────────────────────────────────
+       طبقة الهوية (Brand Layer) — مشتقة تلقائياً من --accent
+       تغيير الـ accent (يدوياً أو عبر ثيم) يعيد تلوين الشريط والأزرار
+       دون الحاجة لتعديل أي مكوّن.
+       ──────────────────────────────────────────────────────────── */
+    --brand-600: var(--accent);
+    --brand-500: color-mix(in srgb, var(--accent) 72%, #ffffff);
+    --brand-700: color-mix(in srgb, var(--accent) 82%, #000000);
+    --brand-ink: #1f1f1f;
+
+    /* خطوط شبكة/صفوف الجداول — زخرفية، ولا تُستخدم لحدود حقول الإدخال */
+    --app-grid: #d9d9d9;
+    --app-zebra: #fafaf9;
+
+    /* كان --app-card مستخدماً في 6 ملفات وغير معرّف (كروت شفافة) */
+    --app-card: var(--app-surface);
+
+    /* ────────────────────────────────────────────────────────────
+       قشرة الميزان الكلاسيكي — قيم افتراضية مشتقة من الثيم النشط.
+       أي ثيم يعمل مع الشكل الكلاسيكي دون تعريفها، و«الميزان الكلاسيكي»
+       يحسمها بقيم صريحة في الوضعين. تُمسح inline قبل كل تبديل ثيم
+       (CLASSIC_CHROME_VARS في themeStore) فتعود هذه الافتراضات.
+       ──────────────────────────────────────────────────────────── */
+    --classic-chrome: color-mix(in srgb, var(--app-surface) 94%, var(--brand-500));
+    --classic-chrome-2: color-mix(in srgb, var(--app-surface) 97%, var(--brand-500));
+    --classic-chrome-border: color-mix(in srgb, var(--app-border) 65%, var(--app-surface));
+    --classic-hover: color-mix(in srgb, var(--brand-500) 16%, var(--app-surface));
+    --classic-hover-border: color-mix(in srgb, var(--brand-500) 45%, var(--app-surface));
+    --classic-active: color-mix(in srgb, var(--brand-500) 26%, var(--app-surface));
+    --classic-active-border: var(--brand-600);
+    --classic-icon: color-mix(in srgb, var(--brand-500) 12%, var(--app-surface));
+    --classic-icon-fg: var(--brand-700);
+    --classic-panel: var(--app-surface);
+    --classic-panel-border: var(--app-grid);
+    --classic-panel-shadow: 0 10px 26px rgb(0 0 0 / 16%), 0 2px 6px rgb(0 0 0 / 10%);
+
     --app-font-size: 15px;
     --radius: 0.5rem;
     --glass-blur: 10px;
@@ -41,6 +78,22 @@
     --app-text: #fafafa;
     --app-text-secondary: #a1a1aa;
     --accent: #3b82f6;
+
+    /* طبقة الهوية في الوضع الليلي */
+    --brand-ink: #1a1a1a;
+    --app-grid: #3d3d3d;
+    --app-zebra: #262626;
+
+    /* قشرة الميزان ليلاً: تفتيح التحديد وظل أعمق (الظل الفاتح غير مرئي) */
+    --classic-chrome: color-mix(in srgb, var(--app-surface) 92%, var(--brand-500));
+    --classic-chrome-2: var(--app-surface);
+    --classic-chrome-border: color-mix(in srgb, var(--app-border) 80%, var(--app-surface));
+    --classic-hover: color-mix(in srgb, var(--brand-500) 22%, var(--app-surface));
+    --classic-hover-border: color-mix(in srgb, var(--brand-500) 55%, var(--app-surface));
+    --classic-active: color-mix(in srgb, var(--brand-500) 32%, var(--app-surface));
+    --classic-icon: color-mix(in srgb, var(--brand-500) 18%, var(--app-surface));
+    --classic-icon-fg: color-mix(in srgb, var(--brand-500) 65%, #ffffff);
+    --classic-panel-shadow: 0 12px 30px rgb(0 0 0 / 60%), 0 2px 6px rgb(0 0 0 / 45%);
   }
 
   html {
@@ -80,6 +133,240 @@
 }
 
 /* ============================================================
+   الوضع المكتبي الكلاسيكي — زوايا شبه مربعة (روح الميزان / إكسل)
+   محدَّدية html[data-corners='square'] :is(.rounded-*) = (0,2,1)
+   تتغلب على hover:rounded-* (0,2,0) دون الحاجة إلى !important.
+   تُفعَّل فقط من الثيمات التي تحمل corners: 'square'.
+   ============================================================ */
+html[data-corners='square']
+  :is(.rounded-sm, .rounded, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl) {
+  border-radius: 2px;
+}
+html[data-corners='square'] :is(.rounded-full) {
+  border-radius: 9999px; /* الدوائر تبقى دائرية (أفاتار، نقاط الحالة) */
+}
+
+/* ============================================================
+   قشرة الميزان الكلاسيكي — قوائم + شريط أوامر (Ribbon) مكتبي
+   تُستخدم فقط عندما يكون الشكل الكلاسيكي نشطاً (lg = 1024px فأعلى).
+   كل الألوان من التوكنات (--classic-* تسقط إلى قيم مشتقة في :root/.dark)،
+   بلا !important، والزوايا 2px لتثبيت الهوية حتى لو كان الثيم دائرياً.
+   التحقق البصري/التبايني مؤتمت في classicIdentity.test.ts.
+   ============================================================ */
+@layer components {
+  /* ── شريط العنوان ──────────────────────────────────────────
+     تدرّج خفيف + قاعدة برتقالية 3px عبر inset shadow (بلا إزاحة تخطيط)
+     كي يُقرأ الشريط كرأس نافذة مكتبية دون التأثير على أي تباين نصي. */
+  .classic-titlebar {
+    background-image: linear-gradient(to bottom, var(--classic-chrome), var(--classic-chrome-2));
+    border-bottom: 1px solid var(--classic-chrome-border);
+    box-shadow: inset 0 3px 0 0 var(--brand-500);
+  }
+
+  .classic-brand-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 2px;
+    background-color: var(--brand-500);
+    color: var(--brand-ink);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-ink) 22%, transparent);
+  }
+
+  /* ── شريط القوائم ───────────────────────────────────────── */
+  .classic-menubar {
+    background-color: var(--classic-chrome-2);
+    border-bottom: 1px solid var(--classic-chrome-border);
+  }
+
+  .classic-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 1.5rem;
+    padding-inline: 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background-color: transparent;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--app-text);
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease;
+  }
+
+  .classic-menu-btn:hover,
+  .classic-menu-btn[aria-expanded='true'] {
+    border-color: var(--classic-hover-border);
+    background-color: var(--classic-hover);
+  }
+
+  .classic-menu-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  /* ── اللوحة المنسدلة ────────────────────────────────────── */
+  .classic-menu-panel {
+    position: absolute;
+    top: calc(100% + 2px);
+    z-index: 60;
+    min-width: 15rem;
+    padding: 3px;
+    border: 1px solid var(--classic-panel-border);
+    border-radius: 2px;
+    background-color: var(--classic-panel);
+    box-shadow: var(--classic-panel-shadow);
+  }
+
+  .classic-menu-separator {
+    height: 1px;
+    margin: 3px 4px;
+    background-color: var(--classic-chrome-border);
+  }
+
+  .classic-menu-item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.5rem;
+    border-radius: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: start;
+    color: var(--app-text);
+    transition: background-color 120ms ease;
+  }
+
+  .classic-menu-item:hover,
+  .classic-menu-item:focus-visible {
+    outline: none;
+    background-color: var(--classic-hover);
+  }
+
+  /* العنصر المفعّل حالياً (الشكل أو الحالة) — --brand-600 = --accent المحقّق لـ AA */
+  .classic-menu-item[aria-checked='true'] {
+    font-weight: 800;
+    color: var(--brand-600);
+  }
+
+  .classic-menu-check {
+    flex-shrink: 0;
+    color: var(--accent);
+  }
+
+  /* ── شريط الأوامر ───────────────────────────────────────── */
+  .classic-ribbon {
+    background-color: var(--classic-chrome-2);
+    border-bottom: 1px solid var(--classic-chrome-border);
+  }
+
+  .classic-ribbon-group {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding-inline: 0.375rem;
+    border-inline-end: 1px solid var(--classic-chrome-border);
+  }
+
+  .classic-ribbon-group:last-child {
+    border-inline-end: 0;
+  }
+
+  .classic-ribbon-group-label {
+    padding-block: 3px 2px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--app-text-secondary);
+  }
+
+  .classic-ribbon-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 4.5rem;
+    max-width: 5.5rem;
+    padding: 4px 6px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.15;
+    text-align: center;
+    color: var(--app-text);
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease;
+  }
+
+  .classic-ribbon-item:hover {
+    border-color: var(--classic-hover-border);
+    background-color: var(--classic-hover);
+  }
+
+  .classic-ribbon-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  /* العنصر النشط: خلفية + إطار + مؤشر سفلي 3px.
+     المؤشر يستخدم --accent (≥ 3:1 مع --classic-active) كي لا يكون
+     التمييز معتمداً على اللون وحده فقط. */
+  .classic-ribbon-item[aria-current='page'] {
+    border-color: var(--classic-active-border);
+    background-color: var(--classic-active);
+    box-shadow: inset 0 -3px 0 0 var(--accent);
+    font-weight: 800;
+  }
+
+  /* الأيقونة هادئة افتراضياً وتُلوَّن عند المرور/التحديد — يمنع ضجيج
+     19 مربعاً برتقالياً في نفس الوقت. */
+  .classic-ribbon-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 2px;
+    background-color: var(--classic-icon);
+    color: var(--classic-icon-fg);
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+  }
+
+  .classic-ribbon-item:hover .classic-ribbon-icon {
+    background-color: color-mix(in srgb, var(--brand-500) 26%, var(--app-surface));
+  }
+
+  .classic-ribbon-item[aria-current='page'] .classic-ribbon-icon {
+    background-color: var(--brand-500);
+    color: var(--brand-ink);
+  }
+
+  .classic-ribbon-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .classic-menu-btn,
+    .classic-menu-item,
+    .classic-ribbon-item,
+    .classic-ribbon-icon {
+      transition: none;
+    }
+  }
+}
+
+/* ============================================================
    iOS: منع التكبير التلقائي عند تركيز حقول الإدخال (يجب ≥ 16px)
    هذا هو البديل القياسي لإزالة user-scalable=no مع الحفاظ على
    قدرة المستخدم على التكبير اليدوي (WCAG 1.4.4)
@@ -113,7 +400,7 @@
 .scroll-x-hint-surface { --scroll-hint-cover: var(--app-surface); }
 .scroll-x-hint-card { --scroll-hint-cover: var(--app-card); }
 .scroll-x-hint-solid { --scroll-hint-cover: #ffffff; }
-.dark .scroll-x-hint-solid { --scroll-hint-cover: #0f172a; }
+.dark .scroll-x-hint-solid { --scroll-hint-cover: var(--app-surface); }
 
 /* ============================================================
    Theme-aware overrides 
@@ -173,20 +460,21 @@
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #94a3b8;
+  /* يتبع الثيم بدل اللون الفولاذي الثابت (#94a3b8) الذي كان يشذّ عن أي لوحة. */
+  background: color-mix(in srgb, var(--app-text-secondary) 45%, transparent);
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: color-mix(in srgb, var(--app-text-secondary) 65%, transparent);
 }
 ::-webkit-scrollbar-thumb:active {
-  background: #475569;
+  background: color-mix(in srgb, var(--app-text-secondary) 85%, transparent);
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: #64748b;
+  background: color-mix(in srgb, var(--app-text-secondary) 50%, transparent);
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: color-mix(in srgb, var(--app-text-secondary) 70%, transparent);
 }
 
 /* خلفيات الصفحات */
@@ -233,18 +521,56 @@
   background-color: var(--app-surface) !important;
 }
 
-/* حدود */
-[data-theme-scope] .border-gray-100,
+/* حدود — ثلاث درجات دلالية:
+   (1) شعرة  border-gray-100 / dark:border-slate-800   ≈ 1.15:1
+   (2) فاصل  border-gray-200 / dark:border-slate-700   ≈ 1.30:1
+   (3) تحكّم border-gray-300 / dark:border-slate-600   ≥ 3.0:1 (WCAG 1.4.11)
+   قبل هذا التقسيم كانت الدرجات الثلاث تُسقَط على توكن واحد بقيمة ~3.5:1،
+   فبدا كل جدول وبطاقة محاطاً بشبكة ثقيلة في الوضعين النهاري والليلي. */
+[data-theme-scope] .border-gray-100 {
+  border-color: var(--app-border-subtle, var(--app-border)) !important;
+}
+
 [data-theme-scope] .border-gray-200 {
   border-color: var(--app-border) !important;
 }
 
+[data-theme-scope] .border-gray-300 {
+  border-color: var(--app-border-strong, var(--app-border)) !important;
+}
+
 .dark [data-theme-scope] .dark\:border-slate-800,
 .dark .dark\:border-slate-800,
-.dark [data-theme-scope] .dark\:border-slate-700,
-.dark .dark\:border-slate-700,
 .dark [data-theme-scope] .dark\:border-gray-800,
 .dark .dark\:border-gray-800 {
+  border-color: var(--app-border-subtle, var(--app-border)) !important;
+}
+
+.dark [data-theme-scope] .dark\:border-slate-700,
+.dark .dark\:border-slate-700 {
+  border-color: var(--app-border) !important;
+}
+
+.dark [data-theme-scope] .dark\:border-slate-600,
+.dark .dark\:border-slate-600 {
+  border-color: var(--app-border-strong, var(--app-border)) !important;
+}
+
+/* فواصل الصفوف (divide-*): تُلوَّن على الأبناء لا على الحاوية.
+   `dark:divide-slate-800` يساوي حرفياً --app-card في المقياس الليلي، فكان
+   يفقد فواصل الجداول ويذوب الصف في الذي يليه؛ لذلك يُرفع إلى درجة الفاصل. */
+.dark [data-theme-scope] .dark\:divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+.dark .dark\:divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+.dark [data-theme-scope] .dark\:divide-slate-900 > :not([hidden]) ~ :not([hidden]),
+.dark .dark\:divide-slate-900 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--app-border) !important;
+}
+
+[data-theme-scope] .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--app-border-subtle, var(--app-border)) !important;
+}
+
+[data-theme-scope] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
   border-color: var(--app-border) !important;
 }
 
@@ -254,15 +580,59 @@
   background-color: var(--app-surface-hover) !important;
 }
 
+/* المناطق الشفافة: تُحفظ شفافيتها (سابقاً كانت تُفرض معتمة بلون hover
+   فتُسطَّح كل طبقات العمق ويبدو الوضع الليلي مسطحاً). */
 .dark [data-theme-scope] .dark\:bg-slate-900\/50,
-.dark .dark\:bg-slate-900\/50,
+.dark .dark\:bg-slate-900\/50 {
+  background-color: color-mix(in srgb, var(--app-surface) 50%, transparent) !important;
+}
+
 .dark [data-theme-scope] .dark\:bg-slate-900\/30,
-.dark .dark\:bg-slate-900\/30,
+.dark .dark\:bg-slate-900\/30 {
+  background-color: color-mix(in srgb, var(--app-surface) 30%, transparent) !important;
+}
+
+/* البطاقات: `dark:bg-slate-800` هو سطح البطاقة لا لون المرور، وإلا صارت
+   كل بطاقة بنفس لون الـhover وضاعت هرمية الأسطح (بطاقة فوق سطح فوق صفحة). */
 .dark [data-theme-scope] .dark\:bg-slate-800,
 .dark .dark\:bg-slate-800,
 .dark [data-theme-scope] .dark\:bg-gray-800,
 .dark .dark\:bg-gray-800 {
-  background-color: var(--app-surface-hover) !important;
+  background-color: var(--app-card) !important;
+}
+
+/* حقول الإدخال: حدّ عنصر تحكّم دائماً (لا الفاصل الخفيف).
+   كثير من الحقول تُرسم بـ`border-[var(--app-border)]` أو `border-gray-200`،
+   فكانت ستصبح بلا حد بعد تحويل --app-border إلى درجة فاصلة. هذه القاعدة
+   ترفع حدود الحقول إلى الدرجة القوية وحدها (ولا تُضيف إطاراً لعنصر بلا حد:
+   تغيير `border-color` وحده لا يرسم حداً حين تكون `border-width: 0`). */
+[data-theme-scope] input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-theme-scope] select,
+[data-theme-scope] textarea {
+  border-color: var(--app-border-strong, var(--app-border)) !important;
+}
+
+/* رسوم Recharts: الشبكة والمحاور كانت تُلوَّن بألوان فولاذية ثابتة داخل
+   المكوّنات (#334155، #94a3b8، #cbd5e1)، فتبقى زرقاء رمادية على أي لوحة دافئة.
+   صفات SVG التقديمية أدنى أولوية من أي قاعدة CSS، فهذه القواعد تغلبها بلا
+   !important ولا تعديل أي مكوّن. ألوان السلاسل (stroke على المنحنيات) لا تُمَس
+   لأنها ليست شبكة ولا نص محاور. */
+.recharts-cartesian-grid line,
+.recharts-cartesian-axis-line,
+.recharts-cartesian-axis-tick-line {
+  stroke: var(--app-grid, var(--app-border));
+}
+.recharts-text.recharts-cartesian-axis-tick-value,
+.recharts-text.recharts-label {
+  fill: var(--app-text-secondary);
+}
+.recharts-legend-item-text {
+  color: var(--app-text-secondary);
+}
+.recharts-default-tooltip {
+  background-color: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+  color: var(--app-text) !important;
 }
 
 /* نصوص */

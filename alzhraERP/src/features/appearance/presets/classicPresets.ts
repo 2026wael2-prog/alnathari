@@ -1,4 +1,5 @@
 import type { ThemePreset } from '../types';
+import { MIZAN_DAY_SLATE, MIZAN_NIGHT_SLATE } from '../classicTokens';
 import { normalize } from './normalize';
 
 export const CLASSIC_PRESETS: ThemePreset[] = [
@@ -269,6 +270,98 @@ export const CLASSIC_PRESETS: ThemePreset[] = [
       '--app-text': '#f0dcd0',
       '--app-text-secondary': '#c08868',
       '--accent': '#e8a040',
+    },
+  }),
+  // ══════════════════════════════════════════════════════════════════════
+  // الميزان الكلاسيكي — Al-Mizan Classic
+  // هوية الأنظمة المحاسبية المكتبية: برتقالي دافئ + فحمي رسمي + شبكة جداول.
+  // ثيم ثنائي الوضع (light + dark) ليظهر دائماً في المعرض وألا يعتمد على
+  // الاشتقاق العام للوضع الليلي.
+  // ══════════════════════════════════════════════════════════════════════
+  normalize({
+    id: 'al-mizan-classic',
+    name: 'الميزان الكلاسيكي',
+    description:
+      'ورق دافئ نظيف بخطوط رفيعة في النهار، وحبر قهوي متدرّج بلمسات كهرمانية في الليل — بحدود ثلاثية الدرجات وروح برامج المحاسبة المكتبية.',
+    colors: ['#f58220', '#c2410c', '#2a241c'],
+    previewColor: '#f7f6f3',
+    accent: '#c2410c',
+    isDark: false,
+    category: 'classic',
+    emoji: '🧾',
+    corners: 'square',
+    layout: 'classic',
+    light: {
+      /* ── «نهار الميزان»: يربط مقياس slate الدافئ نهاراً كي لا تظهر لوحات
+         فولاذية باردة (bg-slate-50/100/200) على الورق الدافئ ── */
+      ...MIZAN_DAY_SLATE,
+      /* ── أسطح ونصوص: ورقة بيضاء على مكتب فاتح دافئ + حبر رسمي ── */
+      '--app-bg': '#f2f0ec',
+      '--app-surface': '#ffffff',
+      '--app-surface-hover': '#f6efe3',
+      /* الحدود بثلاث درجات: الفواصل شعرة، والحقول حدّ مرئي (≥3:1) */
+      '--app-border-subtle': '#f0eee9',
+      '--app-border': '#e6e2da',
+      '--app-border-strong': '#948c7d',
+      '--app-text': '#1b1b19',
+      '--app-text-secondary': '#5a564f',
+      '--accent': '#c2410c',
+      '--brand-500': '#f58220',
+      '--brand-ink': '#1b1b19',
+      '--app-card': '#ffffff',
+      '--app-grid': '#e0dcd3',
+      '--app-zebra': '#fbfaf7',
+      /* ── قشرة الميزان: طبقات نهارية هادئة بلمسة برتقالية ── */
+      '--classic-chrome': '#f7f6f3',
+      '--classic-chrome-2': '#fbfaf8',
+      '--classic-chrome-border': '#e6e2da',
+      '--classic-hover': '#fdf0e0',
+      '--classic-hover-border': '#b57c3d',
+      '--classic-active': '#fce4c8',
+      '--classic-active-border': '#c2410c',
+      '--classic-icon': '#f3efe7',
+      '--classic-icon-fg': '#9a4a08',
+      '--classic-panel': '#ffffff',
+      '--classic-panel-border': '#ddd8cf',
+      '--classic-panel-shadow': '0 10px 26px rgb(31 31 31 / 14%), 0 2px 6px rgb(31 31 31 / 9%)',
+    },
+    dark: {
+      /* ── ليل الميزان: حبر بنّي دافئ + كهرماني، بقيم مشتقة من نفس مقياس
+         الورق النهاري (ليس رمادياً ولا أزرق فولاذياً).
+         القشرة والبطاقات تُلوَّن من مصدرين: توكنات --app-* الخاصة بنا،
+         وأصناف dark:bg-slate-* الحرفية التي أُعيد ربطها بمقياس دافئ عبر
+         MIZAN_NIGHT_SLATE (انظر tailwind.config.js). وبذلك تصبح البطاقات
+         والحقول والحدود من عائلة الميزان نفسها بلا تعديل أي مكوّن. ── */
+      ...MIZAN_NIGHT_SLATE,
+      '--app-bg': '#17140f',
+      '--app-surface': '#201c16',
+      '--app-surface-hover': '#3a3226',
+      /* درجات الحدود: شعرة 1.12، فاصل 1.29، عنصر تحكّم 3.23 — لا شبكة ثقيلة */
+      '--app-border-subtle': '#332c23',
+      '--app-border': '#3d362c',
+      '--app-border-strong': '#82705a',
+      '--app-text': '#f4efe6',
+      '--app-text-secondary': '#b9ac99',
+      '--accent': '#fb923c',
+      /* البرتقالي هو ثابت الهوية — لا يتبدّل بين الوضعين */
+      '--brand-500': '#f58220',
+      '--brand-ink': '#1b1207',
+      '--app-card': '#2a241c',
+      '--app-grid': '#423a30',
+      '--app-zebra': '#211d17',
+      /* ── قشرة الميزان ليلاً: خشب داكن متدرّج + كهرماني للتحديد ── */
+      '--classic-chrome': '#2f2822',
+      '--classic-chrome-2': '#26201a',
+      '--classic-chrome-border': '#453c31',
+      '--classic-hover': '#3b3226',
+      '--classic-hover-border': '#8d7a5f',
+      '--classic-active': '#473923',
+      '--classic-active-border': '#f07f18',
+      '--classic-icon': '#3a3227',
+      '--classic-icon-fg': '#fdba74',
+      '--classic-panel': '#2b241d',
+      '--classic-panel-border': '#4a3f33',
+      '--classic-panel-shadow': '0 12px 30px rgb(10 7 4 / 65%), 0 2px 6px rgb(10 7 4 / 50%)',
     },
   }),
 ];

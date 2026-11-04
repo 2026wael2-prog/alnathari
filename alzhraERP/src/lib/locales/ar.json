@@ -460,5 +460,21 @@
   "vin_tab_decode": "فك الشاصي",
   "vin_tab_saved": "الشواصي المحفوظة",
   "vin_tab_inventory": "المخزون المتطابق",
-  "vin_tab_extract": "استخراج وإضافة القطع"
+  "vin_tab_extract": "استخراج وإضافة القطع",
+  "ribbon_group_main": "الرئيسية",
+  "ribbon_group_sales": "المبيعات والتحصيل",
+  "ribbon_group_stock": "المشتريات والمخزون",
+  "ribbon_group_finance": "المالية والمصروفات",
+  "ribbon_group_parties": "الأطراف والتحليل",
+  "ribbon_group_admin": "الإدارة والنظام",
+  "menu_file": "ملف",
+  "menu_view": "عرض",
+  "menu_reports": "التقارير",
+  "menu_dashboard": "لوحة التحكم",
+  "menu_appearance": "المظهر والثيمات",
+  "menu_toggle_theme": "تبديل الوضع الليلي/النهاري",
+  "menu_layout_auto": "شكل الواجهة: تلقائي (يتبع الثيم)",
+  "menu_layout_modern": "شكل الواجهة: حديث (شريط جانبي)",
+  "menu_layout_classic": "شكل الواجهة: كلاسيكي (قوائم وشريط أوامر)",
+  "menu_toggle_ribbon": "طي/بسط شريط الأوامر"
 }

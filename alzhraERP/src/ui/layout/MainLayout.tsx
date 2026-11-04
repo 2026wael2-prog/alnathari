@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from 'rea
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import ClassicChrome from './classic/ClassicChrome';
+import { useLayoutVariant } from './useLayoutVariant';
 import { WorkspaceTabBar, MultiViewContainer } from './tabs';
 import {
   LayoutDashboard,
@@ -80,6 +82,8 @@ const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const { initializeTheme } = useThemeStore();
   const { t } = useTranslation();
+  // القشرة الكلاسيكية (قوائم + شريط أوامر) تُفعَّل من الثيم/التفضيل وعلى سطح المكتب فقط
+  const isClassicShell = useLayoutVariant() === 'classic';
 
   // Dynamic sidebar width based on screen size and device
   const sidebarWidth = useMemo(
@@ -185,24 +189,27 @@ const MainLayout: React.FC = () => {
         ></div>
       )}
 
-      <Sidebar
-        className="no-print"
-        isCollapsed={isSidebarCollapsed}
-        toggleSidebar={() => {
-          setIsSidebarCollapsed(!isSidebarCollapsed);
-        }}
-        isMobileOpen={isMobileSidebarOpen}
-        onCloseMobile={() => {
-          setIsMobileSidebarOpen(false);
-        }}
-        sidebarWidth={sidebarWidth}
-      />
+      {!isClassicShell && (
+        <Sidebar
+          className="no-print"
+          isCollapsed={isSidebarCollapsed}
+          toggleSidebar={() => {
+            setIsSidebarCollapsed(!isSidebarCollapsed);
+          }}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => {
+            setIsMobileSidebarOpen(false);
+          }}
+          sidebarWidth={sidebarWidth}
+        />
+      )}
 
       <div
         className={cn(
           'relative flex h-full flex-1 flex-col overflow-hidden transition-[margin] duration-150 ease-out print:!m-0 print:!block print:!w-full print:!overflow-visible print:!p-0',
           contentMaxWidth,
           isDesktop &&
+            !isClassicShell &&
             getMainLayoutOffsetClasses({
               breakpoint,
               dir,
@@ -213,11 +220,15 @@ const MainLayout: React.FC = () => {
         )}
       >
         <div className="no-print">
-          <Header
-            onMenuClick={() => {
-              setIsMobileSidebarOpen(true);
-            }}
-          />
+          {isClassicShell ? (
+            <ClassicChrome />
+          ) : (
+            <Header
+              onMenuClick={() => {
+                setIsMobileSidebarOpen(true);
+              }}
+            />
+          )}
           {isDesktop && <WorkspaceTabBar />}
         </div>
 

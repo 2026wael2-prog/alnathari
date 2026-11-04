@@ -9,8 +9,12 @@ import {
   RotateCcw,
   Sparkles,
   Filter,
+  PanelLeft,
+  LayoutTemplate,
+  Monitor,
 } from 'lucide-react';
 import { useThemeStore } from '../../lib/themeStore';
+import type { UiLayout } from '../../lib/themeStore';
 import { THEME_PRESETS, THEME_CATEGORIES } from './constants';
 import ThemePresetCard from './components/ThemePresetCard';
 import ModeSelector from './components/ModeSelector';
@@ -40,6 +44,17 @@ type CategoryFilter =
   | 'artistic'
   | 'industry';
 
+const LAYOUT_OPTIONS: Array<{
+  id: UiLayout;
+  label: string;
+  hint: string;
+  icon: typeof Palette;
+}> = [
+  { id: 'auto', label: 'تلقائي', hint: 'يتبع الثيم', icon: Sparkles },
+  { id: 'modern', label: 'حديث', hint: 'شريط جانبي', icon: PanelLeft },
+  { id: 'classic', label: 'كلاسيكي', hint: 'قوائم وشريط أوامر', icon: LayoutTemplate },
+];
+
 const AppearancePage: React.FC = () => {
   const {
     mode,
@@ -54,6 +69,8 @@ const AppearancePage: React.FC = () => {
     shadowStrength,
     glassBlur,
     glassOpacity,
+    uiLayout,
+    setUiLayout,
     saveAppearanceSettings,
     revertAppearanceSettings,
   } = useThemeStore();
@@ -307,6 +324,44 @@ const AppearancePage: React.FC = () => {
               </h3>
             </div>
             <ModeSelector activeMode={mode} onChange={handleModeChange} />
+          </div>
+
+          <div className="rounded-2xl border-2 border-gray-100 bg-[var(--app-surface)] p-4 shadow-sm dark:border-slate-800 md:rounded-[2.5rem] md:p-6">
+            <div className="mb-3 flex items-center gap-2 px-1 md:mb-4">
+              <span className="h-4 w-1.5 rounded-full bg-amber-500"></span>
+              <h3 className="text-[11px] font-bold text-gray-400 md:text-sm">شكل الواجهة</h3>
+            </div>
+            <div role="radiogroup" aria-label="شكل الواجهة" className="grid grid-cols-3 gap-2">
+              {LAYOUT_OPTIONS.map(option => {
+                const Icon = option.icon;
+                const isActive = uiLayout === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isActive}
+                    onClick={() => {
+                      setUiLayout(option.id);
+                    }}
+                    className={cn(
+                      'flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-2.5 transition-all active:scale-95',
+                      isActive
+                        ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                        : 'border-gray-100 text-[var(--app-text-secondary)] hover:border-gray-200 dark:border-slate-800'
+                    )}
+                  >
+                    <Icon size={16} />
+                    <span className="text-[11px] font-bold">{option.label}</span>
+                    <span className="text-[10px] font-semibold opacity-70">{option.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 flex items-center gap-1.5 px-1 text-[10px] font-semibold text-[var(--app-text-secondary)]">
+              <Monitor size={11} className="shrink-0" />
+              الشكل الكلاسيكي يُطبَّق على الشاشات العريضة (1024px فأعلى)؛ ما دونها يبقى على الشكل الحديث.
+            </p>
           </div>
 
           {renderContent()}

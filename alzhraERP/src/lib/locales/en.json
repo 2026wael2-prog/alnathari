@@ -460,5 +460,21 @@
   "vin_tab_decode": "Decode VIN",
   "vin_tab_saved": "Saved Vehicles",
   "vin_tab_inventory": "Matching Inventory",
-  "vin_tab_extract": "Extract & Add Parts"
+  "vin_tab_extract": "Extract & Add Parts",
+  "ribbon_group_main": "Home",
+  "ribbon_group_sales": "Sales & Collection",
+  "ribbon_group_stock": "Purchasing & Inventory",
+  "ribbon_group_finance": "Finance & Expenses",
+  "ribbon_group_parties": "Parties & Analysis",
+  "ribbon_group_admin": "Administration",
+  "menu_file": "File",
+  "menu_view": "View",
+  "menu_reports": "Reports",
+  "menu_dashboard": "Dashboard",
+  "menu_appearance": "Appearance & Themes",
+  "menu_toggle_theme": "Toggle dark/light mode",
+  "menu_layout_auto": "Layout: Auto (follows theme)",
+  "menu_layout_modern": "Layout: Modern (sidebar)",
+  "menu_layout_classic": "Layout: Classic (menus & ribbon)",
+  "menu_toggle_ribbon": "Collapse/expand ribbon"
 }
