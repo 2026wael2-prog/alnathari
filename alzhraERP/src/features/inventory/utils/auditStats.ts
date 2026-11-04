@@ -1,7 +1,27 @@
 import { toCountedQuantity } from './auditQuantity';
 
+/** ملخّص إحصاءات الجرد الميداني — تُعرض في بلاطات الرأس. */
+export interface AuditStatsSummary {
+  total: number;
+  counted: number;
+  pending: number;
+  discrepancies: number;
+  matched: number;
+  discrepancyValue: number;
+}
+
+/** صف المنتج المرتبط بالبند، أو البند نفسه عند غياب العلاقة (صفوف legacy). */
+const resolveProductRow = (item: Record<string, unknown>): Record<string, unknown> => {
+  const products = item.products;
+  return products !== null && typeof products === 'object'
+    ? (products as Record<string, unknown>)
+    : item;
+};
+
 /** Summarizes audit draft rows without changing quantities or losing negative adjustments. */
-export function calculateAuditStats(items: ReadonlyArray<Record<string, unknown>>) {
+export function calculateAuditStats(
+  items: ReadonlyArray<Record<string, unknown>>
+): AuditStatsSummary {
   let counted = 0;
   let discrepancies = 0;
   let matched = 0;
@@ -23,7 +43,9 @@ export function calculateAuditStats(items: ReadonlyArray<Record<string, unknown>
       continue;
     }
     discrepancies += 1;
-    const product = (item.products as Record<string, unknown>) || item;
+    // `products` قد تأتي كائناً أو غائبة (صفوف legacy) — الدالة المساعدة تمنع
+    // تحذير «الشرط صحيح دائماً» وتحافظ على نفس السلوك.
+    const product = resolveProductRow(item);
     const unitCostRaw = Number(product.cost_price ?? product.purchase_price ?? 0);
     const unitCost = Number.isFinite(unitCostRaw) ? unitCostRaw : 0;
     discrepancyValue += difference * unitCost;

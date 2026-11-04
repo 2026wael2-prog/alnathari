@@ -140,17 +140,19 @@ const mergeLiveQuantities = (
   }
   if (liveQuantityById.size === 0) return base;
 
-  let changed = false;
+  // حاوية حالة: المُصرِّف لا يتتبّع الإسناد داخل `map`، فالمتغيّر العادي كان
+  // يُرى دائماً `false`. الحاوية تُبقي الشرط مقروءاً بلا وصول بالفهرس.
+  const state = { changed: false };
   const merged = base.map(item => {
     const id = itemProductId(item);
     if (id === '' || !liveQuantityById.has(id)) return item;
     const liveQuantity = liveQuantityById.get(id);
     if (isSameQuantity(item.counted_quantity, liveQuantity)) return item;
-    changed = true;
+    state.changed = true;
     return { ...item, counted_quantity: liveQuantity };
   });
 
-  return changed ? merged : base;
+  return state.changed ? merged : base;
 };
 
 export const useAuditSessionForm = ({

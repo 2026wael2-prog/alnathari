@@ -102,7 +102,8 @@ export const auditService = {
         .maybeSingle();
 
       if (stockData) {
-        calculatedExpectedQuantity = Number(stockData.quantity) || 0;
+        // `quantity` رقم في المخطط؛ لا حاجة لتحويل نوعي — والحراسة تمنع NaN فقط.
+        calculatedExpectedQuantity = Number.isFinite(stockData.quantity) ? stockData.quantity : 0;
       } else {
         calculatedExpectedQuantity = 0;
       }

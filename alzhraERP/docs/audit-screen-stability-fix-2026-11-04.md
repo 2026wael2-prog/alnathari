@@ -135,3 +135,39 @@
 3. اختبارات هوكس الحفظ/المزامنة (`useAuditProgressPersistence`، `useAuditSessionForm`).
 4. تطبيع `any` في `AuditItemsTable` إلى `AuditItemRow` (دَين نوعي متبقٍ).
 5. ترتيب الطابع الزمني للترحيل `20261104204658` مقابل ملفات `202609…` عند إعادة بناء قاعدة جديدة.
+
+---
+
+# الموجة الثالثة — مواءمة بوابة الـCI (2026-11-04)
+
+بعد الدفع ظهر فشل في بوابة `check-lint-ratchet` على «الملفات المتغيّرة» فقط، إذ إن
+الملفات التي لمسناها كانت تحمل دَيناً قديماً أعلى من سقفها المسجّل أو أضفنا أسطراً
+جديدة رفعت التعقيد. لم نرفع أي سقف؛ بل خفضنا الدَين فعلياً:
+
+| الملف | قبل | بعد | الإجراء |
+|---|:--:|:--:|---|
+| `AuditSessionHeader.tsx` | 2 | **0** | تفكيك الشريط إلى `SaveStatusHint` + `AddProductAction` + `BulkPopulateAction` + `SaveProgressAction` + `FinalizeAction` + `AuditHeaderActions` (كل مكوّن مسؤولية واحدة) |
+| `AuditStats.tsx` | 5 | **0** | `formattedValue ?? …`، حقل `startedAt` صريح بدل شرط نص nullable، إبقاء `React.memo` والفحوص المنتهية |
+| `useProducts.ts` | 3 | **0** | استخراج `enqueueProductSaveOffline` (نفس متغيّرات الطابور ونفس `metadata.last_updated_at`) فانخفض تعقيد `onError` دون تغيير السلوك |
+| `useAuditSessionForm.ts` | 1 | **0** | حاوية `state.changed` بدل الوصول بالفهرس `base[index]` (تحذير `security/detect-object-injection`) |
+| `useStockAudit.ts` | 23 | 23 | إزالة شروط `payload &&` / `variables &&` الصحيحة دائماً (تحذير نوعي فقط) |
+| `auditService.ts` | 2 | 2 | إزالة تحويلات زائدة (`as`) في مسار الأصناف |
+| `auditStats.ts` | 1 | **0** | استخراج `resolveProductRow` فأعاد تعقيد `calculateAuditStats` إلى 9 |
+| `auditQuantity.test.ts` | 1 | **0** | حذف `as number` غير اللازم |
+
+## بوابات الجودة بعد الموجة الثالثة
+- `node scripts/check-lint-ratchet.mjs --files="…"` ✅ **19/19 ملفاً داخل السقف**
+- `npm run check:lint-total` ✅ **9164** خطأ (baseline مُحدَّث 9186→9164، −22 بلا أي زيادة)
+- `npx tsc --noEmit` ✅ 0 أخطاء — `npm run type-check:tests` ✅
+- `npm test -- --run --coverage` ✅ **157 ملفاً / 1195 اختباراً**
+- `npm run build` ✅ — `check:encoding` / `check:layers` / `check:classes` / `check:fonts` ✅
+
+## ملاحظة CI قائمة قبل هذا العمل (تحتاج قرارك)
+خطوة «Unit tests (with coverage gates)» في `.github/workflows/ci.yml` تفرض عتبات
+`30%` عامة في `vitest.config.ts`، بينما التغطية الفعلية للمستودع **15.3%** (lines/statements)
+و**60.4%** (branches) ⇒ الخطوة حمراء بغضّ النظر عن هذه الإصلاحات (الفارق 15 نقطة،
+ولا علاقة له بالجرد الميداني). الحلول الممكنة — كلها تحتاج موافقتك لأنها تمسّ إعداد CI:
+1. تقليص `coverage.include` إلى الطبقات المُختبَرة فعلاً (منطق `utils`/`services`/`hooks`)
+   ثم رفع العتبة تدريجياً (الأنسب).
+2. إبقاء التغطية تقريراً بلا `thresholds`، والاعتماد على ratchet للجودة.
+3. خفض العتبة إلى القيمة الحالية (15%) كسقف أدنى لا يُنزل تحته مستقبلاً.

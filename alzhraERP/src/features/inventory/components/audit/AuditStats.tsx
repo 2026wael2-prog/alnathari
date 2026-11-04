@@ -49,7 +49,7 @@ const StatBox: React.FC<StatBoxProps> = ({ icon: Icon, label, value, color, form
     </div>
     <div className="min-w-0">
       <h4 className="font-mono text-sm font-black leading-tight text-gray-900 dark:text-white sm:text-xl">
-        {formattedValue !== undefined ? formattedValue : formatNumberDisplay(value)}
+        {formattedValue ?? formatNumberDisplay(value)}
       </h4>
       <p className="truncate text-[10px] font-black uppercase tracking-tighter text-gray-400 sm:text-[11px] sm:tracking-wider">
         {label}
@@ -58,13 +58,28 @@ const StatBox: React.FC<StatBoxProps> = ({ icon: Icon, label, value, color, form
   </div>
 );
 
+/** نص غير فارغ أو `null` — يجعل الفارغ غير صالح كقيمة معروضة. */
+const nonEmptyOrNull = (value?: string | null): string | null =>
+  value !== undefined && value !== null && value !== '' ? value : null;
+
+/** يعيد النص الصالح أو البديل — بديل صريح عن `||` الذي يبتلع الفارغ بصمت. */
+const pickNonEmpty = (primary: string | null | undefined, fallback: string): string =>
+  nonEmptyOrNull(primary) ?? fallback;
+
 const AuditStats: React.FC<Props> = ({ stats, session }) => {
   const hasValue = stats.discrepancyValue !== undefined;
   // [FIX — NaN] أي قيمة غير منتهية تُعرض صفراً بدل نص `NaN` في البلاطة.
   const rawVal = stats.discrepancyValue ?? 0;
   const val = Number.isFinite(rawVal) ? rawVal : 0;
-  const valFormatted = `${val > 0 ? '+' : ''}${formatNumberDisplay(val)} ${stats.currency || 'ر.ي'}`;
+  const currencyLabel = pickNonEmpty(stats.currency, 'ر.ي');
+  const valFormatted = `${val > 0 ? '+' : ''}${formatNumberDisplay(val)} ${currencyLabel}`;
   const valColor = val > 0 ? 'text-emerald-500' : val < 0 ? 'text-rose-500' : 'text-gray-400';
+  // اسم المستودع: الأولوية لـ`warehouse_name` ثم علاقة `warehouses.name_ar`.
+  const warehouseLabel = pickNonEmpty(
+    session.warehouse_name,
+    pickNonEmpty(session.warehouses?.name_ar, 'غير محدد')
+  );
+  const startedAt = nonEmptyOrNull(session.created_at);
 
   return (
     <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-gray-200/50 bg-white/50 shadow-xl shadow-gray-200/20 backdrop-blur-xl dark:border-slate-800/50 dark:bg-slate-900/50 dark:shadow-none sm:grid-cols-3 lg:grid-cols-6">
@@ -72,11 +87,11 @@ const AuditStats: React.FC<Props> = ({ stats, session }) => {
         <div className="flex items-center gap-2">
           <Warehouse size={16} className="text-blue-500" />
           <h3 className="truncate text-xs font-black uppercase tracking-widest text-gray-700 dark:text-slate-300">
-            {session.warehouse_name || session.warehouses?.name_ar || 'غير محدد'}
+            {warehouseLabel}
           </h3>
         </div>
         <p className="mt-1 text-[10px] font-bold text-gray-400">
-          بدء: {session.created_at ? formatLocalDate(session.created_at) : '—'}
+          بدء: {startedAt !== null ? formatLocalDate(startedAt) : '—'}
         </p>
       </div>
       <StatBox icon={Layers} label="الإجمالي" value={stats.total} color="text-blue-500" />

@@ -244,14 +244,14 @@ export const useInventoryMutations = () => {
         | { sessionId?: string; items: Parameters<typeof inventoryService.saveAuditProgress>[0] }
         | Parameters<typeof inventoryService.saveAuditProgress>[0]
     ) => {
-      if (payload && !Array.isArray(payload) && 'items' in payload) {
+      if (!Array.isArray(payload) && 'items' in payload) {
         return inventoryService.saveAuditProgress(payload.items, payload.sessionId);
       }
       return inventoryService.saveAuditProgress(payload);
     },
     onSuccess: async (_, variables) => {
       const sessId =
-        variables && !Array.isArray(variables) && 'sessionId' in variables
+        !Array.isArray(variables) && 'sessionId' in variables
           ? (variables as { sessionId?: string }).sessionId
           : undefined;
       if (sessId) {

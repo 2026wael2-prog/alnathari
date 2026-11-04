@@ -13,6 +13,37 @@ import { normalizeSearch } from '../../../core/utils/search';
 const isOfflineError = (error: Error): boolean =>
   !navigator.onLine || error.message.includes('Failed to fetch');
 
+/**
+ * يضع حفظ المنتج في طابور المزامنة عند فقد الشبكة.
+ * كان هذا الجسم داخل `onError` فرفع تعقيده فوق الحد (11 > 10)؛ استخراجه يُبقي
+ * نفس السلوك (نفس متغيّرات الطابور ونفس `metadata.last_updated_at`) بوضوح أعلى.
+ */
+const enqueueProductSaveOffline = ({
+  variables,
+  previousProducts,
+  user,
+}: {
+  variables: { data: ProductFormData; id?: string };
+  previousProducts: Product[] | undefined;
+  user: { company_id?: string | null; id?: string | null } | null | undefined;
+}): void => {
+  const originalProduct = previousProducts?.find(p => p.id === variables.id);
+  void syncStore.enqueue({
+    mutationKey: ['products', 'save'], // Key for identification
+    variables: {
+      ...variables.data,
+      id: variables.id,
+      company_id: user?.company_id,
+      user_id: user?.id,
+    },
+    metadata: {
+      ...(originalProduct?.updated_at !== undefined
+        ? { last_updated_at: originalProduct.updated_at }
+        : {}),
+    },
+  });
+};
+
 /** Paginated products cache shape used by the paginated product list queries. */
 interface PaginatedProducts {
   data?: Product[];
@@ -206,24 +237,7 @@ export const useProductMutations = (): ProductMutations => {
       }
 
       // Network error: enqueue for offline processing via the global syncStore
-      const originalProduct = context?.previousProducts?.find(
-        (p: Product) => p.id === variables.id
-      );
-
-      void syncStore.enqueue({
-        mutationKey: ['products', 'save'], // Key for identification
-        variables: {
-          ...variables.data,
-          id: variables.id,
-          company_id: user?.company_id,
-          user_id: user?.id,
-        },
-        metadata: {
-          ...(originalProduct?.updated_at !== undefined
-            ? { last_updated_at: originalProduct.updated_at }
-            : {}),
-        },
-      });
+      enqueueProductSaveOffline({ variables, previousProducts: context?.previousProducts, user });
       showToast(
         'تم الحفظ محلياً (وضع عدم الاتصال). سيتم المزامنة تلقائياً عند عودة الإنترنت.',
         'info'

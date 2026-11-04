@@ -27,7 +27,8 @@ describe('parseCountedInput (setValueAs)', () => {
     expect(parseCountedInput('')).toBeNull();
     expect(parseCountedInput(null)).toBeNull();
     expect(parseCountedInput(undefined)).toBeNull();
-    expect(Number.isNaN(parseCountedInput('') as number)).toBe(false);
+    // `Number.isNaN` تقبل `unknown`، فلا حاجة لتحويل نوعي هنا.
+    expect(Number.isNaN(parseCountedInput(''))).toBe(false);
   });
 
   it('passes through typed values', () => {
