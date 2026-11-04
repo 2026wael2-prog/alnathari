@@ -9,6 +9,11 @@ import { useFeedbackStore } from '../../feedback/store';
 import { formatLocalDate } from '../../../core/utils';
 import { convertToBaseCurrency, ensureLatinDigits } from '../../../core/utils/currencyUtils';
 import { createIdempotencyKey } from '../../../core/utils/idempotency';
+import {
+  buildOverAllocationMessage,
+  computeRequestedAllocation,
+  exceedsInvoiceRemaining,
+} from '../invoiceAllocationGuard';
 import { useBondNumericInputs } from './useBondNumericInputs';
 import { useBondCurrencyConversion } from './useBondCurrencyConversion';
 
@@ -59,6 +64,9 @@ export function useBondForm(
   }, [allParties]);
 
   const idempotencyKeyRef = React.useRef(createIdempotencyKey('bond'));
+  // المتبقي على الفاتورة المختارة (بعملة الفاتورة) — يُستخدم لاعتراض تجاوز المبلغ
+  // قبل الخادم بدل انتظار خرق القيد chk_invoices_paid_not_exceed_total (23514).
+  const invoiceRemainingRef = React.useRef<number | null>(null);
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<BondFormData>({
     defaultValues: {
@@ -129,6 +137,7 @@ export function useBondForm(
   useEffect(() => {
     if (isOpen) {
       idempotencyKeyRef.current = createIdempotencyKey('bond');
+      invoiceRemainingRef.current = null;
       const targetAccount = defaultAccountId
         ? allAccounts?.find(a => a.id === defaultAccountId)
         : undefined;
@@ -160,6 +169,9 @@ export function useBondForm(
     setValue('currency_code', currency);
     setValue('description', prefill.description || `تحصيل دفعة من العميل${partyLabel}`);
     if (prefill.invoiceId) setValue('invoice_id', prefill.invoiceId);
+    // التعبئة المسبقة لا تحمل كامل بيانات الفاتورة — لا نفرض حداً على الواجهة،
+    // ويبقى الحارس الخادمي (FOR UPDATE) هو المرجع.
+    invoiceRemainingRef.current = null;
 
     setAmountInputStr(prefill.amount > 0 ? String(prefill.amount) : '');
     if (currency === 'SAR') {
@@ -193,6 +205,7 @@ export function useBondForm(
     (party: PartySelectOption) => {
       setValue('counterparty_id', party.id);
       setValue('invoice_id', undefined);
+      invoiceRemainingRef.current = null;
       setPartyQuery(party.name);
       setShowPartyDropdown(false);
     },
@@ -203,10 +216,12 @@ export function useBondForm(
     (inv: InvoiceSelectOption | null | undefined) => {
       if (!inv) {
         setValue('invoice_id', undefined);
+        invoiceRemainingRef.current = null;
         return;
       }
       setValue('invoice_id', inv.id);
       const remaining = Number(inv.total_amount) - Number(inv.paid_amount || 0);
+      invoiceRemainingRef.current = Number.isFinite(remaining) ? remaining : null;
       const invCurrency = inv.currency_code || inv.currency || 'SAR';
       const invRate = Number(inv.exchange_rate) || (invCurrency === 'YER' ? 410 : 1);
 
@@ -271,13 +286,29 @@ export function useBondForm(
         return;
       }
 
-      // 4. Validate exchange rate for foreign currency
+      // 4. لا تتجاوز المتبقي على الفاتورة المختارة (يمنع 23514 من الخادم)
+      if (data.invoice_id && invoiceRemainingRef.current !== null) {
+        const requestedAllocation = computeRequestedAllocation({
+          mainAmount,
+          commissionAmount: data.commission_amount,
+          currencyCode: data.currency_code,
+        });
+        if (exceedsInvoiceRemaining(requestedAllocation, invoiceRemainingRef.current)) {
+          showToast(
+            buildOverAllocationMessage(requestedAllocation, invoiceRemainingRef.current),
+            'error'
+          );
+          return;
+        }
+      }
+
+      // 5. Validate exchange rate for foreign currency
       if (data.currency_code !== 'SAR' && (!data.exchange_rate || data.exchange_rate <= 0)) {
         showToast('يجب تحديد سعر صرف صالح أكبر من الصفر', 'error');
         return;
       }
 
-      // 5. Validate commission account if commission amount is entered
+      // 6. Validate commission account if commission amount is entered
       if (data.commission_amount && data.commission_amount > 0 && !data.commission_account_id) {
         showToast('يجب تحديد الحساب المحاسبي لتوجيه مبلغ العمولة / الخصم', 'error');
         return;
