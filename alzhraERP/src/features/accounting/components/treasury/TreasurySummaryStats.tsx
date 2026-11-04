@@ -134,12 +134,12 @@ const TreasurySummaryStats: React.FC<Props> = ({ accountId, dateRange }) => {
         title="الرصيد الحالي"
         value={
           isForeign
-            ? formatCurrency(Math.abs(stats.foreignBalance), currencyCode)
-            : formatCurrency(Math.abs(stats.balance), 'SAR')
+            ? formatCurrency(stats.foreignBalance >= 0 ? stats.foreignBalance : -stats.foreignBalance, currencyCode)
+            : formatCurrency(stats.balance >= 0 ? stats.balance : -stats.balance, 'SAR')
         }
         subtext={
           isForeign
-            ? `${isCreditBalance ? 'رصيد دائن (مكشوف)' : 'رصيد مدين (متوفر)'} • يعادل ${formatCurrency(Math.abs(stats.balance), 'SAR')}`
+            ? `${isCreditBalance ? 'رصيد دائن (مكشوف)' : 'رصيد مدين (متوفر)'} • يعادل ${formatCurrency(stats.balance >= 0 ? stats.balance : -stats.balance, 'SAR')}`
             : isCreditBalance
               ? 'رصيد دائن (مكشوف)'
               : 'رصيد مدين (متوفر)'

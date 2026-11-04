@@ -54,7 +54,9 @@ export const ExpenseLedgerSummaryCards: React.FC<ExpenseLedgerSummaryCardsProps>
 
   const creditBadge = isCashbox ? 'منصرف (-)' : 'له (-)';
 
-  const isZero = Math.abs(ledgerMetrics.closingBalance) < 0.001;
+  const isZero = ledgerMetrics.closingBalance > -0.001 && ledgerMetrics.closingBalance < 0.001;
+  const closingMagnitude =
+    ledgerMetrics.closingBalance < 0 ? -ledgerMetrics.closingBalance : ledgerMetrics.closingBalance;
   const isCredit = isDebitNormal
     ? ledgerMetrics.closingBalance < 0
     : ledgerMetrics.closingBalance > 0;
@@ -158,7 +160,7 @@ export const ExpenseLedgerSummaryCards: React.FC<ExpenseLedgerSummaryCardsProps>
           </span>
         </div>
         <h4 dir="ltr" className="font-mono text-base font-black text-blue-700 dark:text-blue-400">
-          {formatCurrency(Math.abs(ledgerMetrics.closingBalance))}
+          {formatCurrency(closingMagnitude)}
         </h4>
         <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
           {balanceStatusText}

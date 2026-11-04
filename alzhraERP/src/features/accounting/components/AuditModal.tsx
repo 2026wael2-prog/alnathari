@@ -62,9 +62,9 @@ export const AuditModal: React.FC<Props> = ({ onClose }) => {
         );
       }
 
-      const diff = Math.abs(totalDebit - totalCredit);
+      const diff = totalDebit - totalCredit;
       // Use the same SOX-grade tolerance as the DB balance trigger and journalsApi (R3)
-      const isBalanced = diff < SOX_BALANCE_TOLERANCE.toNumber();
+      const isBalanced = diff > -SOX_BALANCE_TOLERANCE.toNumber() && diff < SOX_BALANCE_TOLERANCE.toNumber();
 
       if (!isBalanced) {
         unbalancedCount++;
@@ -75,7 +75,7 @@ export const AuditModal: React.FC<Props> = ({ onClose }) => {
           debit_amount: totalDebit,
           credit_amount: totalCredit,
           status: 'unbalanced',
-          message: `الفرق: ${formatCurrency(diff)}`,
+          message: `الفرق: ${formatCurrency(diff < 0 ? -diff : diff)}`,
         });
       } else if (totalDebit === 0 && totalCredit === 0) {
         errorCount++;

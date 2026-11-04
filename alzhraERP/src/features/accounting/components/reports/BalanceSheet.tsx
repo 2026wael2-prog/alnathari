@@ -170,7 +170,7 @@ const BalanceSheet: React.FC<Props> = ({ dateRange }) => {
         <span className="uppercase tracking-widest">
           {isBalanced
             ? 'الميزانية متزنة (Balanced)'
-            : `غير متزنة - الفرق ${formatCurrency(Math.abs(differenceAmount))}`}
+            : `غير متزنة - الفرق ${formatCurrency(differenceAmount < 0 ? -differenceAmount : differenceAmount)}`}
         </span>
       </div>
     </div>

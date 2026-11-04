@@ -84,7 +84,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({
               )}
             >
               {item.netBalance < 0
-                ? `(${formatCurrency(Math.abs(item.netBalance))})`
+                ? `(${formatCurrency(-item.netBalance)})`
                 : formatCurrency(item.netBalance)}
             </span>
           </div>
@@ -103,7 +103,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({
                 : 'text-emerald-600 dark:text-emerald-400'
           )}
         >
-          {total < 0 ? `(${formatCurrency(Math.abs(total))})` : formatCurrency(total)}
+          {total < 0 ? `(${formatCurrency(-total)})` : formatCurrency(total)}
         </span>
       </div>
     </div>
@@ -128,7 +128,10 @@ const BalanceSheetView: React.FC = () => {
     );
 
   const { assets, liabilities, equity, totalAssets, totalLiabEquity } = data;
-  const isBalanced = Math.abs(totalAssets - totalLiabEquity) < 1;
+  // الفارق كما هو (لا Math.abs على المجاميع) — القيمة المطلقة تُحسب مرة واحدة للعرض/التحقق فقط.
+  const balanceDiff = totalAssets - totalLiabEquity;
+  const absBalanceDiff = balanceDiff < 0 ? -balanceDiff : balanceDiff;
+  const isBalanced = absBalanceDiff < 1;
   const reportDate = formatLocalDate(new Date());
 
   const totalLiabilities = liabilities.reduce((s: number, a: BalanceItem) => s + a.netBalance, 0);
@@ -171,7 +174,7 @@ const BalanceSheetView: React.FC = () => {
             eventType="balance_sheet"
             title="مشاركة الميزانية العمومية"
             className="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-hover)] px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-200 dark:text-slate-200 dark:hover:bg-slate-700"
-            message={`🏦 الميزانية العمومية (المركز المالي) - الجعفري سمارت\n━━━━━━━━━━━━━━\n💼 إجمالي الأصول: ${formatCurrency(totalAssets)}\n📋 إجمالي الخصوم: ${formatCurrency(totalLiabilities)}\n🏛️ حقوق الملكية: ${totalEquity < 0 ? `(${formatCurrency(Math.abs(totalEquity))})` : formatCurrency(totalEquity)}\n${isBalanced ? '✅ الميزانية متزنة' : `❌ غير متزنة - الفرق: ${formatCurrency(Math.abs(totalAssets - totalLiabEquity))}`}\n📅 التاريخ: ${reportDate}`}
+            message={`🏦 الميزانية العمومية (المركز المالي) - الجعفري سمارت\n━━━━━━━━━━━━━━\n💼 إجمالي الأصول: ${formatCurrency(totalAssets)}\n📋 إجمالي الخصوم: ${formatCurrency(totalLiabilities)}\n🏛️ حقوق الملكية: ${totalEquity < 0 ? `(${formatCurrency(-totalEquity)})` : formatCurrency(totalEquity)}\n${isBalanced ? '✅ الميزانية متزنة' : `❌ غير متزنة - الفرق: ${formatCurrency(absBalanceDiff)}`}\n📅 التاريخ: ${reportDate}`}
           />
         </div>
       </div>
@@ -228,7 +231,7 @@ const BalanceSheetView: React.FC = () => {
             <p className="mt-0.5 text-xs opacity-75">
               {isBalanced
                 ? 'المعادلة متزنة تماماً (الأصول = الخصوم + حقوق الملكية)'
-                : `يوجد تباين محاسبي قدره ${formatCurrency(Math.abs(totalAssets - totalLiabEquity))}`}
+                : `يوجد تباين محاسبي قدره ${formatCurrency(absBalanceDiff)}`}
             </p>
           </div>
         </div>

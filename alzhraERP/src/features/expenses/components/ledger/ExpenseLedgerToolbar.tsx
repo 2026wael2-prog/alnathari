@@ -198,12 +198,17 @@ export const ExpenseLedgerToolbar: React.FC<ExpenseLedgerToolbarProps> = ({
                 const isCredit = isDebitNormal
                   ? ledgerMetrics.closingBalance < 0
                   : ledgerMetrics.closingBalance > 0;
-                const isZero = Math.abs(ledgerMetrics.closingBalance) < 0.001;
+                const isZero =
+                  ledgerMetrics.closingBalance > -0.001 && ledgerMetrics.closingBalance < 0.001;
+                const closingMagnitude =
+                  ledgerMetrics.closingBalance < 0
+                    ? -ledgerMetrics.closingBalance
+                    : ledgerMetrics.closingBalance;
                 const balText = isZero
                   ? 'متزن (خالص)'
                   : isCredit
-                    ? `له: ${formatCurrency(Math.abs(ledgerMetrics.closingBalance))}`
-                    : `عليه: ${formatCurrency(Math.abs(ledgerMetrics.closingBalance))}`;
+                    ? `له: ${formatCurrency(closingMagnitude)}`
+                    : `عليه: ${formatCurrency(closingMagnitude)}`;
 
                 return (
                   <ShareButton

@@ -103,7 +103,8 @@ export function getExpenseLedgerColumns(selectedAccount?: Account | null) {
           )}
           {row.foreign_amount &&
           row.foreign_amount > 0 &&
-          Math.abs(row.debit_amount - row.foreign_amount) > 0.01 ? (
+          (row.debit_amount - row.foreign_amount > 0.01 ||
+            row.foreign_amount - row.debit_amount > 0.01) ? (
             <div
               dir="ltr"
               className="font-mono text-[10px] font-semibold text-rose-700/80 dark:text-rose-400/80"
@@ -148,7 +149,8 @@ export function getExpenseLedgerColumns(selectedAccount?: Account | null) {
           )}
           {row.foreign_amount &&
           row.foreign_amount > 0 &&
-          Math.abs(row.credit_amount - row.foreign_amount) > 0.01 ? (
+          (row.credit_amount - row.foreign_amount > 0.01 ||
+            row.foreign_amount - row.credit_amount > 0.01) ? (
             <div
               dir="ltr"
               className="font-mono text-[10px] font-semibold text-emerald-700/80 dark:text-emerald-400/80"
@@ -177,7 +179,7 @@ export function getExpenseLedgerColumns(selectedAccount?: Account | null) {
       header: 'الرصيد التراكمي (له / عليه)',
       accessor: (row: LedgerEntry) => {
         const isCredit = isDebitNormal ? row.balance < 0 : row.balance > 0;
-        const isZero = Math.abs(row.balance) < 0.001;
+        const isZero = row.balance > -0.001 && row.balance < 0.001;
         const isForeign = Boolean(
           row.foreign_balance !== undefined && row.currency_code && row.currency_code !== 'SAR'
         );
@@ -215,13 +217,18 @@ export function getExpenseLedgerColumns(selectedAccount?: Account | null) {
                 }`}
               >
                 {isForeign
-                  ? formatCurrency(Math.abs(row.foreign_balance ?? 0), row.currency_code)
-                  : formatCurrency(Math.abs(row.balance))}
+                  ? formatCurrency(
+                      (row.foreign_balance ?? 0) < 0
+                        ? -(row.foreign_balance ?? 0)
+                        : (row.foreign_balance ?? 0),
+                      row.currency_code
+                    )
+                  : formatCurrency(row.balance < 0 ? -row.balance : row.balance)}
               </span>
             </div>
             {isForeign && (
               <div dir="ltr" className="font-mono text-[10px] text-gray-400">
-                ≈ {formatCurrency(Math.abs(row.balance), 'SAR')}
+                ≈ {formatCurrency(row.balance < 0 ? -row.balance : row.balance, 'SAR')}
               </div>
             )}
           </div>
@@ -232,7 +239,7 @@ export function getExpenseLedgerColumns(selectedAccount?: Account | null) {
         const lastRow = data.length > 0 ? data[data.length - 1] : null;
         const finalBal = lastRow ? lastRow.balance : 0;
         const isCredit = isDebitNormal ? finalBal < 0 : finalBal > 0;
-        const isZero = Math.abs(finalBal) < 0.001;
+        const isZero = finalBal > -0.001 && finalBal < 0.001;
 
         return (
           <div className="flex flex-col items-start gap-0.5 text-left">
@@ -260,7 +267,7 @@ export function getExpenseLedgerColumns(selectedAccount?: Account | null) {
                       : 'text-rose-700 dark:text-rose-400'
                   }`}
                 >
-                  {formatCurrency(Math.abs(finalBal))}
+                  {formatCurrency(finalBal < 0 ? -finalBal : finalBal)}
                 </span>
               </div>
             )}

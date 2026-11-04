@@ -409,13 +409,13 @@ export const reportService = {
       const existingRetainedBalance = existingRetainedAcc?.net_balance || 0;
       const priorEarnings = totalRetainedToDate - netIncome - existingRetainedBalance;
 
-      if (Math.abs(priorEarnings) > 0.001) {
+      if (priorEarnings > 0.001 || priorEarnings < -0.001) {
         equityTBI.push({
           account_id: 'prior-retained-earnings',
           code: '3200-PRIOR',
           name: 'أرباح/خسائر مدورة من فترات سابقة',
           type: 'equity',
-          total_debit: priorEarnings < 0 ? Math.abs(priorEarnings) : 0,
+          total_debit: priorEarnings < 0 ? -priorEarnings : 0,
           total_credit: priorEarnings > 0 ? priorEarnings : 0,
           net_balance: priorEarnings,
           currency_code: 'SAR',
@@ -467,7 +467,8 @@ export const reportService = {
         : [];
     }
 
-    const isBalanced = Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 1;
+    const balanceSheetDiff = totalAssets - (totalLiabilities + totalEquity);
+    const isBalanced = balanceSheetDiff > -1 && balanceSheetDiff < 1;
 
     const cogsItems = expenseTBI.filter(
       item => item.is_cogs || item.code === '5100' || item.code.startsWith('51')

@@ -23,7 +23,7 @@ const JournalEntryTotals: React.FC<JournalEntryTotalsProps> = ({
   errors,
   onAutoBalance,
 }) => {
-  const diffMagnitude = Math.abs(difference);
+  const diffMagnitude = difference < 0 ? -difference : difference;
 
   return (
     <div className="flex justify-end pt-2">

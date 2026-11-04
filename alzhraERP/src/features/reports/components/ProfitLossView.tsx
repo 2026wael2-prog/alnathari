@@ -44,7 +44,10 @@ const ProfitLossView: React.FC = () => {
     );
   }
 
-  const isProfit = (data?.netProfit ?? 0) >= 0;
+  const netProfitValue = data?.netProfit ?? 0;
+  const isProfit = netProfitValue >= 0;
+  /** مقدار صافي الربح/الخسارة للعرض — الإشارة تُفهم من التسمية، فلا Math.abs. */
+  const netProfitMagnitude = isProfit ? netProfitValue : -netProfitValue;
   const totalRevenues =
     typeof data?.totalRevenues === 'number'
       ? data.totalRevenues
@@ -95,7 +98,7 @@ const ProfitLossView: React.FC = () => {
                     : 'text-rose-600 dark:text-rose-400'
                 )}
               >
-                {formatCurrency(Math.abs(data?.netProfit || 0))}
+                {formatCurrency(netProfitMagnitude)}
               </p>
             </div>
             <div className="mt-1 flex items-center gap-1.5">
@@ -127,7 +130,7 @@ const ProfitLossView: React.FC = () => {
             >
               {isProfit ? '+' : '-'}
               {totalRevenues > 0
-                ? ((Math.abs(data?.netProfit || 0) / totalRevenues) * 100).toFixed(1)
+                ? ((netProfitMagnitude / totalRevenues) * 100).toFixed(1)
                 : 0}
               %
             </p>
@@ -137,7 +140,7 @@ const ProfitLossView: React.FC = () => {
             eventType="profit_loss"
             title="مشاركة تقرير الأداء المالي"
             className="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-            message={`📊 تقرير الأرباح والخسائر - الجعفري سمارت\n━━━━━━━━━━━━━━\n📗 إجمالي الإيرادات: ${formatCurrency(totalRevenues)}\n📕 إجمالي المصروفات: ${formatCurrency(totalExpenses)}\n${isProfit ? '✅' : '🔴'} صافي ${isProfit ? 'الربح' : 'الخسارة'}: ${formatCurrency(Math.abs(data?.netProfit || 0))}\n📅 التاريخ: ${reportDate}`}
+            message={`📊 تقرير الأرباح والخسائر - الجعفري سمارت\n━━━━━━━━━━━━━━\n📗 إجمالي الإيرادات: ${formatCurrency(totalRevenues)}\n📕 إجمالي المصروفات: ${formatCurrency(totalExpenses)}\n${isProfit ? '✅' : '🔴'} صافي ${isProfit ? 'الربح' : 'الخسارة'}: ${formatCurrency(netProfitMagnitude)}\n📅 التاريخ: ${reportDate}`}
           />
         </div>
       </div>
@@ -182,7 +185,7 @@ const ProfitLossView: React.FC = () => {
                   }`}
                 >
                   {rev.netBalance < 0 ? '-' : ''}
-                  {formatCurrency(Math.abs(rev.netBalance))}
+                  {formatCurrency(rev.netBalance < 0 ? -rev.netBalance : rev.netBalance)}
                 </span>
               </div>
             ))}
@@ -248,7 +251,7 @@ const ProfitLossView: React.FC = () => {
                   }`}
                 >
                   {exp.netBalance < 0 ? '(' : ''}
-                  {formatCurrency(Math.abs(exp.netBalance))}
+                  {formatCurrency(exp.netBalance < 0 ? -exp.netBalance : exp.netBalance)}
                   {exp.netBalance < 0 ? ')' : ''}
                 </span>
               </div>

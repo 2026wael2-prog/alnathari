@@ -71,7 +71,7 @@ const TrialBalanceView: React.FC = () => {
           )}
         >
           <span>{row.netBalance >= 0 ? 'مدين' : 'دائن'}</span>
-          <span className="font-mono">{formatCurrency(Math.abs(row.netBalance))}</span>
+          <span className="font-mono">{formatCurrency(row.netBalance >= 0 ? row.netBalance : -row.netBalance)}</span>
         </span>
       ),
       className: 'text-left font-bold bg-slate-50 dark:bg-slate-800',
@@ -80,8 +80,8 @@ const TrialBalanceView: React.FC = () => {
 
   const totalDr = data?.reduce((s: number, r: TrialBalanceRowView) => s + r.totalDebit, 0) || 0;
   const totalCr = data?.reduce((s: number, r: TrialBalanceRowView) => s + r.totalCredit, 0) || 0;
-  const diff = Math.abs(totalDr - totalCr);
-  const isBalanced = diff < 0.1;
+  const diff = totalDr - totalCr;
+  const isBalanced = diff > -0.1 && diff < 0.1;
 
   return (
     <div className="animate-in fade-in space-y-4 duration-500">
@@ -110,7 +110,7 @@ const TrialBalanceView: React.FC = () => {
             <p className="mt-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
               {isBalanced
                 ? 'تطابق تام بين الحركات المدينة والدائنة'
-                : `فارق مالي قدره ${diff.toLocaleString('en-US')} ريال`}
+                : `فارق مالي قدره ${(diff >= 0 ? diff : -diff).toLocaleString('en-US')} ريال`}
             </p>
           </div>
         </div>
@@ -129,7 +129,7 @@ const TrialBalanceView: React.FC = () => {
                   : 'text-rose-600 dark:text-rose-400'
               )}
             >
-              {formatCurrency(diff)}
+              {formatCurrency(diff >= 0 ? diff : -diff)}
             </p>
           </div>
           <ShareButton

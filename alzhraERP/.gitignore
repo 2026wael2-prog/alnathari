@@ -94,6 +94,11 @@ push-detached.ps1
 *creds*
 *token*
 *-token*
+# استثناء: ملفات مصدر شرعية يحتوي اسمها على "Token" (توكنات تصميم/CSS — ليست أسراراً).
+# بدون هذا الاستثناء يُستبعد src/features/appearance/classicTokens.ts من المستودع
+# فيفشل بناء Vercel بـ "Could not resolve ../features/appearance/classicTokens".
+!src/**/*token*
+!src/**/*Token*
 .pg/
 pg-test/
 

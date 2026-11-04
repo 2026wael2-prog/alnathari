@@ -65,7 +65,7 @@ export const PartyCurrencyGrid: React.FC<PartyCurrencyGridProps> = ({ data }) =>
                         : 'text-slate-600 dark:text-slate-300'
                   }`}
                 >
-                  {Math.abs(curr.balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  {(curr.balance >= 0 ? curr.balance : -curr.balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </span>
               </div>
             </div>

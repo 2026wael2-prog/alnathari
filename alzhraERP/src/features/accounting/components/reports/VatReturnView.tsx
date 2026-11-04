@@ -114,7 +114,7 @@ const VatReturnView: React.FC<Props> = ({ dateRange }) => {
                         : 'text-blue-700 dark:text-blue-400'
                   }`}
                 >
-                  {formatCurrency(Math.abs(netVat))}
+                  {formatCurrency(netVat > 0 ? netVat : -netVat)}
                 </div>
                 <div className="text-[10px] font-bold text-gray-400">
                   {netVat > 0 ? 'مستحق للسداد' : netVat < 0 ? 'رصيد دائن مسترد' : 'لا يوجد استحقاق'}

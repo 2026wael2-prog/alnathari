@@ -120,11 +120,12 @@ class DataProcessorClient {
             totalCredit += Number(entry.credit || 0);
           });
         }
+        const balance = totalDebit - totalCredit;
         return {
           totalDebit,
           totalCredit,
-          balance: totalDebit - totalCredit,
-          isBalanced: Math.abs(totalDebit - totalCredit) < 0.001,
+          balance,
+          isBalanced: balance > -0.001 && balance < 0.001,
         } as unknown as T;
       }
       default:

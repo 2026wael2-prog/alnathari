@@ -67,7 +67,7 @@ const OpeningBalancesModal: React.FC<OpeningBalancesModalProps> = ({ isOpen, onC
   );
 
   const difference = totals.debit_amount - totals.credit_amount;
-  const isBalanced = Math.abs(difference) < BALANCE_TOLERANCE;
+  const isBalanced = difference > -BALANCE_TOLERANCE && difference < BALANCE_TOLERANCE;
 
   const onSubmit = (data: FormData) => {
     const filteredLines = data.lines
@@ -114,7 +114,7 @@ const OpeningBalancesModal: React.FC<OpeningBalancesModalProps> = ({ isOpen, onC
             dir="ltr"
             className={`font-mono text-[11px] font-bold ${isBalanced ? 'text-emerald-600' : 'text-rose-600'}`}
           >
-            {formatCurrency(Math.abs(difference))}
+            {formatCurrency(difference < 0 ? -difference : difference)}
           </span>
         </div>
         <div className="flex flex-col text-start">

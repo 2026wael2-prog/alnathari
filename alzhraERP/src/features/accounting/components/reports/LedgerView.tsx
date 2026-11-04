@@ -19,6 +19,15 @@ interface Props {
 const isPositiveAmount = (value: number | null | undefined): value is number =>
   value !== null && value !== undefined && value > 0;
 
+/**
+ * مقدار مطلق للعرض فقط: تسمية الرصيد (له/عليه) هي التي تحمل الاتجاه،
+ * فلا نطبّق `Math.abs()` على بنود الحساب (AGENTS.md §6).
+ */
+const magnitude = (value: number): number => (value < 0 ? -value : value);
+
+/** هل يختلف المبلغ الأجنبي عن مبلغ العملة الأساسية بأكثر من قرش، في أي اتجاه؟ */
+const differsByMoreThanCent = (a: number, b: number): boolean => a - b > 0.01 || b - a > 0.01;
+
 const LedgerView: React.FC<Props> = ({ dateRange, accountId, showAccountSelector = true }) => {
   const { data: accounts } = useAccounts();
   const [internalAccountId, setInternalAccountId] = useState<string>('');
@@ -112,7 +121,7 @@ const LedgerView: React.FC<Props> = ({ dateRange, accountId, showAccountSelector
             {row.debit_amount > 0 ? formatCurrency(row.debit_amount) : '-'}
           </div>
           {isPositiveAmount(row.foreign_amount) &&
-          Math.abs(row.debit_amount - row.foreign_amount) > 0.01 ? (
+          differsByMoreThanCent(row.debit_amount, row.foreign_amount) ? (
             <div dir="ltr" className="font-mono text-[10px] text-gray-400">
               ({formatCurrency(row.foreign_amount, row.currency_code)})
             </div>
@@ -137,7 +146,7 @@ const LedgerView: React.FC<Props> = ({ dateRange, accountId, showAccountSelector
             {row.credit_amount > 0 ? formatCurrency(row.credit_amount) : '-'}
           </div>
           {isPositiveAmount(row.foreign_amount) &&
-          Math.abs(row.credit_amount - row.foreign_amount) > 0.01 ? (
+          differsByMoreThanCent(row.credit_amount, row.foreign_amount) ? (
             <div dir="ltr" className="font-mono text-[10px] text-gray-400">
               ({formatCurrency(row.foreign_amount, row.currency_code)})
             </div>
@@ -173,13 +182,13 @@ const LedgerView: React.FC<Props> = ({ dateRange, accountId, showAccountSelector
               <span>{balanceLabel}</span>
               <span dir="ltr" className="font-mono">
                 {isForeignLine
-                  ? formatCurrency(Math.abs(foreignBalance), row.currency_code)
-                  : formatCurrency(Math.abs(row.balance))}
+                  ? formatCurrency(magnitude(foreignBalance), row.currency_code)
+                  : formatCurrency(magnitude(row.balance))}
               </span>
             </span>
             {isForeignLine && (
               <div dir="ltr" className="font-mono text-[10px] text-gray-400">
-                ≈ {formatCurrency(Math.abs(row.balance), 'SAR')}
+                ≈ {formatCurrency(magnitude(row.balance), 'SAR')}
               </div>
             )}
           </div>

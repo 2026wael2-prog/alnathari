@@ -80,7 +80,7 @@ const InventoryMovementView: React.FC = () => {
     if (!movementArr || movementArr.length === 0) return null;
     const totalIn = movementArr.reduce((sum, m) => sum + (m.quantity > 0 ? m.quantity : 0), 0);
     const totalOut = movementArr.reduce(
-      (sum, m) => sum + (m.quantity < 0 ? Math.abs(m.quantity) : 0),
+      (sum, m) => sum + (m.quantity < 0 ? -m.quantity : 0),
       0
     );
     const startBalance = movementArr[0].balance_after - movementArr[0].quantity;

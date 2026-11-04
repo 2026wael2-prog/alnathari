@@ -180,7 +180,7 @@ const IncomeStatement: React.FC<Props> = ({ dateRange }) => {
             showLabel
             eventType="income_statement"
             title="مشاركة قائمة الدخل"
-            message={`📑 قائمة الدخل المرحلية\n━━━━━━━━━━━━━━\n📗 إجمالي الإيرادات: ${formatCurrency(totalRevenue)}\n📦 تكلفة البضاعة المباعة: ${formatCurrency(totalCogs)}\n🔷 مجمل الربح: ${formatCurrency(grossProfit)}\n📕 المصاريف التشغيلية: ${formatCurrency(totalOperatingExpenses)}\n${netIncome >= 0 ? '✅' : '🔴'} صافي ${netIncome >= 0 ? 'الربح' : 'الخسارة'}: ${formatCurrency(Math.abs(netIncome))}\n📅 الفترة: من ${dateRange.from} إلى ${dateRange.to}`}
+            message={`📑 قائمة الدخل المرحلية\n━━━━━━━━━━━━━━\n📗 إجمالي الإيرادات: ${formatCurrency(totalRevenue)}\n📦 تكلفة البضاعة المباعة: ${formatCurrency(totalCogs)}\n🔷 مجمل الربح: ${formatCurrency(grossProfit)}\n📕 المصاريف التشغيلية: ${formatCurrency(totalOperatingExpenses)}\n${netIncome >= 0 ? '✅' : '🔴'} صافي ${netIncome >= 0 ? 'الربح' : 'الخسارة'}: ${formatCurrency(netIncome >= 0 ? netIncome : -netIncome)}\n📅 الفترة: من ${dateRange.from} إلى ${dateRange.to}`}
           />
           <div className="bg-slate-900 p-2 text-white max-md:p-1.5">
             <FileText size={20} />

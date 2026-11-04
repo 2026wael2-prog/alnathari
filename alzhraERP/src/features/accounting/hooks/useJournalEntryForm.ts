@@ -42,7 +42,8 @@ const journalEntrySchema = z
     data => {
       const totalDebit = data.lines.reduce((sum, line) => sum + line.debit_amount, 0);
       const totalCredit = data.lines.reduce((sum, line) => sum + line.credit_amount, 0);
-      return Math.abs(totalDebit - totalCredit) < BALANCE_TOLERANCE;
+      const imbalance = totalDebit - totalCredit;
+      return imbalance > -BALANCE_TOLERANCE && imbalance < BALANCE_TOLERANCE;
     },
     {
       message: 'القيد غير متوازن (إجمالي المدين لا يساوي إجمالي الدائن)',
@@ -117,14 +118,17 @@ export const useJournalEntryForm = (
 
   const difference = totals.debit_amount - totals.credit_amount;
   // توحيد مع SOX_BALANCE_TOLERANCE (مطابق لطبقة الخدمة) بدل 0.01 السابق
-  const isBalanced = Math.abs(difference) < BALANCE_TOLERANCE && totals.debit_amount > 0;
+  const isBalanced =
+    difference > -BALANCE_TOLERANCE &&
+    difference < BALANCE_TOLERANCE &&
+    totals.debit_amount > 0;
 
   const autoBalance = () => {
     const currentLines = form.getValues('lines');
     const currentDebit = currentLines.reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0);
     const currentCredit = currentLines.reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0);
     const diff = Number((currentDebit - currentCredit).toFixed(2));
-    if (Math.abs(diff) < BALANCE_TOLERANCE) return;
+    if (diff > -BALANCE_TOLERANCE && diff < BALANCE_TOLERANCE) return;
 
     if (diff > 0) {
       // المدين أكبر من الدائن: يجب تعويض الفارق في جانب الدائن
@@ -144,7 +148,8 @@ export const useJournalEntryForm = (
       }
     } else {
       // الدائن أكبر من المدين: يجب تعويض الفارق في جانب المدين
-      const absDiff = Math.abs(diff);
+      // في هذا الفرع diff سالب (الدائن أكبر) — المقدار هو سالبه بلا Math.abs
+      const absDiff = -diff;
       let targetIdx = currentLines.findIndex(l => !l.debit_amount && !l.credit_amount);
       if (targetIdx === -1) {
         targetIdx = currentLines.findIndex(l => Number(l.debit_amount) > 0);

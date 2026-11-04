@@ -70,7 +70,7 @@ const DebtReportView: React.FC = () => {
               : 'border border-rose-500/20 bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400'
           )}
         >
-          {formatCurrency(Math.abs(row.remaining_amount), baseCurrency)}
+          {formatCurrency(row.remaining_amount >= 0 ? row.remaining_amount : -row.remaining_amount, baseCurrency)}
         </span>
       ),
       className: 'text-left',
@@ -146,7 +146,7 @@ const DebtReportView: React.FC = () => {
             dir="ltr"
             className="font-mono text-xl font-bold tracking-tight text-white sm:text-2xl"
           >
-            {formatCurrency(Math.abs(netPosition), baseCurrency)}
+            {formatCurrency(netPosition >= 0 ? netPosition : -netPosition, baseCurrency)}
           </h3>
           <div className="mt-2 flex items-center justify-between pt-1">
             <span className="text-xs text-blue-100">
@@ -157,7 +157,7 @@ const DebtReportView: React.FC = () => {
               eventType="debt_report"
               title="مشاركة المركز"
               className="rounded-lg bg-white/20 px-2.5 py-1 text-xs text-white transition-all hover:bg-white/30"
-              message={`📊 تقرير المركز المالي - الجعفري سمارت\n━━━━━━━━━━━━━━\n✅ مستحقات (عملاء): ${formatCurrency(data?.summary.receivables || 0, baseCurrency)}\n🔴 التزامات (موردين): ${formatCurrency(data?.summary.payables || 0, baseCurrency)}\n📊 صافي المركز: ${formatCurrency(Math.abs(netPosition), baseCurrency)} ${netPosition >= 0 ? '(لصالحك)' : '(عليك)'}\n📅 التاريخ: ${formatLocalDate(new Date())}`}
+              message={`📊 تقرير المركز المالي - الجعفري سمارت\n━━━━━━━━━━━━━━\n✅ مستحقات (عملاء): ${formatCurrency(data?.summary.receivables || 0, baseCurrency)}\n🔴 التزامات (موردين): ${formatCurrency(data?.summary.payables || 0, baseCurrency)}\n📊 صافي المركز: ${formatCurrency(netPosition >= 0 ? netPosition : -netPosition, baseCurrency)} ${netPosition >= 0 ? '(لصالحك)' : '(عليك)'}\n📅 التاريخ: ${formatLocalDate(new Date())}`}
             />
           </div>
         </div>

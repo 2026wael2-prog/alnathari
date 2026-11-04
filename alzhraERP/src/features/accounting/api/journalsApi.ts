@@ -48,7 +48,9 @@ const validateJournalInput = (data: PostJournalEntryInput): number => {
     throw parseError('سعر صرف غير صالح (يجب أن يكون أكبر من صفر)');
   }
 
-  if (Math.abs(totalDebit - totalCredit) > SOX_BALANCE_TOLERANCE.toNumber()) {
+  const imbalance = totalDebit - totalCredit;
+  const tolerance = SOX_BALANCE_TOLERANCE.toNumber();
+  if (imbalance > tolerance || imbalance < -tolerance) {
     throw parseError(
       `القيد غير متوازن: مدين ${totalDebit.toFixed(2)} ≠ دائن ${totalCredit.toFixed(2)}`
     );

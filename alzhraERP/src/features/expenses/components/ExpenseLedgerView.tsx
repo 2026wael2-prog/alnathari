@@ -129,7 +129,7 @@ export const ExpenseLedgerView: React.FC<Props> = ({ initialAccountId, onBackToL
     const isDebitNormal = isDebitNormalAccount(selectedAccount.type);
     const exportData = ledger.map(r => {
       const isCredit = isDebitNormal ? r.balance < 0 : r.balance > 0;
-      const isZero = Math.abs(r.balance) < 0.001;
+      const isZero = r.balance > -0.001 && r.balance < 0.001;
       const statusText = isZero ? 'متزن' : isCredit ? 'له' : 'عليه';
       return {
         date: r.date,
@@ -138,7 +138,7 @@ export const ExpenseLedgerView: React.FC<Props> = ({ initialAccountId, onBackToL
         party: r.party_name || '-',
         debit: r.debit_amount,
         credit: r.credit_amount,
-        balance: `${statusText}: ${Math.abs(r.balance)}`,
+        balance: `${statusText}: ${r.balance < 0 ? -r.balance : r.balance}`,
       };
     });
     exportToCSV(exportData, `كشف_حساب_${selectedAccount.code}_${selectedAccount.name}`, headers);

@@ -375,7 +375,9 @@ const InvoiceListView: React.FC<InvoiceListViewProps> = ({
           const hasForeignCurrency = row.currencyCode && row.currencyCode !== 'SAR';
           const rateIsNotOne = row.exchangeRate && row.exchangeRate !== 1;
           const showBaseLine =
-            hasForeignCurrency && rateIsNotOne && Math.abs(row.baseTotal - row.total) > 0.01;
+            hasForeignCurrency &&
+            rateIsNotOne &&
+            (row.baseTotal - row.total > 0.01 || row.total - row.baseTotal > 0.01);
           return (
             <div className="flex flex-col items-end leading-tight">
               <span

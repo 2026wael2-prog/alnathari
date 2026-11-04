@@ -111,7 +111,8 @@ export const journalEntrySchema = z
     data => {
       const totalDebit = data.lines.reduce((sum, line) => sum + (line.debit_amount || 0), 0);
       const totalCredit = data.lines.reduce((sum, line) => sum + (line.credit_amount || 0), 0);
-      return Math.abs(totalDebit - totalCredit) < SOX_TOLERANCE_NUM;
+      const imbalance = totalDebit - totalCredit;
+      return imbalance > -SOX_TOLERANCE_NUM && imbalance < SOX_TOLERANCE_NUM;
     },
     {
       message: 'القيد المحاسبي غير متوازن: إجمالي المدين يجب أن يساوي إجمالي الدائن',

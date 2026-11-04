@@ -96,14 +96,14 @@ const useOperationalExpenses = (days = 30) => {
       // Pie chart data
       const chartData = expensesByAccount.slice(0, 8).map((a, i) => ({
         name: a.name,
-        value: Math.abs(a.total),
+        value: a.total,
         fill: COLORS[i % COLORS.length] || '#ef4444',
       }));
 
       // If there are more than 8, group the rest as "أخرى"
       if (expensesByAccount.length > 8) {
         const otherTotal = expensesByAccount.slice(8).reduce((s, a) => s + a.total, 0);
-        chartData.push({ name: 'أخرى', value: Math.abs(otherTotal), fill: '#94a3b8' });
+        chartData.push({ name: 'أخرى', value: otherTotal, fill: '#94a3b8' });
       }
 
       return {
@@ -148,7 +148,7 @@ const OperationalExpensesReport: React.FC = () => {
       {
         header: 'الإجمالي',
         accessor: (row: ExpenseAccountRow) => (
-          // [FIX] لا Math.abs — total = debit - credit للحساب (موجب بعد الفلترة).
+          // لا Math.abs — total = debit - credit للحساب، والصفوف مفلترة على total > 0.
           <span
             dir="ltr"
             className={`font-mono text-xs font-bold ${
@@ -158,7 +158,7 @@ const OperationalExpensesReport: React.FC = () => {
             }`}
           >
             {row.total < 0 ? '(' : ''}
-            {formatCurrency(Math.abs(row.total))}
+            {formatCurrency(row.total < 0 ? -row.total : row.total)}
             {row.total < 0 ? ')' : ''}
           </span>
         ),
@@ -299,7 +299,7 @@ const OperationalExpensesReport: React.FC = () => {
               size="sm"
               eventType="expenses_report"
               title="مشاركة تقرير المصاريف"
-              message={`💰 تقرير المصاريف التشغيلية\n━━━━━━━━━━━━━━\n📊 إجمالي المصروفات (${days} يوم): ${formatCurrency(data?.totalExpenses || 0)}\n📋 عدد الأنواع: ${data?.expensesByAccount.length || 0}\n\n أعلى المصروفات:\n${(data?.expensesByAccount.slice(0, 5) || []).map((e: ExpenseAccountRow, i: number) => `${i + 1}. ${e.name}: ${formatCurrency(Math.abs(e.total))}`).join('\n')}\n📅 التاريخ: ${formatLocalDate(new Date())}`}
+              message={`💰 تقرير المصاريف التشغيلية\n━━━━━━━━━━━━━━\n📊 إجمالي المصروفات (${days} يوم): ${formatCurrency(data?.totalExpenses || 0)}\n📋 عدد الأنواع: ${data?.expensesByAccount.length || 0}\n\n أعلى المصروفات:\n${(data?.expensesByAccount.slice(0, 5) || []).map((e: ExpenseAccountRow, i: number) => `${i + 1}. ${e.name}: ${formatCurrency(e.total < 0 ? -e.total : e.total)}`).join('\n')}\n📅 التاريخ: ${formatLocalDate(new Date())}`}
             />
           </div>
           <div className="overflow-x-auto">

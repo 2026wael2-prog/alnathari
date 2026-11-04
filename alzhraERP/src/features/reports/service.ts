@@ -226,13 +226,13 @@ export const reportsService = {
       const existingRetainedBalance = existingRetainedAcc?.netBalance || 0;
       const unclosedEarnings = totalRetainedToDate - existingRetainedBalance;
 
-      if (Math.abs(unclosedEarnings) > 0.001) {
+      if (unclosedEarnings > 0.001 || unclosedEarnings < -0.001) {
         equity.push({
           id: 'unclosed-retained-earnings',
           code: '3999',
           name: 'صافي أرباح/خسائر الفترات السابقة والحالية',
           type: 'equity',
-          totalDebit: unclosedEarnings < 0 ? Math.abs(unclosedEarnings) : 0,
+          totalDebit: unclosedEarnings < 0 ? -unclosedEarnings : 0,
           totalCredit: unclosedEarnings > 0 ? unclosedEarnings : 0,
           netBalance: unclosedEarnings,
         });
@@ -400,8 +400,10 @@ export const reportsService = {
         fAmount > 0
           ? fAmount
           : exRate > 1
-            ? Math.abs(debit - credit) * exRate
-            : Math.abs(debit - credit);
+            ? (debit - credit >= 0 ? debit - credit : credit - debit) * exRate
+            : debit - credit >= 0
+              ? debit - credit
+              : credit - debit;
       const sign = debit >= credit ? 1 : -1;
 
       current.foreignBalance += sign * fMovement;

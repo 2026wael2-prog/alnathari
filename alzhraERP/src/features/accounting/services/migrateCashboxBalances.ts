@@ -49,7 +49,8 @@ export const migrateCashboxBalances = async (companyId: string, userId: string) 
   }
 
   // 4. قيد تحويل متوازن (يدعم الرصيد المدين والدائن)
-  const amount = Math.abs(mainBalance);
+  // مقدار القيد = القيمة المطلقة للرصيد، والاتجاه يُحدَّد بـ isDebitBalance (لا Math.abs على بنود القيد)
+  const amount = mainBalance > 0 ? mainBalance : -mainBalance;
   const isDebitBalance = mainBalance > 0;
   const { error: postError } = await supabase.rpc('post_manual_journal', {
     p_company_id: companyId,
