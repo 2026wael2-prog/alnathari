@@ -54,10 +54,10 @@ export const ConversationView: React.FC<Props> = ({ onBack }) => {
 
   if (!activeChannel) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-[var(--app-text-secondary)]">
+      <div className="flex h-full min-h-0 flex-1 flex-col items-center justify-center p-8 text-center text-[var(--app-text-secondary)]">
         <Hash size={40} className="mb-3 text-[var(--accent)] opacity-40" />
         <h3 className="text-base font-bold text-[var(--app-text)]">اختر محادثة للبدء</h3>
-        <p className="mt-1 text-xs">
+        <p className="mt-1 max-w-xs text-xs">
           تواصل مع زملائك في الفروع وشارك القطع وطلبات المناقلة لحظياً.
         </p>
       </div>
@@ -83,20 +83,20 @@ export const ConversationView: React.FC<Props> = ({ onBack }) => {
   };
 
   return (
-    <div className="flex h-full flex-1 flex-col bg-[var(--app-bg)]">
-      {/* Top Channel Header (WhatsApp-grade) */}
-      <div className="flex items-center justify-between border-b border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-xs">
-        <div className="flex items-center gap-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--app-bg)]">
+      {/* Top Channel Header (WhatsApp-grade) — ثابت: لا يتقلّص ولا يُدفع خارج الشاشة */}
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-xs">
+        <div className="flex min-w-0 items-center gap-3">
           {onBack && (
             <button
               onClick={onBack}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] lg:hidden"
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] lg:hidden"
             >
               <ArrowRight size={18} />
             </button>
           )}
 
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             {activeChannel.type === 'direct' && directUser?.avatar_url ? (
               <img
                 src={directUser.avatar_url}
@@ -124,17 +124,19 @@ export const ConversationView: React.FC<Props> = ({ onBack }) => {
             )}
           </div>
 
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-[var(--app-text)]">{activeChannel.name}</h3>
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <h3 className="truncate text-sm font-bold text-[var(--app-text)]">
+                {activeChannel.name}
+              </h3>
               {activeChannel.branch_name && (
-                <span className="py-0.2 rounded border border-[var(--app-border)] bg-[var(--app-bg)] px-1.5 text-[10px] font-semibold text-[var(--app-text-secondary)]">
+                <span className="py-0.2 flex-shrink-0 rounded border border-[var(--app-border)] bg-[var(--app-bg)] px-1.5 text-[10px] font-semibold text-[var(--app-text-secondary)]">
                   {activeChannel.branch_name}
                 </span>
               )}
             </div>
 
-            <p className="text-[11px] text-[var(--app-text-secondary)]">
+            <p className="truncate text-[11px] text-[var(--app-text-secondary)]">
               {isDirectTyping ? (
                 <span className="animate-pulse font-bold text-[var(--accent)]">يكتب الآن...</span>
               ) : activeChannel.type === 'direct' ? (
@@ -152,7 +154,7 @@ export const ConversationView: React.FC<Props> = ({ onBack }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[var(--app-text-secondary)]">
+        <div className="flex shrink-0 items-center gap-1.5 text-[var(--app-text-secondary)]">
           {/* In-Chat Search Button */}
           <button
             type="button"

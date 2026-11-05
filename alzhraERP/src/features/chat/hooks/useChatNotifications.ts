@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useSoundStore } from '../../notifications/store';
 import { showDesktopNotification } from '../../notifications/desktopNotificationService';
 import { logger } from '../../../core/utils/logger';
@@ -14,7 +14,12 @@ export const useChatNotifications = () => {
   const { isSoundEnabled } = useSoundStore();
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  const playIncomingBeep = async () => {
+  /**
+   * مُذكَّرة عبر `useCallback`: الهوية ثابتة ما لم يتغيّر خيار الصوت.
+   * ثبات الهوية شرط لاستقرار اعتماديات `useChatRealtime` (بلا ذلك يُعاد إنشاء
+   * اشتراك الـ websocket على كل رسم ⇒ رسائل مفقودة وحمل مضاعف).
+   */
+  const playIncomingBeep = useCallback(async () => {
     if (!isSoundEnabled) return;
     try {
       const AudioCtx =
@@ -60,28 +65,27 @@ export const useChatNotifications = () => {
     } catch (err) {
       logger.debug('ChatNotifications', 'Audio chime suppressed by browser policy', err);
     }
-  };
+  }, [isSoundEnabled]);
 
-  const notifyIncomingMessage = (
-    senderName: string,
-    messageText: string,
-    conversationId?: string
-  ) => {
-    const now = Date.now();
-    if (now - lastNotifyAt < NOTIFY_COOLDOWN_MS) return;
-    lastNotifyAt = now;
-    void playIncomingBeep();
+  const notifyIncomingMessage = useCallback(
+    (senderName: string, messageText: string, conversationId?: string) => {
+      const now = Date.now();
+      if (now - lastNotifyAt < NOTIFY_COOLDOWN_MS) return;
+      lastNotifyAt = now;
+      void playIncomingBeep();
 
-    // If tab is in background or document hidden, dispatch OS desktop notification
-    if (typeof document !== 'undefined' && document.hidden) {
-      showDesktopNotification({
-        title: `💬 رسالة جديدة من: ${senderName}`,
-        body: messageText,
-        link: conversationId ? `#/chat/${conversationId}` : '#/chat',
-        requireInteraction: true,
-      });
-    }
-  };
+      // If tab is in background or document hidden, dispatch OS desktop notification
+      if (typeof document !== 'undefined' && document.hidden) {
+        showDesktopNotification({
+          title: `💬 رسالة جديدة من: ${senderName}`,
+          body: messageText,
+          link: conversationId ? `#/chat/${conversationId}` : '#/chat',
+          requireInteraction: true,
+        });
+      }
+    },
+    [playIncomingBeep]
+  );
 
   return { playIncomingBeep, notifyIncomingMessage };
 };

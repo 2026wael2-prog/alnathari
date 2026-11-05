@@ -57,6 +57,7 @@ interface ChatState {
   ) => Promise<void>;
   addIncomingMessage: (message: ChatMessage, currentUserId: string) => void;
   updateMessageInState: (messageId: string, updates: Partial<ChatMessage>) => void;
+  applyPeerReadReceipt: (peerUserId: string, lastReadMessageId: string | null) => void;
   markChannelAsRead: (channelId: string) => Promise<void>;
   toggleReaction: (messageId: string, emoji: string, userId: string) => Promise<void>;
   pinMessage: (messageId: string, userId: string, isPinned: boolean) => Promise<void>;
@@ -134,10 +135,14 @@ export const useChatStore = create<ChatState>()(
             if (get().isLoadingMoreMessages || !get().hasMoreMessages[channelId]) return;
             set({ isLoadingMoreMessages: true });
             const oldestMessage = currentMessages[0];
+            // مؤشّر مركّب: نعتمد المعرّف فقط (الخدمة تجلب طابع الرسالة المرجعية
+            // وتبني شرط (created_at, id) معاً). تمرير الطابع الزمني وحده كان
+            // يُلغي فرع المؤشّر المركّب داخل الخدمة ⇒ فقدان صامت للرسائل التي
+            // تتشارك نفس الطابع الزمني (بذر بيانات أو إرسال دفعة واحدة).
             const older = await chatService.getMessages(
               channelId,
               30,
-              oldestMessage?.created_at,
+              undefined,
               oldestMessage?.id
             );
             set(state => ({
@@ -175,14 +180,26 @@ export const useChatStore = create<ChatState>()(
 
       sendMessage: async (payload, currentUserId, currentUserName, file, companyId) => {
         const tempId = `temp_${Date.now()}`;
+        // مفتاح عدم التكرار يُنشأ هنا (مصدر واحد) ويُمرَّر للخدمة ليعيد استخدامه،
+        // وبذلك تحمله الرسالة المتفائلة أيضاً. بلا ذلك كان صدى الـ realtime يصِل
+        // بمعرّف عميل لا تعرفه الفقاعة المتفائلة ⇒ فقاعتان مكرّرتان لنفس الرسالة.
+        const clientMessageId =
+          payload.client_message_id ??
+          `msg_${String(Date.now())}_${Math.random().toString(36).slice(2, 9)}`;
+        const outgoingPayload: SendMessagePayload = {
+          ...payload,
+          client_message_id: clientMessageId,
+        };
+
         const optimisticMessage: ChatMessage = {
           id: tempId,
-          channel_id: payload.channel_id,
+          channel_id: outgoingPayload.channel_id,
           sender_id: currentUserId,
-          message_type: payload.message_type || 'text',
-          content: payload.content,
-          metadata: payload.metadata || {},
-          reply_to_id: payload.reply_to_id || null,
+          message_type: outgoingPayload.message_type || 'text',
+          content: outgoingPayload.content,
+          metadata: outgoingPayload.metadata || {},
+          reply_to_id: outgoingPayload.reply_to_id || null,
+          client_message_id: clientMessageId,
           created_at: new Date().toISOString(),
           sender_name: currentUserName || 'أنت',
           is_optimistic: true,
@@ -207,8 +224,8 @@ export const useChatStore = create<ChatState>()(
         set(state => ({
           messagesByChannel: {
             ...state.messagesByChannel,
-            [payload.channel_id]: [
-              ...(state.messagesByChannel[payload.channel_id] || []),
+            [outgoingPayload.channel_id]: [
+              ...(state.messagesByChannel[outgoingPayload.channel_id] || []),
               optimisticMessage,
             ],
           },
@@ -218,7 +235,7 @@ export const useChatStore = create<ChatState>()(
 
         try {
           // 2. Network Send
-          const confirmed = await chatService.sendMessage(payload);
+          const confirmed = await chatService.sendMessage(outgoingPayload);
           if (confirmed) {
             let uploadedAttachment = null;
             if (file && companyId) {
@@ -234,7 +251,7 @@ export const useChatStore = create<ChatState>()(
             }
 
             set(state => {
-              const currentList = state.messagesByChannel[payload.channel_id] || [];
+              const currentList = state.messagesByChannel[outgoingPayload.channel_id] || [];
               const updatedList: ChatMessage[] = currentList.map(m =>
                 m.id === tempId
                   ? {
@@ -250,7 +267,7 @@ export const useChatStore = create<ChatState>()(
               return {
                 messagesByChannel: {
                   ...state.messagesByChannel,
-                  [payload.channel_id]: updatedList,
+                  [outgoingPayload.channel_id]: updatedList,
                 },
               };
             });
@@ -261,9 +278,9 @@ export const useChatStore = create<ChatState>()(
           set(state => ({
             messagesByChannel: {
               ...state.messagesByChannel,
-              [payload.channel_id]: (state.messagesByChannel[payload.channel_id] || []).filter(
-                m => m.id !== tempId
-              ),
+              [outgoingPayload.channel_id]: (
+                state.messagesByChannel[outgoingPayload.channel_id] || []
+              ).filter(m => m.id !== tempId),
             },
           }));
           throw err;
@@ -339,13 +356,42 @@ export const useChatStore = create<ChatState>()(
 
       updateMessageInState: (messageId, updates) => {
         set(state => {
-          const newMap = { ...state.messagesByChannel };
-          for (const channelId in newMap) {
-            newMap[channelId] = newMap[channelId].map(m =>
-              m.id === messageId ? { ...m, ...updates } : m
-            );
-          }
-          return { messagesByChannel: newMap };
+          // حدِّد القناة التي تحتوي الرسالة أولاً، ثم حدِّث قناتها وحدها.
+          // المرور على كل القنوات (بنسخ كل مصفوفة) كان O(كل الرسائل المحمّلة)
+          // لكل حدث واقعي عبر الـ realtime، أي إهدار واضح في المحادثات الطويلة.
+          const targetChannelId = Object.keys(state.messagesByChannel).find(channelId =>
+            state.messagesByChannel[channelId].some(m => m.id === messageId)
+          );
+          if (targetChannelId === undefined) return state;
+
+          const channelMessages = state.messagesByChannel[targetChannelId];
+          const updatedMessages = channelMessages.map(m =>
+            m.id === messageId ? { ...m, ...updates } : m
+          );
+
+          return {
+            messagesByChannel: {
+              ...state.messagesByChannel,
+              [targetChannelId]: updatedMessages,
+            },
+          };
+        });
+      },
+
+      applyPeerReadReceipt: (peerUserId, lastReadMessageId) => {
+        set(state => {
+          // القناة المباشرة فريدة لكل زوج مستخدمين (محمية بـ pg_advisory_lock
+          // داخل RPC)، لذا يكفي مطابقة الطرف المقابل لتحديد القناة المستهدفة.
+          let changed = false;
+          const channels = state.channels.map(ch => {
+            if (ch.type !== 'direct' || ch.direct_user?.id !== peerUserId) return ch;
+            if (ch.peer_last_read_message_id === lastReadMessageId) return ch;
+            changed = true;
+            return { ...ch, peer_last_read_message_id: lastReadMessageId };
+          });
+
+          // إرجاع `state` نفسها عند عدم التغيير يمنع إعادة رسم بلا داعٍ.
+          return changed ? { channels } : state;
         });
       },
 

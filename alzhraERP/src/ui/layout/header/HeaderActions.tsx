@@ -46,6 +46,13 @@ const HeaderActions: React.FC = () => {
   const { enabled: isAccompanyingEnabled, toggleEnabled: toggleAccompanyingEnabled } =
     useAccompanyingInfoStore();
 
+  // شارة غير المقروء: اشتراك حقيقي في المخزن (selector عددي مستقر).
+  // القراءة السابقة عبر `useChatStore.getState()` داخل JSX لا تُشترك في التحديثات
+  // ⇒ كانت الشارة تبقى صامتة عند وصول رسالة جديدة خارج صفحة المحادثة.
+  const chatUnreadCount = useChatStore(state =>
+    state.channels.reduce((sum, channel) => sum + (channel.unread_count ?? 0), 0)
+  );
+
   // Poll for pending sync count
   useEffect(() => {
     const checkPending = async () => {
@@ -195,16 +202,14 @@ const HeaderActions: React.FC = () => {
         aria-label="المحادثات والتواصل الداخلي"
       >
         <MessageSquare size={14} className="transition-transform duration-150" />
-        {useChatStore.getState().getTotalUnreadCount() > 0 && (
+        {chatUnreadCount > 0 && (
           <span
             className={cn(
               'absolute -top-1.5 flex h-[14px] min-w-[14px] items-center justify-center rounded-full border-2 border-[var(--app-surface)] bg-rose-500 px-1 text-[10px] font-bold text-white shadow-xs',
               dir === 'rtl' ? '-left-1.5' : '-right-1.5'
             )}
           >
-            {useChatStore.getState().getTotalUnreadCount() > 9
-              ? '9+'
-              : useChatStore.getState().getTotalUnreadCount()}
+            {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
           </span>
         )}
       </button>

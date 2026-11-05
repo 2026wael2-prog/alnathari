@@ -75,20 +75,22 @@ export const ConversationList: React.FC<Props> = ({ onSelectChannel }) => {
   };
 
   return (
-    <div className="flex h-full flex-col border-e border-[var(--app-border)] bg-[var(--app-surface)]">
-      {/* Header & Search */}
-      <div className="space-y-2.5 border-b border-[var(--app-border)] p-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MessageSquare size={20} className="text-[var(--accent)]" />
-            <h2 className="text-base font-bold text-[var(--app-text)]">المحادثات والتواصل</h2>
+    <div className="flex h-full min-h-0 flex-col border-e border-[var(--app-border)] bg-[var(--app-surface)]">
+      {/* Header & Search — ثابت لا يتقلّص (`shrink-0`) كي يبقى البحث مرئياً دائماً */}
+      <div className="shrink-0 space-y-2.5 border-b border-[var(--app-border)] p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <MessageSquare size={20} className="flex-shrink-0 text-[var(--accent)]" />
+            <h2 className="truncate text-base font-bold text-[var(--app-text)]">
+              المحادثات والتواصل
+            </h2>
           </div>
           <button
             onClick={() => {
               setIsNewChatOpen(true);
             }}
             title="محادثة جديدة"
-            className="flex h-8 items-center gap-1.5 rounded-xl bg-[var(--accent)] px-3 text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+            className="flex h-8 flex-shrink-0 items-center gap-1.5 rounded-xl bg-[var(--accent)] px-3 text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
           >
             <Plus size={15} />
             <span className="hidden sm:inline">جديد</span>
@@ -113,7 +115,7 @@ export const ConversationList: React.FC<Props> = ({ onSelectChannel }) => {
         </div>
 
         {/* Filter Pills */}
-        <div className="scrollbar-none flex gap-1 overflow-x-auto pb-1 text-[11px] font-semibold">
+        <div className="flex shrink-0 gap-1 overflow-x-auto pb-1 text-[11px] font-semibold">
           {[
             { id: 'all', label: 'الكل' },
             { id: 'branch', label: 'الفروع' },
@@ -138,8 +140,9 @@ export const ConversationList: React.FC<Props> = ({ onSelectChannel }) => {
         </div>
       </div>
 
-      {/* Channel list */}
-      <div className="scrollbar-thin flex-1 space-y-1 overflow-y-auto p-2">
+      {/* Channel list — `min-h-0` + `overflow-y-auto` = التمرير داخل القائمة فقط
+          بدل تمدّدها ودفع بقية الواجهة خارج الشاشة */}
+      <div className="custom-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2">
         {isLoadingChannels && channels.length === 0 && (
           <div className="py-10 text-center text-xs text-[var(--app-text-secondary)]">
             جاري تحميل المحادثات...
@@ -172,9 +175,9 @@ export const ConversationList: React.FC<Props> = ({ onSelectChannel }) => {
                 setActiveChannel(channel.id);
                 onSelectChannel?.();
               }}
-              className={`group flex w-full items-center gap-3 rounded-xl p-2.5 text-start transition-all ${
+              className={`group flex w-full min-w-0 items-center gap-3 rounded-xl p-2.5 text-start transition-all ${
                 isSelected
-                  ? 'bg-[var(--accent)] text-white shadow-sm'
+                  ? 'bg-[var(--accent)] text-white shadow-sm ring-1 ring-inset ring-white/25'
                   : 'text-[var(--app-text)] hover:bg-[var(--app-surface-hover)]'
               }`}
             >
@@ -214,7 +217,7 @@ export const ConversationList: React.FC<Props> = ({ onSelectChannel }) => {
                   <span className="truncate text-xs font-bold">{channel.name}</span>
                   {formattedTime && (
                     <span
-                      className={`text-[10px] ${
+                      className={`flex-shrink-0 text-[10px] ${
                         isSelected ? 'text-white/80' : 'text-[var(--app-text-secondary)]'
                       }`}
                     >
@@ -268,7 +271,7 @@ export const ConversationList: React.FC<Props> = ({ onSelectChannel }) => {
                 {/* Branch tag */}
                 {channel.branch_name && channel.type !== 'direct' && (
                   <span
-                    className={`py-0.2 mt-1 inline-block rounded px-1.5 text-[10px] font-medium ${
+                    className={`py-0.2 mt-1 block max-w-full truncate rounded px-1.5 text-[10px] font-medium ${
                       isSelected
                         ? 'bg-white/20 text-white'
                         : 'bg-[var(--app-bg)] text-[var(--app-text-secondary)]'

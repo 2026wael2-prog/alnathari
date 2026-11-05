@@ -33,8 +33,8 @@ export const ChatSearchOverlay: React.FC<Props> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="animate-in slide-in-from-top flex items-center gap-2 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2 shadow-sm duration-200">
-      <Search size={16} className="text-[var(--app-text-secondary)]" />
+    <div className="animate-in slide-in-from-top flex min-w-0 flex-shrink-0 items-center gap-2 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2 shadow-sm duration-200">
+      <Search size={16} className="flex-shrink-0 text-[var(--app-text-secondary)]" />
 
       <input
         ref={inputRef}
@@ -52,11 +52,11 @@ export const ChatSearchOverlay: React.FC<Props> = ({
             onClose();
           }
         }}
-        className="flex-1 rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] px-2.5 py-1 text-xs text-[var(--app-text)] placeholder-[var(--app-text-secondary)] outline-none focus:border-[var(--accent)]"
+        className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] px-2.5 py-1 text-xs text-[var(--app-text)] placeholder-[var(--app-text-secondary)] outline-none focus:border-[var(--accent)]"
       />
 
       {/* Match indicator */}
-      <span className="whitespace-nowrap text-[11px] font-medium text-[var(--app-text-secondary)]">
+      <span className="flex-shrink-0 whitespace-nowrap text-[11px] font-medium text-[var(--app-text-secondary)]">
         {totalMatches > 0
           ? `${activeMatchIndex} من ${totalMatches}`
           : searchTerm
@@ -69,7 +69,7 @@ export const ChatSearchOverlay: React.FC<Props> = ({
         type="button"
         onClick={onPrev}
         disabled={totalMatches === 0}
-        className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] disabled:opacity-30"
+        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] disabled:opacity-30"
         title="الرسالة السابقة (Shift + Enter)"
       >
         <ChevronUp size={16} />
@@ -79,7 +79,7 @@ export const ChatSearchOverlay: React.FC<Props> = ({
         type="button"
         onClick={onNext}
         disabled={totalMatches === 0}
-        className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] disabled:opacity-30"
+        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] disabled:opacity-30"
         title="الرسالة التالية (Enter)"
       >
         <ChevronDown size={16} />
@@ -88,7 +88,7 @@ export const ChatSearchOverlay: React.FC<Props> = ({
       <button
         type="button"
         onClick={onClose}
-        className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] hover:text-rose-500"
+        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] hover:text-rose-500"
         title="إغلاق البحث (Esc)"
       >
         <X size={15} />

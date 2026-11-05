@@ -107,7 +107,7 @@ export const ForwardMessageModal: React.FC<Props> = ({ isOpen, message, onClose 
         </div>
 
         {/* Destination List */}
-        <div className="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-3 pb-3">
+        <div className="custom-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pb-3">
           {filteredChannels.map(ch => {
             const isSelected = selectedChannelId === ch.id;
             return (

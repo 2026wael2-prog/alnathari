@@ -146,14 +146,14 @@ export const MessageItem: React.FC<Props> = ({
 
         {/* Message Bubble Container */}
         <div
-          className={`flex max-w-[85%] flex-col sm:max-w-[75%] ${isOwn ? 'items-end' : 'items-start'}`}
+          className={`flex min-w-0 max-w-[85%] flex-col sm:max-w-[75%] ${isOwn ? 'items-end' : 'items-start'}`}
         >
           {/* Sender Name & Branch Header (only for incoming messages) */}
           {!isOwn && (
-            <div className="mb-0.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold text-[var(--app-text-secondary)]">
-              <span>{message.sender_name || 'موظف'}</span>
+            <div className="mb-0.5 flex min-w-0 items-center gap-1.5 px-1 text-[11px] font-semibold text-[var(--app-text-secondary)]">
+              <span className="truncate">{message.sender_name || 'موظف'}</span>
               {message.sender_branch && (
-                <span className="py-0.2 rounded border border-[var(--app-border)] bg-[var(--app-bg)] px-1 text-[10px] text-[var(--app-text-secondary)]">
+                <span className="py-0.2 flex-shrink-0 truncate rounded border border-[var(--app-border)] bg-[var(--app-bg)] px-1 text-[10px] text-[var(--app-text-secondary)]">
                   {message.sender_branch}
                 </span>
               )}
@@ -162,7 +162,7 @@ export const MessageItem: React.FC<Props> = ({
 
           {/* Main WhatsApp-Style Bubble with Tail */}
           <div
-            className={`relative rounded-2xl p-2.5 shadow-xs transition-all ${
+            className={`relative min-w-0 max-w-full overflow-hidden rounded-2xl p-2.5 shadow-xs transition-all ${
               isOwn
                 ? 'rounded-br-xs bg-[var(--accent)] text-white'
                 : 'rounded-bl-xs border border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-text)]'
@@ -183,28 +183,30 @@ export const MessageItem: React.FC<Props> = ({
             {/* Forwarded Header */}
             {message.metadata && (message.metadata as any).forwarded_from && (
               <div
-                className={`mb-1 flex items-center gap-1 text-[10px] italic ${
+                className={`mb-1 flex min-w-0 items-center gap-1 text-[10px] italic ${
                   isOwn ? 'text-white/70' : 'text-[var(--app-text-secondary)]'
                 }`}
               >
-                <Forward size={11} />
-                <span>معاد توجيهها من {(message.metadata as any).forwarded_from}</span>
+                <Forward size={11} className="flex-shrink-0" />
+                <span className="truncate">
+                  معاد توجيهها من {(message.metadata as any).forwarded_from}
+                </span>
               </div>
             )}
 
             {/* Reply Context Bar */}
             {message.reply_to_message && (
               <div
-                className={`border-s-3 mb-2 rounded-lg p-2 text-xs opacity-95 ${
+                className={`border-s-3 mb-2 min-w-0 rounded-lg p-2 text-xs opacity-95 ${
                   isOwn
                     ? 'border-white/70 bg-black/15 text-white/95'
                     : 'border-[var(--accent)] bg-[var(--app-bg)] text-[var(--app-text-secondary)]'
                 }`}
               >
-                <div className="text-[10px] font-bold">
+                <div className="truncate text-[10px] font-bold">
                   {message.reply_to_message.sender_name || 'رد على رسالة'}
                 </div>
-                <p className="line-clamp-1">{message.reply_to_message.content}</p>
+                <p className="line-clamp-1 break-words">{message.reply_to_message.content}</p>
               </div>
             )}
 
@@ -295,9 +297,9 @@ export const MessageItem: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Hover Action Toolbar (WhatsApp style) */}
+          {/* Hover Action Toolbar (WhatsApp style) — على الجوال بلا hover، لذا تظهر دائماً */}
           <div
-            className={`mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 ${
+            className={`mt-1 flex flex-wrap items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100 ${
               isOwn ? 'flex-row-reverse' : 'flex-row'
             }`}
           >
@@ -325,7 +327,7 @@ export const MessageItem: React.FC<Props> = ({
               </button>
 
               {showEmojiPicker && (
-                <div className="animate-in zoom-in-90 absolute top-7 z-20 flex gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] p-1 shadow-lg duration-100">
+                <div className="animate-in zoom-in-90 absolute end-0 top-7 z-20 flex gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] p-1 shadow-lg duration-100">
                   {QUICK_EMOJIS.map(emoji => (
                     <button
                       key={emoji}

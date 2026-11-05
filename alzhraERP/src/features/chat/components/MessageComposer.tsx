@@ -3,6 +3,8 @@ import { Send, Paperclip, Smile, X, Layers, Image as ImageIcon, Loader2, Mic } f
 import { useChatStore } from '../stores/chatStore';
 import { useAuthStore } from '../../auth/store';
 import { useFeedbackStore } from '../../feedback/store';
+import { parseError } from '../../../core/utils/errorUtils';
+import { logger } from '../../../core/utils/logger';
 import { EntityShareModal } from './EntityShareModal';
 import { AudioRecorder } from './composer/AudioRecorder';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
@@ -108,8 +110,12 @@ export const MessageComposer: React.FC<Props> = ({ channelId, onTyping }) => {
       setSelectedFile(null);
       setReplyingTo(null);
       setShowEmojiPicker(false);
-    } catch {
-      // Error handled in store
+    } catch (err) {
+      // لا نبتلع الخطأ: المخزن يعيد رمي الخطأ المُفسَّر (parseError) بعد التراجع
+      // عن الرسالة المتفائلة، فيبقى النص في الحقل ويظهر السبب للمستخدم فوراً.
+      const appError = parseError(err);
+      logger.error('MessageComposer', 'Failed to send chat message', appError);
+      showToast(`${appError.message} — النص محفوظ في الحقل، أعد المحاولة.`, 'error');
     } finally {
       setIsSending(false);
     }
@@ -167,14 +173,16 @@ export const MessageComposer: React.FC<Props> = ({ channelId, onTyping }) => {
   const canSendText = Boolean(text.trim() || attachedEntity || selectedFile);
 
   return (
-    <div className="border-t border-[var(--app-border)] bg-[var(--app-surface)] p-2.5 sm:p-3">
+    <div className="min-w-0 flex-shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] p-2.5 sm:p-3">
       {/* Reply Banner */}
       {replyingTo && (
-        <div className="mb-2 flex items-center justify-between rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] p-2 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-1 rounded-full bg-[var(--accent)]" />
-            <div>
-              <span className="font-bold text-[var(--accent)]">{replyingTo.sender_name}</span>
+        <div className="mb-2 flex min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] p-2 text-xs">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="h-6 w-1 flex-shrink-0 rounded-full bg-[var(--accent)]" />
+            <div className="min-w-0">
+              <span className="truncate font-bold text-[var(--accent)]">
+                {replyingTo.sender_name}
+              </span>
               <p className="line-clamp-1 text-[var(--app-text-secondary)]">{replyingTo.content}</p>
             </div>
           </div>
@@ -182,7 +190,7 @@ export const MessageComposer: React.FC<Props> = ({ channelId, onTyping }) => {
             onClick={() => {
               setReplyingTo(null);
             }}
-            className="flex h-6 w-6 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)]"
+            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)]"
           >
             <X size={14} />
           </button>
@@ -191,14 +199,14 @@ export const MessageComposer: React.FC<Props> = ({ channelId, onTyping }) => {
 
       {/* Attached Entity Card Preview */}
       {attachedEntity && (
-        <div className="bg-[var(--accent)]/10 border-[var(--accent)]/30 mb-2 flex items-center justify-between rounded-xl border p-2 text-xs">
-          <div className="flex items-center gap-2">
-            <Layers size={16} className="text-[var(--accent)]" />
-            <div>
-              <span className="font-bold text-[var(--app-text)]">
+        <div className="bg-[var(--accent)]/10 border-[var(--accent)]/30 mb-2 flex min-w-0 items-center justify-between gap-2 rounded-xl border p-2 text-xs">
+          <div className="flex min-w-0 items-center gap-2">
+            <Layers size={16} className="flex-shrink-0 text-[var(--accent)]" />
+            <div className="min-w-0">
+              <span className="block truncate font-bold text-[var(--app-text)]">
                 {attachedEntity.metadata.title}
               </span>
-              <p className="text-[11px] text-[var(--app-text-secondary)]">
+              <p className="truncate text-[11px] text-[var(--app-text-secondary)]">
                 {attachedEntity.metadata.subtitle}
               </p>
             </div>
@@ -207,7 +215,7 @@ export const MessageComposer: React.FC<Props> = ({ channelId, onTyping }) => {
             onClick={() => {
               setAttachedEntity(null);
             }}
-            className="flex h-6 w-6 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-500/10"
+            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-500/10"
           >
             <X size={14} />
           </button>
@@ -216,16 +224,16 @@ export const MessageComposer: React.FC<Props> = ({ channelId, onTyping }) => {
 
       {/* Selected File Preview */}
       {selectedFile && (
-        <div className="mb-2 flex items-center justify-between rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] p-2 text-xs">
-          <div className="flex items-center gap-2">
-            <ImageIcon size={16} className="text-[var(--accent)]" />
-            <span className="font-medium text-[var(--app-text)]">{selectedFile.name}</span>
+        <div className="mb-2 flex min-w-0 items-center justify-between gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] p-2 text-xs">
+          <div className="flex min-w-0 items-center gap-2">
+            <ImageIcon size={16} className="flex-shrink-0 text-[var(--accent)]" />
+            <span className="truncate font-medium text-[var(--app-text)]">{selectedFile.name}</span>
           </div>
           <button
             onClick={() => {
               setSelectedFile(null);
             }}
-            className="flex h-6 w-6 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-500/10"
+            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-500/10"
           >
             <X size={14} />
           </button>
@@ -233,7 +241,7 @@ export const MessageComposer: React.FC<Props> = ({ channelId, onTyping }) => {
       )}
 
       {/* Input controls */}
-      <div className="flex items-end gap-2">
+      <div className="flex min-w-0 items-end gap-2">
         {/* If user is recording, show full WhatsApp voice recording bar */}
         {isRecording ? (
           <AudioRecorder
@@ -300,7 +308,7 @@ export const MessageComposer: React.FC<Props> = ({ channelId, onTyping }) => {
             </div>
 
             {/* Text Input */}
-            <div className="relative flex-1">
+            <div className="relative min-w-0 flex-1">
               <textarea
                 rows={1}
                 value={text}

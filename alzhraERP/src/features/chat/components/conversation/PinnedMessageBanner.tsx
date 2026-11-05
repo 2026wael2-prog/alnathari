@@ -18,15 +18,15 @@ export const PinnedMessageBanner: React.FC<Props> = ({
   if (!pinnedMessage) return null;
 
   return (
-    <div className="shadow-2xs flex items-center justify-between border-b border-[var(--app-border)] bg-[var(--app-surface-hover)] px-3 py-1.5 text-xs">
+    <div className="shadow-2xs flex min-w-0 flex-shrink-0 items-center justify-between gap-2 border-b border-[var(--app-border)] bg-[var(--app-surface-hover)] px-3 py-1.5 text-xs">
       <div
-        className="flex flex-1 cursor-pointer items-center gap-2 overflow-hidden"
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 overflow-hidden"
         onClick={() => onJumpToMessage?.(pinnedMessage.id)}
         title="انقر للانتقال للرسالة"
       >
         <Pin size={14} className="flex-shrink-0 rotate-45 text-[var(--accent)]" />
-        <div className="flex items-center gap-1.5 truncate">
-          <span className="font-bold text-[var(--accent)]">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="flex-shrink-0 font-bold text-[var(--accent)]">
             {pinnedMessage.sender_name || 'رسالة مثبتة'}:
           </span>
           <span className="truncate text-[var(--app-text)] opacity-90">

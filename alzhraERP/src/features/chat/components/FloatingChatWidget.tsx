@@ -100,31 +100,38 @@ export const FloatingChatWidget: React.FC = () => {
 
   // Expanded Floating Window
   return (
+    /**
+     * `max-h-[calc(100dvh-…)]` يحمي من تجاوز الشاشة: الارتفاع الثابت (480/520px)
+     * مع الإزاحة السفلية 4.5rem كان يتجاوز الشاشات القصيرة (أو شاشة الهاتف عند
+     * فتح لوحة المفاتيح) فيخرج أعلى النافذة أو صندوق الكتابة عن حدود العرض.
+     */
     <div
-      className={`fixed bottom-[calc(4.5rem_+_env(safe-area-inset-bottom))] end-3 z-40 flex flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] shadow-2xl transition-all duration-300 md:bottom-5 md:end-5 ${
+      className={`fixed bottom-[calc(4.5rem_+_env(safe-area-inset-bottom))] end-3 z-40 flex max-h-[calc(100dvh-6.5rem)] min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] shadow-2xl transition-all duration-300 md:bottom-5 md:end-5 md:max-h-[calc(100dvh-3rem)] ${
         isExpanded
           ? 'h-[75vh] w-[92vw] sm:w-[680px] md:h-[85vh]'
           : 'h-[480px] w-[92vw] sm:w-[390px] md:h-[520px]'
       }`}
     >
       {/* Floating Header */}
-      <div className="flex items-center justify-between border-b border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2">
-        <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-shrink-0 items-center justify-between gap-2 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2">
           {activeChannelId && (
             <button
               onClick={() => {
                 setActiveChannel(null);
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)]"
+              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)]"
               title="الرجوع للقائمة"
             >
               <ChevronLeft size={16} />
             </button>
           )}
-          <span className="text-xs font-bold text-[var(--app-text)]">محادثات وتواصل الفروع</span>
+          <span className="truncate text-xs font-bold text-[var(--app-text)]">
+            محادثات وتواصل الفروع
+          </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex flex-shrink-0 items-center gap-1">
           <button
             onClick={handleOpenHub}
             title="فتح في صفحة كاملة"
@@ -161,14 +168,14 @@ export const FloatingChatWidget: React.FC = () => {
       </div>
 
       {/* Floating Content Body */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* If expanded on desktop, show two panes; otherwise show active view */}
         {isExpanded ? (
-          <div className="flex h-full w-full">
-            <div className="w-64 border-e border-[var(--app-border)]">
+          <div className="flex h-full min-h-0 w-full">
+            <div className="min-h-0 w-64 min-w-0 flex-shrink-0 border-e border-[var(--app-border)]">
               <ConversationList />
             </div>
-            <div className="flex-1">
+            <div className="min-h-0 min-w-0 flex-1">
               <ConversationView />
             </div>
           </div>

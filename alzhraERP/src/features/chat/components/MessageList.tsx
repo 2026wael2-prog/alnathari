@@ -76,7 +76,7 @@ export const MessageList: React.FC<Props> = ({
 
   if (isLoading && messages.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center text-[var(--app-text-secondary)]">
+      <div className="flex min-h-0 flex-1 items-center justify-center text-[var(--app-text-secondary)]">
         <Loader2 size={28} className="animate-spin text-[var(--accent)]" />
       </div>
     );
@@ -84,7 +84,7 @@ export const MessageList: React.FC<Props> = ({
 
   if (messages.length === 0) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center p-6 text-center text-[var(--app-text-secondary)]">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center text-[var(--app-text-secondary)]">
         <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--app-surface-hover)]">
           <MessageSquare size={28} className="text-[var(--accent)]" />
         </div>
@@ -100,7 +100,7 @@ export const MessageList: React.FC<Props> = ({
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="scrollbar-thin scrollbar-thumb-[var(--app-border)] relative flex-1 overflow-y-auto px-3 py-4 sm:px-5"
+      className="custom-scrollbar relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-4 sm:px-5"
     >
       {/* Loading older messages indicator */}
       {isLoadingMore && (

@@ -6,7 +6,7 @@ import React from 'react';
  */
 export const ChatWallpaper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <div className="relative flex h-full flex-1 flex-col overflow-hidden bg-[var(--app-bg)]">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[var(--app-bg)]">
       {/* Subtle WhatsApp-style doodle background texture */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.035] dark:opacity-[0.05]"
