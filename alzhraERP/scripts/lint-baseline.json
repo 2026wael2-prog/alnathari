@@ -682,7 +682,7 @@
   "src/features/sales/components/Analytics/components/TopCustomersList.tsx": 5,
   "src/features/sales/components/Analytics/components/TopProductsList.tsx": 4,
   "src/features/sales/components/Analytics/components/index.ts": 0,
-  "src/features/sales/components/PrintableInvoice.tsx": 79,
+  "src/features/sales/components/PrintableInvoice.tsx": 0,
   "src/features/sales/components/Returns/SalesReturns.tsx": 7,
   "src/features/sales/components/Returns/SalesReturnsView.tsx": 31,
   "src/features/sales/components/create/CreateInvoiceView.tsx": 31,
