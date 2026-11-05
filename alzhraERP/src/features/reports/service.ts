@@ -150,7 +150,7 @@ export const reportsService = {
         p_company_id: companyId,
         p_as_of_date: today,
       }),
-      supabase.rpc('report_balance_sheet_detailed' as any, {
+      supabase.rpc('report_balance_sheet_detailed', {
         p_company_id: companyId,
         p_as_of_date: today,
       }),
@@ -167,8 +167,10 @@ export const reportsService = {
 
     const totalAssets = Number(assetRow?.amount) || 0;
     const totalLiabilities = Number(liabilityRow?.amount) || 0;
+    // 'equity' من الخادم تشمل صافي ربح الفترة غير المُقفلة (انظر migration
+    // 20261105000001) — بدونها لا تتزن المعادلة المحاسبية.
     const totalEquity = Number(equityRow?.amount) || 0;
-    const totalRetainedToDate = Number(retainedRow?.amount) || 0;
+    const netProfitToDate = Number(retainedRow?.amount) || 0;
 
     let assets: TrialBalanceItem[] = [];
     let liabilities: TrialBalanceItem[] = [];
@@ -176,7 +178,7 @@ export const reportsService = {
 
     if (!detailedError && Array.isArray(detailedData)) {
       const detailedRows = detailedData as unknown as Array<{
-        account_id: string;
+        account_id: string | null;
         account_code: string;
         account_name: string;
         account_type: string;
@@ -185,56 +187,39 @@ export const reportsService = {
         balance: number | string;
       }>;
 
-      assets = detailedRows
-        .filter(r => r.account_type === 'asset')
-        .map(r => ({
-          id: r.account_id,
-          code: r.account_code,
-          name: r.account_name,
-          type: r.account_type,
-          totalDebit: Number(r.total_debit) || 0,
-          totalCredit: Number(r.total_credit) || 0,
-          netBalance: Number(r.balance) || 0,
-        }));
+      // سطر صافي ربح الفترة (3999) حساب وهمي بلا معرّف — نبني له مفتاحاً ثابتاً.
+      const mapAccount = (r: (typeof detailedRows)[number]): TrialBalanceItem => ({
+        id: r.account_id ?? `synthetic-${r.account_code}`,
+        code: r.account_code,
+        name: r.account_name,
+        type: r.account_type,
+        totalDebit: Number(r.total_debit) || 0,
+        totalCredit: Number(r.total_credit) || 0,
+        netBalance: Number(r.balance) || 0,
+      });
 
-      liabilities = detailedRows
-        .filter(r => r.account_type === 'liability')
-        .map(r => ({
-          id: r.account_id,
-          code: r.account_code,
-          name: r.account_name,
-          type: r.account_type,
-          totalDebit: Number(r.total_debit) || 0,
-          totalCredit: Number(r.total_credit) || 0,
-          netBalance: Number(r.balance) || 0,
-        }));
+      const byType = (accountType: string) =>
+        detailedRows.filter(r => r.account_type === accountType).map(mapAccount);
 
-      equity = detailedRows
-        .filter(r => r.account_type === 'equity')
-        .map(r => ({
-          id: r.account_id,
-          code: r.account_code,
-          name: r.account_name,
-          type: r.account_type,
-          totalDebit: Number(r.total_debit) || 0,
-          totalCredit: Number(r.total_credit) || 0,
-          netBalance: Number(r.balance) || 0,
-        }));
+      assets = byType('asset');
+      liabilities = byType('liability');
+      equity = byType('equity');
 
-      // Calculate unclosed retained earnings to date
-      const existingRetainedAcc = equity.find(e => e.code === '3200');
-      const existingRetainedBalance = existingRetainedAcc?.netBalance || 0;
-      const unclosedEarnings = totalRetainedToDate - existingRetainedBalance;
-
-      if (unclosedEarnings > 0.001 || unclosedEarnings < -0.001) {
+      // سطر صافي ربح الفترة (3999) يأتي من RPC التفصيلي مباشرةً.
+      // ⚠️ لا نطرح رصيد 3200 ولا نُلغيه: الأرباح المبقاة المُرحّلة تبقى كما هي،
+      // وصافي ربح الفترة يُضاف كبند مستقل داخل حقوق الملكية.
+      // احتياط: إن لم يُرجع الخادم سطر 3999 رغم وجود صافي ربح، نضيفه هنا حتى
+      // لا تظهر الميزانية غير متزنة على قاعدة بيانات لم تُرحّل الإصلاح بعد.
+      const hasNetProfitRow = equity.some(e => e.code === '3999');
+      if (!hasNetProfitRow && Math.abs(netProfitToDate) > 0.001) {
         equity.push({
-          id: 'unclosed-retained-earnings',
+          id: 'unclosed-net-profit',
           code: '3999',
-          name: 'صافي أرباح/خسائر الفترات السابقة والحالية',
+          name: 'صافي ربح/خسارة الفترة غير المُقفلة',
           type: 'equity',
-          totalDebit: unclosedEarnings < 0 ? -unclosedEarnings : 0,
-          totalCredit: unclosedEarnings > 0 ? unclosedEarnings : 0,
-          netBalance: unclosedEarnings,
+          totalDebit: netProfitToDate < 0 ? -netProfitToDate : 0,
+          totalCredit: netProfitToDate > 0 ? netProfitToDate : 0,
+          netBalance: netProfitToDate,
         });
       }
     } else {
@@ -279,12 +264,22 @@ export const reportsService = {
         : [];
     }
 
+    const sumNet = (items: TrialBalanceItem[]) =>
+      items.reduce((sum, item) => sum + (item.netBalance || 0), 0);
+
+    // عند توفر التفصيل نعتمد مجموع البنود المعروضة (يشمل سطر 3999 لصافي ربح
+    // الفترة) حتى يتطابق "إجمالي القسم" مع المجاميع العليا، وإلا نعتمد مجاميع
+    // الملخص من الخادم.
+    const hasSections = assets.length + liabilities.length + equity.length > 0;
+
     return {
       assets,
       liabilities,
       equity,
-      totalAssets,
-      totalLiabEquity: totalLiabilities + totalEquity,
+      totalAssets: hasSections ? sumNet(assets) : totalAssets,
+      totalLiabEquity: hasSections
+        ? sumNet(liabilities) + sumNet(equity)
+        : totalLiabilities + totalEquity,
     };
   },
 

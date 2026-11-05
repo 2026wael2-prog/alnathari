@@ -73,7 +73,8 @@ const toTrialBalanceRows = (value: unknown): TrialBalanceRpcRow[] => {
     const total_credit = Number(row.total_credit);
     const balance = Number(row.balance);
     if (
-      typeof row.account_id !== 'string' ||
+      // سطر صافي ربح الفترة في الميزانية (كود 3999) حساب وهمي بلا معرّف
+      (row.account_id !== null && typeof row.account_id !== 'string') ||
       typeof row.account_code !== 'string' ||
       typeof row.account_name !== 'string' ||
       typeof row.account_type !== 'string' ||
@@ -84,7 +85,8 @@ const toTrialBalanceRows = (value: unknown): TrialBalanceRpcRow[] => {
       return [];
     return [
       {
-        account_id: row.account_id,
+        account_id:
+          typeof row.account_id === 'string' ? row.account_id : `synthetic-${row.account_code}`,
         account_code: row.account_code,
         account_name: row.account_name,
         account_type: row.account_type,
@@ -357,7 +359,7 @@ export const reportService = {
     let equityTBI: TrialBalanceItem[] = [];
 
     const { data: detailBsData, error: detailBsError } = await supabase.rpc(
-      'report_balance_sheet_detailed' as any,
+      'report_balance_sheet_detailed',
       {
         p_company_id: companyId,
         p_as_of_date: to,
