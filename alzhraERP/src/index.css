@@ -365,34 +365,41 @@ html[data-preset='classic-golden-erp']:not(.dark) {
   }
 }
 
-/* ── ب) الوضع الليلي: ليل الميزان الذهبي الدافئ والواضح (وداعاً لألوان التطبيق الزرقاء) ── */
-html[data-preset='classic-golden-erp'].dark,
-.dark html[data-preset='classic-golden-erp'] {
-  /* جسر لوحة slate: استبدال ألوان Tailwind الزرقاء الفولاذية بمقياس دافئ فحمي/ذهبي */
-  --slate-50: 246 242 235;
-  --slate-100: 238 232 222;
-  --slate-200: 218 208 194;
-  --slate-300: 188 175 156;
-  --slate-400: 150 137 118;
-  --slate-500: 118 106 88;
-  --slate-600: 82 72 58;
-  --slate-700: 54 47 38;
-  --slate-750: 45 39 31;
-  --slate-800: 35 30 24;
-  --slate-850: 29 25 20;
-  --slate-900: 24 20 16;
-  --slate-950: 18 15 12;
+/* ── ب) الوضع الليلي: ليل الميزان الذهبي الفخم والعميق (فحمي نقي OLED + لمسات ذهبية حادة) ── */
+html[data-preset='classic-golden-erp'].dark {
+  /* جسر لوحة slate: فحمي احترافي عميق ونظيف خالي تماماً من أية درجات طينية أو زرقاء باهتة */
+  --slate-50: 243 244 246;
+  --slate-100: 229 231 235;
+  --slate-200: 209 213 219;
+  --slate-300: 156 163 175;
+  --slate-400: 107 114 128;
+  --slate-500: 75 85 99;
+  --slate-600: 45 49 58;
+  --slate-700: 32 35 42;
+  --slate-750: 26 29 35;
+  --slate-800: 20 22 27;
+  --slate-850: 16 18 22;
+  --slate-900: 12 13 16;
+  --slate-950: 8 9 11;
 
-  background-color: #151310 !important;
-  color: #f5f0e8 !important;
+  background-color: #090a0d !important;
+  color: #f3f4f6 !important;
 
-  /* تقوية ووضوح خطوط الليل */
+  /* خلفيات مساحة العمل والحاويات الرئيسية */
+  &,
+  & body,
+  & div[data-theme-scope='app'],
+  & main {
+    background-color: #090a0d !important;
+  }
+
+  /* وضوح وقوة خطوط الليل */
   & .text-slate-400,
   & .text-slate-500,
   & .text-gray-400,
   & .text-gray-500,
   & .text-\[var\(--app-text-secondary\)\] {
-    color: #c8bcab !important;
+    color: #9ca3af !important;
     font-weight: 500 !important;
   }
 
@@ -401,12 +408,12 @@ html[data-preset='classic-golden-erp'].dark,
     font-weight: 700 !important;
   }
 
-  /* 1. الترويسات وشريط العنوان في الوضع الليلي: ذهبي كهرماني عميق دافئ */
+  /* 1. الترويسات وشريط العنوان في الوضع الليلي: فحمي عميق فاخر مع خط ذهبي برتقالي بارز */
   & .classic-titlebar,
   & header {
-    background: linear-gradient(to bottom, #7d5400, #543800) !important;
-    border-bottom: 1px solid #946300 !important;
-    box-shadow: none !important;
+    background: #121317 !important;
+    border-bottom: 2px solid #E99A00 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45) !important;
   }
   & .classic-titlebar span,
   & .classic-titlebar div,
@@ -417,96 +424,102 @@ html[data-preset='classic-golden-erp'].dark,
     font-weight: 700 !important;
   }
   & .classic-brand-mark {
-    background-color: #F5C04A !important;
-    color: #1a1610 !important;
+    background-color: #E99A00 !important;
+    color: #090a0d !important;
+    font-weight: 900 !important;
   }
 
-  /* 2. شريط الأوامر والقوائم ليلاً: أسطح خشبية دافئة وحدود ذهبية */
+  /* 2. شريط الأوامر والقوائم ليلاً: أسطح فحمية مريحة مع تبويب نشط ذهبي */
   & .classic-menubar,
   & .classic-ribbon {
-    background-color: #1f1c17 !important;
-    border-bottom: 1px solid #3c362d !important;
+    background-color: #14151a !important;
+    border-bottom: 1px solid #23252c !important;
   }
   & .classic-menu-btn {
-    color: #f5f0e8 !important;
+    color: #f3f4f6 !important;
+    font-weight: 600 !important;
   }
   & .classic-menu-btn:hover,
   & .classic-menu-btn[aria-expanded='true'] {
-    background-color: #E99A002e !important;
-    border-color: #D99000 !important;
+    background-color: #E99A0026 !important;
+    border-color: #E99A00 !important;
     color: #F5C04A !important;
   }
   & .classic-ribbon-item {
-    color: #f5f0e8 !important;
+    color: #d1d5db !important;
   }
   & .classic-ribbon-item:hover {
-    background-color: #E99A0024 !important;
+    background-color: #E99A001c !important;
     border-color: #B87B00 !important;
   }
   & .classic-ribbon-item[aria-current='page'] {
-    background-color: #E99A0033 !important;
+    background-color: #E99A002e !important;
     border-color: #E99A00 !important;
     box-shadow: inset 0 -3px 0 0 #E99A00 !important;
     color: #F5C04A !important;
+    font-weight: 700 !important;
   }
   & .classic-ribbon-item[aria-current='page'] .classic-ribbon-icon {
     background-color: #E99A00 !important;
-    color: #181510 !important;
+    color: #090a0d !important;
   }
 
-  /* 3. الجداول المحاسبية ليلاً: ترويسة خضراء زيتونية داكنة مع صفوف دافئة */
+  /* 3. الجداول المحاسبية ليلاً: ترويسة خضراء زمردية محاسبية أنيقة مع خطوط واضحة */
   & table thead,
   & thead.sticky,
   & table thead tr th,
   & thead.sticky tr th {
-    background-color: #244422 !important;
-    color: #e8f5e7 !important;
-    border-color: #3c362d !important;
-    font-weight: 700 !important;
+    background-color: #102d18 !important;
+    color: #80C77B !important;
+    border-color: #23252c !important;
+    font-weight: 800 !important;
   }
   & table thead tr th *,
   & thead.sticky tr th * {
-    color: #e8f5e7 !important;
+    color: #80C77B !important;
   }
   & table tbody tr {
-    background-color: #1f1c17 !important;
-    border-color: #3c362d !important;
-    color: #f5f0e8 !important;
+    background-color: #14151a !important;
+    border-color: #23252c !important;
+    color: #f3f4f6 !important;
   }
   & table tbody tr:nth-child(even) {
-    background-color: #26221d !important;
+    background-color: #191b22 !important;
   }
   & table tbody tr:has(input[type="checkbox"]:checked),
   & table tbody tr.bg-blue-50\/80,
   & table tbody tr[aria-selected='true'] {
-    background-color: #1e4a1c !important;
+    background-color: #14351d !important;
   }
   & table td,
   & table th {
-    border-color: #3c362d !important;
-    color: #f5f0e8 !important;
+    border-color: #23252c !important;
+    color: #f3f4f6 !important;
   }
 
-  /* 4. حقول الإدخال ليلاً: أسطح دافئة وحدود نحاسية وخطوط بيضاء واضحة */
+  /* 4. حقول الإدخال ليلاً: أسطح فحمية داكنة نقية وحدود دقيقة وخطوط بيضاء */
   & input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='submit']):not([type='button']),
   & select,
   & textarea {
-    background-color: #26221d !important;
-    border-color: #4d4538 !important;
+    background-color: #0e0f14 !important;
+    border-color: #282a32 !important;
     color: #ffffff !important;
+    font-weight: 500 !important;
   }
   & input:focus,
   & select:focus,
   & textarea:focus {
-    border-color: #F2B52B !important;
-    outline-color: #F2B52B !important;
+    border-color: #E99A00 !important;
+    outline: 1px solid #E99A00 !important;
   }
 
-  /* 5. البطاقات والحاويات ليلاً */
-  & .bg-white {
-    background-color: #1f1c17 !important;
-    color: #f5f0e8 !important;
-    border-color: #3c362d !important;
+  /* 5. البطاقات والحاويات والقوائم الجانبية ليلاً */
+  & aside,
+  & .bg-white,
+  & .bg-\[var\(--app-surface\)\] {
+    background-color: #14151a !important;
+    color: #f3f4f6 !important;
+    border-color: #23252c !important;
   }
 }
 
