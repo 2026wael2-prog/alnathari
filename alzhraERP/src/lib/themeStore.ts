@@ -226,6 +226,7 @@ const applyPresetCSSVars = (presetId: string, currentTheme: 'light' | 'dark') =>
   OPTIONAL_VARS.forEach(prop => root.style.removeProperty(prop));
   // شكل الزوايا (كلاسيكي = شبه مربعة) يُدار عبر [data-corners] في index.css
   root.dataset.corners = preset.corners ?? 'rounded';
+  root.dataset.preset = preset.id;
 
   if (preset.light && preset.dark) {
     // اختيار المتغيرات بناءً على الوضع الحالي للباقات التي تدعم كلا الوضعين
@@ -260,21 +261,21 @@ const applyPresetCSSVars = (presetId: string, currentTheme: 'light' | 'dark') =>
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      mode: 'system',
+      mode: 'light',
       theme: 'light',
-      activePresetId: 'clean-white',
-      accentColor: '#10b981',
+      activePresetId: 'classic-golden-erp',
+      accentColor: '#164F85',
       font: 'Cairo',
-      radius: 0.5,
+      radius: 0.125,
       fontSize: 14,
       shadowStrength: 0.05,
       glassBlur: 10,
       glassOpacity: 0.1,
       uiLayout: 'auto',
       draftSettings: {
-        accentColor: '#10b981',
+        accentColor: '#164F85',
         font: 'Cairo',
-        radius: 0.5,
+        radius: 0.125,
         fontSize: 14,
         shadowStrength: 0.05,
         glassBlur: 10,

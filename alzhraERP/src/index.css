@@ -203,6 +203,119 @@ input.is-modified {
 }
 
 /* ============================================================
+   ثيم «الميزان الذهبي ERP» — تطبيق صارم وحرفي للألوان الـ 15 المعتمدة
+   ============================================================ */
+html[data-preset='classic-golden-erp'] {
+  /* 1. الترويسات والعناصر الرئيسية: البرتقالي الذهبي والبرتقالي الداكن */
+  & .classic-titlebar {
+    background: linear-gradient(to bottom, #E99A00, #D99000) !important;
+    border-bottom: 1px solid #B87B00 !important;
+    box-shadow: none !important;
+  }
+  & .classic-titlebar span,
+  & .classic-titlebar div {
+    color: #292929 !important;
+  }
+  & header {
+    background: linear-gradient(to bottom, #E99A00, #D99000) !important;
+    border-bottom: 1px solid #B87B00 !important;
+  }
+  & header span,
+  & header button {
+    color: #292929 !important;
+  }
+  & .classic-brand-mark {
+    background-color: #292929 !important;
+    color: #E99A00 !important;
+  }
+
+  /* 2. قشرة الشريط والقوائم: الرمادي الفاتح مع تمييز نشط ذهبي وبرتقالي */
+  & .classic-menubar,
+  & .classic-ribbon {
+    background-color: #F4F4F4 !important;
+    border-bottom: 1px solid #C8C8C8 !important;
+  }
+  & .classic-menu-btn:hover,
+  & .classic-menu-btn[aria-expanded='true'] {
+    background-color: #F5C04A33 !important;
+    border-color: #D99000 !important;
+  }
+  & .classic-ribbon-item:hover {
+    background-color: #F5C04A26 !important;
+    border-color: #F2B52B !important;
+  }
+  & .classic-ribbon-item[aria-current='page'] {
+    background-color: #F5C04A33 !important;
+    border-color: #D99000 !important;
+    box-shadow: inset 0 -3px 0 0 #D99000 !important;
+  }
+  & .classic-ribbon-item[aria-current='page'] .classic-ribbon-icon {
+    background-color: #E99A00 !important;
+    color: #292929 !important;
+  }
+
+  /* 3. الجداول: الأخضر الأساسي للترويسات والرمادي البديل والأخضر الفاتح للتحديد */
+  & table thead,
+  & thead.sticky,
+  & table thead tr th,
+  & thead.sticky tr th {
+    background-color: #80C77B !important;
+    color: #292929 !important;
+    border-color: #C8C8C8 !important;
+    font-weight: 700 !important;
+  }
+  & table thead tr th *,
+  & thead.sticky tr th * {
+    color: #292929 !important;
+  }
+  & table tbody tr {
+    background-color: #F4F4F4 !important;
+    border-color: #C8C8C8 !important;
+    color: #292929 !important;
+  }
+  & table tbody tr:nth-child(even) {
+    background-color: #EAEAEA !important;
+  }
+  & table tbody tr:has(input[type="checkbox"]:checked),
+  & table tbody tr.bg-blue-50\/80,
+  & table tbody tr[aria-selected='true'] {
+    background-color: #A0D995 !important;
+  }
+  & table td,
+  & table th {
+    border-color: #C8C8C8 !important;
+  }
+
+  /* 4. حقول الإدخال: بيضاء نقية مع حدود رمادية */
+  & input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='submit']):not([type='button']),
+  & select,
+  & textarea {
+    background-color: #FFFFFF !important;
+    border-color: #C8C8C8 !important;
+    color: #292929 !important;
+  }
+  & input:focus,
+  & select:focus,
+  & textarea:focus {
+    border-color: #164F85 !important;
+    outline-color: #164F85 !important;
+  }
+
+  /* 5. العناصر التفاعلية والأزرار الزرقاء بنمط الميزان الأصلي */
+  & .bg-blue-600 {
+    background-color: #164F85 !important;
+    border-color: #164F85 !important;
+  }
+  & .hover\:bg-blue-700:hover {
+    background-color: #0f365c !important;
+    border-color: #0f365c !important;
+  }
+  & .text-blue-600 {
+    color: #164F85 !important;
+  }
+}
+
+/* ============================================================
    قشرة الميزان الكلاسيكي — قوائم + شريط أوامر (Ribbon) مكتبي
    تُستخدم فقط عندما يكون الشكل الكلاسيكي نشطاً (lg = 1024px فأعلى).
    كل الألوان من التوكنات (--classic-* تسقط إلى قيم مشتقة في :root/.dark)،

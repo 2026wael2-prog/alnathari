@@ -8,6 +8,7 @@ describe('themeStore — application of preset CSS variables', () => {
   beforeEach(() => {
     root().removeAttribute('style');
     delete root().dataset.corners;
+    delete root().dataset.preset;
     root().classList.remove('dark');
   });
 
