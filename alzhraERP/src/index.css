@@ -33,6 +33,16 @@
     /* كان --app-card مستخدماً في 6 ملفات وغير معرّف (كروت شفافة) */
     --app-card: var(--app-surface);
 
+    /* توكنات الهوية الكلاسيكية وحقول الإدخال والجداول */
+    --app-input-bg: var(--app-surface);
+    --table-header-bg: var(--app-bg);
+    --table-header-fg: var(--app-text);
+    --table-selected-row: color-mix(in srgb, var(--accent) 18%, var(--app-surface));
+    --field-modified-bg: #F4C58A;
+    --interactive-blue: #164F85;
+    --secondary-gold: #F2B52B;
+    --accent-gold-yellow: #F5C04A;
+
     /* ────────────────────────────────────────────────────────────
        قشرة الميزان الكلاسيكي — قيم افتراضية مشتقة من الثيم النشط.
        أي ثيم يعمل مع الشكل الكلاسيكي دون تعريفها، و«الميزان الكلاسيكي»
@@ -83,6 +93,15 @@
     --brand-ink: #1a1a1a;
     --app-grid: #3d3d3d;
     --app-zebra: #262626;
+
+    --app-input-bg: var(--app-surface);
+    --table-header-bg: var(--app-bg);
+    --table-header-fg: var(--app-text);
+    --table-selected-row: color-mix(in srgb, var(--accent) 25%, var(--app-surface));
+    --field-modified-bg: #5c3d1e;
+    --interactive-blue: #38bdf8;
+    --secondary-gold: #F2B52B;
+    --accent-gold-yellow: #F5C04A;
 
     /* قشرة الميزان ليلاً: تفتيح التحديد وظل أعمق (الظل الفاتح غير مرئي) */
     --classic-chrome: color-mix(in srgb, var(--app-surface) 92%, var(--brand-500));
@@ -144,6 +163,43 @@ html[data-corners='square']
 }
 html[data-corners='square'] :is(.rounded-full) {
   border-radius: 9999px; /* الدوائر تبقى دائرية (أفاتار، نقاط الحالة) */
+}
+
+/* ============================================================
+   هوية الجداول وحقول الإدخال الكلاسيكية (روح الميزان دوت نت)
+   ============================================================ */
+html[data-corners='square'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='submit']):not([type='button']),
+html[data-corners='square'] select,
+html[data-corners='square'] textarea {
+  background-color: var(--app-input-bg, #ffffff);
+  border-color: var(--app-border-strong, var(--app-border));
+  color: var(--app-text);
+}
+
+html[data-corners='square'] table thead tr th,
+html[data-corners='square'] thead.sticky tr th {
+  background-color: var(--table-header-bg, var(--app-bg));
+  color: var(--table-header-fg, var(--app-text));
+  border-color: var(--app-grid, var(--app-border));
+}
+
+html[data-corners='square'] table tbody tr:nth-child(even) {
+  background-color: var(--app-zebra, var(--app-surface));
+}
+
+html[data-corners='square'] table tr:has(input[type="checkbox"]:checked) {
+  background-color: var(--table-selected-row, #A0D995) !important;
+}
+
+html[data-corners='square'] table td,
+html[data-corners='square'] table th {
+  border-color: var(--app-grid, var(--app-border));
+}
+
+.field-modified,
+[data-modified='true'],
+input.is-modified {
+  background-color: var(--field-modified-bg, #F4C58A) !important;
 }
 
 /* ============================================================

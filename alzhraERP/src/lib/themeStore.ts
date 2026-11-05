@@ -177,6 +177,16 @@ const OPTIONAL_VARS = [
   '--app-zebra',
   '--brand-500',
   '--brand-ink',
+  '--brand-600',
+  '--brand-700',
+  '--secondary-gold',
+  '--accent-gold-yellow',
+  '--app-input-bg',
+  '--table-header-bg',
+  '--table-header-fg',
+  '--table-selected-row',
+  '--field-modified-bg',
+  '--interactive-blue',
   // درجات الحدود (خفيف / فاصل / عنصر تحكّم) — تُمسح كي تسقط الثيمات الأخرى
   // إلى --app-border فلا ترث ثقل حدود الميزان أو خفّتها.
   ...APP_BORDER_TIER_VARS,
