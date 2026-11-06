@@ -1,5 +1,6 @@
 /* eslint-disable complexity, max-lines-per-function, @typescript-eslint/strict-boolean-expressions, @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/no-unnecessary-type-conversion, @typescript-eslint/restrict-template-expressions, @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-unnecessary-condition */
 import React from 'react';
+import { Building2, ShieldCheck, Phone, MapPin, Mail, Calendar } from 'lucide-react';
 import type { DocumentHeaderConfig, LogoSize } from '@/core/types/documentHeader';
 import { DEFAULT_DOCUMENT_HEADER_CONFIG } from '@/core/types/documentHeader';
 
@@ -14,10 +15,12 @@ export interface UniversalDocumentHeaderProps {
     tax_number?: string | undefined;
     commercial_register?: string | undefined;
     slogan?: string | undefined;
+    name_en?: string | undefined;
   };
   documentTitle?: string | undefined;
   documentNumber?: string | undefined;
   documentDate?: string | undefined;
+  statusBadge?: string | undefined;
   className?: string | undefined;
 }
 
@@ -34,13 +37,14 @@ export const UniversalDocumentHeader: React.FC<UniversalDocumentHeaderProps> = (
   documentTitle,
   documentNumber,
   documentDate,
+  statusBadge,
   className = '',
 }) => {
   const { typography, logo, banner, details, style } = config;
 
   // Resolve values (priority: config overrides -> company record -> fallback)
   const resolvedCompanyName =
-    details.companyNameOverride?.trim() || company.name?.trim() || 'اسم المنشأة';
+    details.companyNameOverride?.trim() || company.name?.trim() || 'اسم المنشأة التجارية';
 
   const resolvedSlogan = details.sloganText?.trim() || company.slogan?.trim() || '';
   const resolvedPhone = company.phone?.trim() || '';
@@ -49,10 +53,12 @@ export const UniversalDocumentHeader: React.FC<UniversalDocumentHeaderProps> = (
   const resolvedTaxNumber = company.tax_number?.trim() || '';
   const resolvedCommercialRegister = company.commercial_register?.trim() || '';
   const resolvedLogoUrl = logo.logoUrl?.trim() || company.logo_url?.trim() || '';
+  const resolvedNameEn = company.name_en?.trim() || '';
 
   // Safe font sizes (enforcing AGENTS.md rule: >= 10px)
-  const safeTitleSize = Math.max(12, Number(typography.titleSize) || 20);
+  const safeTitleSize = Math.max(14, Number(typography.titleSize) || 22);
   const safeDetailsSize = Math.max(10, Number(typography.detailsSize) || 11);
+  const accentColor = style.accentColor || '#1F4E78';
 
   // If full-banner mode is active and banner url exists
   if (banner.enabled && banner.bannerUrl) {
@@ -61,7 +67,7 @@ export const UniversalDocumentHeader: React.FC<UniversalDocumentHeaderProps> = (
         className={`w-full overflow-hidden print:w-full ${className}`}
         style={{
           borderBottom: style.showDivider
-            ? `${style.borderWidth}px solid ${style.borderColor}`
+            ? `${Math.max(1, style.borderWidth)}px solid ${style.borderColor || '#cbd5e1'}`
             : 'none',
         }}
       >
@@ -77,29 +83,44 @@ export const UniversalDocumentHeader: React.FC<UniversalDocumentHeaderProps> = (
         />
         {documentTitle && (
           <div
-            className="flex items-center justify-between border-b px-4 py-2"
+            className="flex items-center justify-between border-b px-4 py-2 print:border-slate-800"
             style={{
-              borderColor: style.borderColor,
-              backgroundColor: style.backgroundColor,
+              borderColor: style.borderColor || '#cbd5e1',
+              backgroundColor: style.backgroundColor || '#ffffff',
             }}
           >
-            <h2
-              style={{
-                fontFamily: typography.titleFont,
-                color: style.accentColor,
-                fontSize: `${safeTitleSize * 0.85}px`,
-              }}
-              className="font-bold"
-            >
-              {documentTitle}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2
+                style={{
+                  fontFamily: typography.titleFont,
+                  color: accentColor,
+                  fontSize: `${safeTitleSize * 0.85}px`,
+                }}
+                className="font-black"
+              >
+                {documentTitle}
+              </h2>
+              {statusBadge && (
+                <span className="rounded-md border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                  {statusBadge}
+                </span>
+              )}
+            </div>
             {(documentNumber || documentDate) && (
               <div
-                className="flex items-center gap-3 text-xs text-slate-600"
+                className="flex items-center gap-4 text-xs text-slate-700 print:text-black"
                 style={{ fontFamily: typography.detailsFont }}
               >
-                {documentNumber && <span>رقم: {documentNumber}</span>}
-                {documentDate && <span>التاريخ: {documentDate}</span>}
+                {documentNumber && (
+                  <span>
+                    <strong>رقم:</strong> <bdo dir="ltr" className="font-mono font-bold">{documentNumber}</bdo>
+                  </span>
+                )}
+                {documentDate && (
+                  <span>
+                    <strong>التاريخ:</strong> <bdo dir="ltr" className="font-mono">{documentDate}</bdo>
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -112,7 +133,7 @@ export const UniversalDocumentHeader: React.FC<UniversalDocumentHeaderProps> = (
   const titleStyle: React.CSSProperties = {
     fontFamily: typography.titleFont,
     fontSize: `${safeTitleSize}px`,
-    fontWeight: typography.titleBold ? 700 : 500,
+    fontWeight: typography.titleBold ? 800 : 700,
     color: typography.titleColor || '#0f172a',
   };
 
@@ -120,32 +141,59 @@ export const UniversalDocumentHeader: React.FC<UniversalDocumentHeaderProps> = (
     fontFamily: typography.detailsFont,
     fontSize: `${safeDetailsSize}px`,
     fontWeight: typography.detailsBold ? 600 : 400,
-    color: typography.detailsColor || '#475569',
+    color: typography.detailsColor || '#334155',
     lineHeight: 1.5,
   };
 
-  // Logo Element
-  const renderLogo = () => {
-    if (!logo.showLogo || !resolvedLogoUrl) return null;
-    const sizeConfig = LOGO_SIZE_CLASSES[logo.size] || LOGO_SIZE_CLASSES.medium;
+  // Logo Element (Render Image or Dignified Emblem)
+  const renderLogo = (isCenter = false) => {
+    if (!logo.showLogo) return null;
 
+    if (resolvedLogoUrl) {
+      const sizeConfig = LOGO_SIZE_CLASSES[logo.size] || LOGO_SIZE_CLASSES.medium;
+      return (
+        <div className={`flex flex-shrink-0 items-center justify-center ${isCenter ? 'mx-auto' : ''}`}>
+          <img
+            src={resolvedLogoUrl}
+            alt={resolvedCompanyName}
+            className={`${sizeConfig.img} object-contain transition-all`}
+            style={{
+              maxHeight: logo.customWidth ? undefined : `${sizeConfig.maxH}px`,
+              width: logo.customWidth ? `${logo.customWidth}px` : undefined,
+              borderRadius: `${logo.borderRadius ?? 8}px`,
+            }}
+          />
+        </div>
+      );
+    }
+
+    // Default Prestigious Seal / Emblem when no image is uploaded
     return (
-      <div className="flex flex-shrink-0 items-center justify-center">
-        <img
-          src={resolvedLogoUrl}
-          alt={resolvedCompanyName}
-          className={`${sizeConfig.img} object-contain transition-all`}
-          style={{
-            maxHeight: logo.customWidth ? undefined : `${sizeConfig.maxH}px`,
-            width: logo.customWidth ? `${logo.customWidth}px` : undefined,
-            borderRadius: `${logo.borderRadius ?? 8}px`,
-          }}
-        />
+      <div
+        className={`flex flex-shrink-0 flex-col items-center justify-center rounded-xl border border-slate-300 bg-slate-50/90 p-2 shadow-2xs print:border-slate-400 print:bg-white ${
+          isCenter ? 'mx-auto' : ''
+        }`}
+        style={{
+          width: '70px',
+          height: '66px',
+          borderColor: style.borderColor || '#cbd5e1',
+        }}
+        title="الختم التجاري المعتمد"
+      >
+        <div
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-xs"
+          style={{ backgroundColor: accentColor }}
+        >
+          <Building2 size={18} />
+        </div>
+        <span className="mt-1 text-[10px] font-black tracking-tight text-slate-700 print:text-black">
+          معتمد رسمياً
+        </span>
       </div>
     );
   };
 
-  // Details List
+  // Official Commercial Details Badges
   const renderDetails = (align: 'right' | 'left' | 'center' = 'right') => {
     const alignClass =
       align === 'center'
@@ -155,97 +203,115 @@ export const UniversalDocumentHeader: React.FC<UniversalDocumentHeaderProps> = (
           : 'items-start text-right';
 
     return (
-      <div className={`flex flex-col gap-0.5 ${alignClass}`} style={detailsStyle}>
+      <div className={`flex flex-col gap-1.5 ${alignClass}`} style={detailsStyle}>
         {details.showSlogan && resolvedSlogan && (
-          <p className="mb-0.5 italic text-slate-500">{resolvedSlogan}</p>
+          <p className="text-xs font-semibold text-slate-600 print:text-slate-800">
+            {resolvedSlogan}
+          </p>
         )}
 
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {/* Commercial Registration & Tax Identification Badges */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
           {details.showTaxNumber && resolvedTaxNumber && (
-            <span>
-              <strong className="text-slate-700">
+            <span className="inline-flex items-center gap-1 rounded border border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-800 print:border-slate-400 print:bg-transparent print:text-black">
+              <span className="text-slate-500 print:text-black">
                 {details.taxNumberLabel || 'الرقم الضريبي'}:
-              </strong>{' '}
-              <bdo dir="ltr">{resolvedTaxNumber}</bdo>
+              </span>
+              <bdo dir="ltr" className="font-mono font-black">{resolvedTaxNumber}</bdo>
             </span>
           )}
 
           {details.showCommercialRegister && resolvedCommercialRegister && (
-            <span>
-              <strong className="text-slate-700">
+            <span className="inline-flex items-center gap-1 rounded border border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-800 print:border-slate-400 print:bg-transparent print:text-black">
+              <span className="text-slate-500 print:text-black">
                 {details.commercialRegisterLabel || 'السجل التجاري'}:
-              </strong>{' '}
-              <bdo dir="ltr">{resolvedCommercialRegister}</bdo>
+              </span>
+              <bdo dir="ltr" className="font-mono font-black">{resolvedCommercialRegister}</bdo>
             </span>
           )}
         </div>
 
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {/* Contact info row: Phone, Address, Email */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5 text-[11px] text-slate-600 print:text-slate-800">
           {details.showPhone && resolvedPhone && (
-            <span>
-              <strong className="text-slate-700">{details.phoneLabel || 'الهاتف'}:</strong>{' '}
-              <bdo dir="ltr">{resolvedPhone}</bdo>
+            <span className="inline-flex items-center gap-1">
+              <Phone size={11} className="text-slate-400 print:text-slate-600" />
+              <span className="font-bold text-slate-500 print:text-black">{details.phoneLabel || 'هاتف'}:</span>
+              <bdo dir="ltr" className="font-mono font-bold text-slate-900 print:text-black">{resolvedPhone}</bdo>
+            </span>
+          )}
+
+          {details.showAddress && resolvedAddress && (
+            <span className="inline-flex items-center gap-1">
+              <MapPin size={11} className="text-slate-400 print:text-slate-600" />
+              <span>{resolvedAddress}</span>
             </span>
           )}
 
           {details.showEmail && resolvedEmail && (
-            <span>
-              <strong className="text-slate-700">البريد:</strong> {resolvedEmail}
+            <span className="inline-flex items-center gap-1">
+              <Mail size={11} className="text-slate-400 print:text-slate-600" />
+              <span className="font-mono">{resolvedEmail}</span>
             </span>
           )}
         </div>
 
-        {details.showAddress && resolvedAddress && (
-          <p className="max-w-lg truncate text-slate-600">{resolvedAddress}</p>
-        )}
-
         {details.showCustomNote && details.customNoteText && (
-          <p className="mt-0.5 text-[10px] text-slate-500">{details.customNoteText}</p>
+          <p className="mt-0.5 text-[10px] text-slate-500 print:text-slate-700">{details.customNoteText}</p>
         )}
       </div>
     );
   };
 
-  // Document Badge (Title, Number, Date)
+  // Official Document Identification Card (Title, Number, Date, Status)
   const renderDocumentBadge = () => {
-    if (!documentTitle && !documentNumber && !documentDate) return null;
+    if (!documentTitle && !documentNumber && !documentDate && !statusBadge) return null;
 
     return (
       <div
-        className="flex flex-shrink-0 flex-col items-center justify-center rounded-lg border px-4 py-2 sm:items-end"
+        className="flex flex-shrink-0 flex-col items-center justify-center rounded-xl border-2 bg-gradient-to-b from-white to-slate-50/80 p-3 shadow-2xs print:border-slate-800 print:bg-white print:shadow-none sm:items-end"
         style={{
-          borderColor: style.borderColor,
-          backgroundColor: '#f8fafc',
+          borderColor: accentColor,
           fontFamily: typography.detailsFont,
         }}
       >
+        {/* Document Title Badge */}
         {documentTitle && (
           <div
-            className="mb-1 font-bold tracking-wide"
+            className="mb-1.5 flex items-center gap-1.5 rounded-lg px-3 py-1 font-black text-white shadow-xs print:border print:border-black print:text-white"
             style={{
-              color: style.accentColor,
-              fontSize: `${Math.max(14, safeTitleSize * 0.75)}px`,
+              backgroundColor: accentColor,
+              fontSize: `${Math.max(13, safeTitleSize * 0.7)}px`,
             }}
           >
-            {documentTitle}
+            <ShieldCheck size={14} className="shrink-0" />
+            <span>{documentTitle}</span>
           </div>
         )}
+
+        {/* Status Chip if present */}
+        {statusBadge && (
+          <div className="mb-1 rounded border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 print:border-slate-400 print:text-black">
+            {statusBadge}
+          </div>
+        )}
+
+        {/* Document Number */}
         {documentNumber && (
-          <div
-            className="text-xs font-semibold text-slate-700"
-            style={{ fontSize: `${safeDetailsSize}px` }}
-          >
-            <span>رقم: </span>
-            <span className="font-mono text-slate-900">{documentNumber}</span>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 print:text-black">
+            <span className="text-slate-500 print:text-black">رقم المستند:</span>
+            <bdo dir="ltr" className="font-mono font-black text-slate-900 print:text-black">
+              {documentNumber}
+            </bdo>
           </div>
         )}
+
+        {/* Document Date */}
         {documentDate && (
-          <div
-            className="mt-0.5 text-xs text-slate-500"
-            style={{ fontSize: `${Math.max(10, safeDetailsSize - 1)}px` }}
-          >
-            <span>التاريخ: </span>
-            <bdo dir="ltr">{documentDate}</bdo>
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-600 print:text-black">
+            <Calendar size={11} className="text-slate-400 print:text-slate-700" />
+            <span className="font-bold text-slate-500 print:text-black">التاريخ:</span>
+            <bdo dir="ltr" className="font-mono font-semibold">{documentDate}</bdo>
           </div>
         )}
       </div>
@@ -254,60 +320,66 @@ export const UniversalDocumentHeader: React.FC<UniversalDocumentHeaderProps> = (
 
   return (
     <header
-      className={`relative w-full transition-colors ${className}`}
+      className={`relative w-full overflow-hidden bg-white text-slate-900 print:bg-white print:text-black ${className}`}
       style={{
         backgroundColor: style.backgroundColor || '#ffffff',
-        borderBottom: style.showDivider
-          ? `${style.borderWidth}px solid ${style.borderColor || '#e2e8f0'}`
-          : 'none',
-        paddingTop: `${style.paddingY}px`,
-        paddingBottom: `${style.paddingY}px`,
+        paddingTop: `${Math.max(8, style.paddingY)}px`,
+        paddingBottom: `${Math.max(8, style.paddingY)}px`,
       }}
     >
-      {/* Decorative top accent bar */}
+      {/* Top Official Decorative Accent Ribbon */}
       <div
-        className="absolute left-0 right-0 top-0 h-1"
-        style={{ backgroundColor: style.accentColor }}
+        className="absolute left-0 right-0 top-0 h-1.5 print:h-1"
+        style={{
+          background: `linear-gradient(90deg, ${accentColor}, #3b82f6 50%, ${accentColor})`,
+        }}
       />
 
-      {/* Layout Variant: Modern Centered */}
+      {/* Modern Centered Layout */}
       {style.layout === 'modern-centered' && (
-        <div className="flex flex-col items-center gap-3 px-4 text-center">
-          {logo.position === 'center' && renderLogo()}
-          <div className="flex w-full items-center justify-center gap-4">
-            {logo.position === 'right' && renderLogo()}
-            <div className="flex flex-col items-center">
-              {details.showCompanyName && (
-                <h1 style={titleStyle} className="leading-tight">
-                  {resolvedCompanyName}
-                </h1>
-              )}
-              {renderDetails('center')}
-            </div>
-            {logo.position === 'left' && renderLogo()}
+        <div className="flex flex-col items-center gap-3 px-4 pt-1 text-center">
+          {logo.position === 'center' && renderLogo(true)}
+          <div className="flex w-full flex-col items-center justify-center gap-2">
+            {details.showCompanyName && (
+              <h1 style={titleStyle} className="leading-tight text-slate-950 print:text-black">
+                {resolvedCompanyName}
+              </h1>
+            )}
+            {resolvedNameEn && (
+              <p className="font-mono text-xs font-bold tracking-wider text-slate-600 print:text-black" dir="ltr">
+                {resolvedNameEn}
+              </p>
+            )}
+            {renderDetails('center')}
           </div>
           {renderDocumentBadge()}
         </div>
       )}
 
-      {/* Layout Variant: Compact Minimal */}
+      {/* Compact Minimal Layout */}
       {style.layout === 'compact-minimal' && (
-        <div className="flex items-center justify-between gap-4 px-3">
+        <div className="flex items-center justify-between gap-4 px-3 pt-1">
           <div className="flex items-center gap-3">
             {renderLogo()}
             <div>
               {details.showCompanyName && (
-                <h1 style={{ ...titleStyle, fontSize: `${safeTitleSize * 0.9}px` }}>
+                <h1
+                  style={{ ...titleStyle, fontSize: `${safeTitleSize * 0.9}px` }}
+                  className="font-black leading-tight text-slate-950 print:text-black"
+                >
                   {resolvedCompanyName}
                 </h1>
               )}
               <div
-                className="mt-0.5 flex items-center gap-3 text-xs text-slate-600"
+                className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-slate-700 print:text-black"
                 style={detailsStyle}
               >
                 {details.showPhone && resolvedPhone && <span>هاتف: {resolvedPhone}</span>}
                 {details.showTaxNumber && resolvedTaxNumber && (
                   <span>ضريبي: {resolvedTaxNumber}</span>
+                )}
+                {details.showCommercialRegister && resolvedCommercialRegister && (
+                  <span>س.ت: {resolvedCommercialRegister}</span>
                 )}
               </div>
             </div>
@@ -316,29 +388,47 @@ export const UniversalDocumentHeader: React.FC<UniversalDocumentHeaderProps> = (
         </div>
       )}
 
-      {/* Layout Variant: Classic Split (Default) */}
+      {/* Classic Split Layout (Default Official Commercial Design) */}
       {(style.layout === 'classic-split' || !style.layout) && (
-        <div className="flex flex-col items-start justify-between gap-4 px-4 sm:flex-row sm:items-center">
-          {/* Right Side: Logo & Main Info */}
+        <div className="flex flex-col items-start justify-between gap-4 px-4 pt-1 sm:flex-row sm:items-center">
+          {/* Right Section: Commercial Organization Info */}
           <div className="flex items-center gap-4">
             {logo.position !== 'left' && renderLogo()}
             <div className="flex flex-col">
               {details.showCompanyName && (
-                <h1 style={titleStyle} className="mb-1 leading-snug">
+                <h1 style={titleStyle} className="mb-0.5 leading-snug text-slate-950 print:text-black">
                   {resolvedCompanyName}
                 </h1>
+              )}
+              {resolvedNameEn && (
+                <p className="font-mono text-xs font-bold tracking-wider text-slate-600 print:text-black" dir="ltr">
+                  {resolvedNameEn}
+                </p>
               )}
               {renderDetails('right')}
             </div>
           </div>
 
-          {/* Left Side: Document Badge or Left Logo */}
+          {/* Left Section: Document Identification Card or Left Logo */}
           <div className="flex items-center gap-4 self-end sm:self-center">
             {renderDocumentBadge()}
             {logo.position === 'left' && renderLogo()}
           </div>
         </div>
       )}
+
+      {/* Official Bottom Commercial Dual-Line Divider */}
+      {style.showDivider && (
+        <div className="mt-3 w-full">
+          <div
+            className="h-[2px] w-full"
+            style={{ backgroundColor: accentColor }}
+          />
+          <div className="mt-[2px] h-[1px] w-full bg-slate-200 print:bg-slate-400" />
+        </div>
+      )}
     </header>
   );
 };
+
+export default UniversalDocumentHeader;

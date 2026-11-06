@@ -54,3 +54,4 @@ describe('Classic Al-Mizan Pro (الميزان برو — محلات النظا�
     expect(dark['--classic-chrome']).toBe('#1b2a3d');
   });
 });
+

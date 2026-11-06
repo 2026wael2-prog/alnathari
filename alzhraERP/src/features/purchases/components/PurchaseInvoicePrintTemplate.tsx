@@ -53,53 +53,18 @@ interface PurchaseInvoicePrintTemplateProps {
 
 const printStyles = `
     @media print {
-        body { background-color: white !important; }
+        body { background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .no-print { display: none !important; }
-        @page { margin: 10mm; size: auto; }
+        @page { margin: 8mm 10mm; size: auto; }
     }
-    .purchases-print-box { font-family: 'Arial', 'Segoe UI', sans-serif; color: #111827 !important; background-color: #ffffff !important; font-variant-numeric: tabular-nums; }
-    .grid-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; background-color: #ffffff !important; }
-    .grid-table th, .grid-table td { border: 1px solid #D3D3D3; padding: 8px; color: #111827 !important; background-color: #ffffff !important; }
-    .grid-table th { background-color: #1F4E78 !important; color: #FFFFFF !important; font-weight: bold; text-align: center; }
-    .grid-table tr:nth-child(even) td { background-color: #F8FAFC !important; }
-    .print-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1F4E78; padding-bottom: 15px; margin-bottom: 20px; }
-    .meta-box { border: 1px solid #1F4E78; background-color: #F8FAFC !important; padding: 10px; border-radius: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; font-size: 13px; color: #111827 !important; }
-    .meta-row { display: flex; justify-content: space-between; margin-bottom: 5px; color: #111827 !important; }
+    .purchases-print-box { font-family: 'Cairo', 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif; color: #0f172a !important; background-color: #ffffff !important; font-variant-numeric: tabular-nums; }
+    .grid-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; background-color: #ffffff !important; }
+    .grid-table th, .grid-table td { border: 1px solid #cbd5e1; padding: 8px; color: #0f172a !important; }
+    .grid-table th { background-color: #1F4E78 !important; color: #FFFFFF !important; font-weight: 800; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .grid-table tr:nth-child(even) td { background-color: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .meta-box { border: 1.5px solid #1F4E78; background-color: #F8FAFC !important; padding: 12px; border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; font-size: 12px; color: #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .meta-row { display: flex; justify-content: space-between; margin-bottom: 6px; color: #0f172a !important; }
 `;
-
-const PrintHeader = ({ company }: { company: CompanyPrintInfo }): React.ReactElement => (
-  <div className="print-header">
-    <div className="flex-1 text-right">
-      <h1 className="text-2xl font-bold text-[#1F4E78]">{company.nameAr}</h1>
-      {company.specialization !== '' && (
-        <p className="text-sm font-bold text-blue-800">{company.specialization}</p>
-      )}
-      <p className="mt-1 text-sm">{company.address}</p>
-      <div className="mt-1 flex flex-col gap-1 text-xs font-bold text-gray-700">
-        {company.phone !== '' && <span>هاتف: {company.phone}</span>}
-        {company.taxNumber !== '' && <span>الرقم الضريبي: {company.taxNumber}</span>}
-      </div>
-    </div>
-    <div className="flex flex-1 flex-col items-center justify-center text-center">
-      {company.logoUrl ? (
-        <img
-          src={company.logoUrl}
-          alt="شعار المنشأة"
-          className="h-16 w-auto max-w-[120px] object-contain"
-        />
-      ) : company.headerText !== '' ? (
-        <p className="text-sm font-bold text-gray-500">{company.headerText}</p>
-      ) : null}
-    </div>
-    <div className="flex-1 text-left" dir="ltr">
-      <h1 className="text-2xl font-bold text-[#1F4E78]">{company.nameEn}</h1>
-      <h2 className="mt-2 text-lg font-bold text-gray-800">Purchase Invoice</h2>
-      <h2 className="text-lg font-bold text-gray-800" dir="rtl">
-        فاتورة مشتريات
-      </h2>
-    </div>
-  </div>
-);
 
 const MetaInfo = ({ invoice }: { invoice: PurchasePrintInvoice }): React.ReactElement => (
   <div className="meta-box">
@@ -225,27 +190,24 @@ const PurchaseInvoicePrintTemplate = React.forwardRef<
     <div ref={ref} className="mx-auto max-w-4xl bg-white font-sans text-black print:p-0" dir="rtl">
       <style>{printStyles}</style>
       <div className="purchases-print-box p-8">
-        {headerConfig?.isTemplateAppliedToAll ? (
-          <div className="mb-5">
-            <UniversalDocumentHeader
-              config={headerConfig}
-              company={{
-                name: company.nameAr ?? settingsCompany?.name_ar ?? undefined,
-                phone: (company.phone ?? settingsCompany?.phone ?? undefined) || undefined,
-                address: (company.address ?? settingsCompany?.address ?? undefined) || undefined,
-                tax_number:
-                  (company.taxNumber ?? settingsCompany?.tax_number ?? undefined) || undefined,
-                slogan: company.specialization ?? undefined,
-                logo_url: (company.logoUrl ?? settingsCompany?.logo_url ?? undefined) || undefined,
-              }}
-              documentTitle="فاتورة مشتريات"
-              documentNumber={invoice.invoice_number ?? undefined}
-              documentDate={invoice.issue_date}
-            />
-          </div>
-        ) : (
-          <PrintHeader company={company} />
-        )}
+        <div className="mb-5">
+          <UniversalDocumentHeader
+            config={headerConfig}
+            company={{
+              name: company.nameAr ?? settingsCompany?.name_ar ?? undefined,
+              name_en: company.nameEn ?? undefined,
+              phone: (company.phone ?? settingsCompany?.phone ?? undefined) || undefined,
+              address: (company.address ?? settingsCompany?.address ?? undefined) || undefined,
+              tax_number:
+                (company.taxNumber ?? settingsCompany?.tax_number ?? undefined) || undefined,
+              slogan: company.specialization ?? undefined,
+              logo_url: (company.logoUrl ?? settingsCompany?.logo_url ?? undefined) || undefined,
+            }}
+            documentTitle="فاتورة مشتريات معتمدة"
+            documentNumber={invoice.invoice_number ?? undefined}
+            documentDate={invoice.issue_date}
+          />
+        </div>
         <MetaInfo invoice={invoice} />
         <ItemsTable items={invoice.invoice_items} />
         <Totals invoice={invoice} />

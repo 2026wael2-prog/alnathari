@@ -1,9 +1,10 @@
 import React from 'react';
-import { Printer, X, Building2, FileText, CheckCircle2 } from 'lucide-react';
+import { Printer, X, FileText, CheckCircle2 } from 'lucide-react';
 import Modal from '../../../ui/base/Modal';
 import Button from '../../../ui/base/Button';
 import { formatCurrency } from '../../../core/utils';
 import type { PublicPortalContext } from '../types';
+import { UniversalDocumentHeader } from '@/ui/common/UniversalDocumentHeader';
 
 export interface QuotationPrintItem {
   id?: string | undefined;
@@ -91,65 +92,38 @@ export const SupplierQuotationPrintModal: React.FC<Props> = ({
         {/* Printable Document Paper Sheet */}
         <div className="rounded-2xl border border-slate-700 bg-white p-6 text-slate-900 shadow-xl print:border-none print:p-0 print:shadow-none">
           {/* Document Header */}
-          <div className="flex items-start justify-between border-b-2 border-slate-900 pb-4">
-            {/* Buyer Company Info */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                {company.logo_url ? (
-                  <img
-                    src={company.logo_url}
-                    alt={company.name_ar || ''}
-                    className="h-10 w-10 rounded-lg border object-contain p-0.5"
-                  />
-                ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white">
-                    <Building2 size={18} />
-                  </div>
-                )}
-                <div>
-                  <h2 className="text-base font-black text-slate-950">
-                    {company.name_ar || 'مؤسسة الجعفري'}
-                  </h2>
-                  <p className="text-[10px] font-medium text-slate-500">
-                    إدارة المشتريات والتوريدات
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-0.5 pt-1 text-[10px] text-slate-600">
-                {company.phone && (
-                  <p>
-                    الهاتف: <span dir="ltr">{company.phone}</span>
-                  </p>
-                )}
-                {company.tax_number && (
-                  <p>
-                    الرقم الضريبي: <span className="font-mono">{company.tax_number}</span>
-                  </p>
-                )}
-                {company.address && <p>العنوان: {company.address}</p>}
-              </div>
-            </div>
+          <div className="mb-4">
+            <UniversalDocumentHeader
+              company={{
+                name: company.name_ar ?? 'مؤسسة الجعفري لقطع الغيار',
+                phone: company.phone ?? undefined,
+                address: company.address ?? undefined,
+                tax_number: company.tax_number ?? undefined,
+                logo_url: company.logo_url ?? undefined,
+                slogan: 'إدارة المشتريات والتوريدات والعقود',
+              }}
+              documentTitle="عرض سعر توريد معتمد"
+              documentNumber={quotation.quotation_number}
+              documentDate={quotation.issue_date}
+              statusBadge={quotation.status === 'accepted' ? 'معتمد' : quotation.status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}
+            />
+          </div>
 
-            {/* Quotation Identity & Number */}
-            <div className="text-left font-mono">
-              <span className="inline-block rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-black text-white">
-                عرض سعر توريد
-              </span>
-              <h3 className="mt-1.5 text-base font-black tracking-tight text-slate-900">
-                {quotation.quotation_number}
-              </h3>
-              <div className="mt-1 space-y-0.5 text-[10px] text-slate-600">
-                <p>
-                  تاريخ التقديم: <span className="font-bold">{quotation.issue_date}</span>
-                </p>
-                {quotation.valid_until && (
-                  <p>
-                    صالح لغاية:{' '}
-                    <span className="font-bold text-amber-700">{quotation.valid_until}</span>
-                  </p>
-                )}
-              </div>
+          {/* Supplier Info & Meta Card */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+            <div>
+              <span className="font-bold text-slate-500">مقدم العرض (المورد): </span>
+              <span className="font-black text-slate-900">{supplier.name}</span>
+              {Boolean(supplier.phone) && (
+                <span className="mr-3 font-mono text-slate-600" dir="ltr">({supplier.phone})</span>
+              )}
             </div>
+            {Boolean(quotation.valid_until) && (
+              <div className="text-slate-600">
+                <span className="font-bold text-slate-500">صالح لغاية: </span>
+                <span className="font-bold text-amber-700" dir="ltr">{quotation.valid_until}</span>
+              </div>
+            )}
           </div>
 
           {/* Supplier Info Badge */}

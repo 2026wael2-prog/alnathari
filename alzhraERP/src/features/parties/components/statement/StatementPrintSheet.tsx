@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function, @typescript-eslint/strict-boolean-expressions, @typescript-eslint/prefer-nullish-coalescing */
 import React from 'react';
 import type { PartyType } from '../../types';
 import { useDocumentHeaderSettings } from '@/features/settings/settingsStore';
@@ -34,12 +35,12 @@ export const StatementPrintSheet: React.FC<StatementPrintSheetProps> = ({
     <>
       <style>{`
         @media print {
-            body { background-color: white !important; }
+            body { background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .no-print { display: none !important; }
             .print-only { display: block !important; }
-            @page { margin: 10mm; size: A4 portrait; }
+            @page { margin: 8mm 10mm; size: A4 portrait; }
             .print-area {
-                font-family: 'Arial', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+                font-family: 'Cairo', 'Tajawal', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
                 color: #000 !important;
                 font-variant-numeric: tabular-nums;
             }
@@ -49,13 +50,14 @@ export const StatementPrintSheet: React.FC<StatementPrintSheetProps> = ({
                 width: 100% !important;
             }
             th, td {
-                border: 1px solid #000 !important;
-                padding: 6px !important;
+                border: 1px solid #cbd5e1 !important;
+                padding: 6px 8px !important;
                 color: #000 !important;
             }
             th {
                 background-color: #1F4E78 !important;
                 color: #fff !important;
+                font-weight: 800 !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
@@ -70,70 +72,35 @@ export const StatementPrintSheet: React.FC<StatementPrintSheetProps> = ({
         .print-only { display: none; }
       `}</style>
 
-      {/* Professional Header - Universal or Classic */}
-      <div className="screen:max-md:mb-3 screen:max-md:pb-2 screen:max-md:p-3 mb-5 rounded-xl border-b-2 border-[#1F4E78] bg-[var(--app-surface)] p-5 pb-4 shadow-sm dark:border-blue-700">
-        {headerConfig?.isTemplateAppliedToAll ? (
-          <div className="mb-4">
-            <UniversalDocumentHeader
-              config={headerConfig}
-              company={{
-                name: company.nameAr,
-                phone: company.phone || undefined,
-                address: company.address || undefined,
-                tax_number: company.taxNumber || undefined,
-                slogan: company.specialization || undefined,
-              }}
-              documentTitle={printSubtitle || 'كشف حساب تفصيلي'}
-              documentDate={currentDate}
-            />
-          </div>
-        ) : (
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex-1 text-right">
-              <h1 className="text-xl font-bold text-[#1F4E78] dark:text-blue-400">
-                {company.nameAr}
-              </h1>
-              {company.specialization && (
-                <p className="text-sm font-bold text-blue-800 dark:text-blue-300">
-                  {company.specialization}
-                </p>
-              )}
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{company.address}</p>
-              <div className="mt-1 flex flex-col gap-1 text-xs font-bold text-slate-600 dark:text-slate-400">
-                {company.phone && <span>هاتف: {company.phone}</span>}
-                {company.taxNumber && <span>الرقم الضريبي: {company.taxNumber}</span>}
-              </div>
-            </div>
-            <div className="flex-1 text-center">
-              {company.headerText && (
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                  {company.headerText}
-                </p>
-              )}
-              <h2 className="screen:max-md:text-base mt-2 inline-block rounded-lg bg-slate-100 px-4 py-1 text-xl font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
-                {printSubtitle || 'كشف حساب'}
-              </h2>
-            </div>
-            <div className="flex-1 text-left" dir="ltr">
-              <h1 className="text-xl font-bold text-[#1F4E78] dark:text-blue-400">
-                {company.nameEn}
-              </h1>
-              <h2 className="text-md mt-2 font-bold text-slate-800 dark:text-slate-300">
-                Statement of Account
-              </h2>
-            </div>
-          </div>
-        )}
-        <div className="flex justify-between rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80">
-          <div className="text-sm text-slate-800 dark:text-slate-200">
+      {/* Professional Commercial Header */}
+      <div className="screen:max-md:mb-3 screen:max-md:pb-2 screen:max-md:p-3 mb-5 rounded-xl border-b-2 border-[#1F4E78] bg-[var(--app-surface)] p-5 pb-4 shadow-sm dark:border-blue-700 print:mb-4 print:border-none print:bg-white print:p-0 print:shadow-none">
+        <div className="mb-4">
+          <UniversalDocumentHeader
+            config={headerConfig}
+            company={{
+              name: company.nameAr,
+              name_en: company.nameEn,
+              phone: company.phone || undefined,
+              address: company.address || undefined,
+              tax_number: company.taxNumber || undefined,
+              slogan: company.specialization || undefined,
+            }}
+            documentTitle={printSubtitle || 'كشف حساب رسمي معتمد'}
+            documentDate={currentDate}
+          />
+        </div>
+        <div className="flex justify-between rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80 print:border-slate-400 print:bg-slate-50 print:text-black">
+          <div className="text-sm text-slate-800 dark:text-slate-200 print:text-black">
             <strong>اسم {partyType === 'customer' ? 'العميل' : 'المورد'}:</strong>{' '}
-            {partyName || '—'}
+            <span className="font-bold">{partyName || '—'}</span>
           </div>
-          <div className="text-sm text-slate-800 dark:text-slate-200">
-            <strong>تاريخ الاستخراج:</strong> <span dir="ltr">{currentDate}</span>
+          <div className="text-sm text-slate-800 dark:text-slate-200 print:text-black">
+            <strong>تاريخ الاستخراج:</strong> <span dir="ltr" className="font-mono font-bold">{currentDate}</span>
           </div>
         </div>
       </div>
     </>
   );
 };
+
+export default StatementPrintSheet;

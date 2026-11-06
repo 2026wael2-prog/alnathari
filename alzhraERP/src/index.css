@@ -2292,20 +2292,24 @@ a:focus-visible {
     display: none !important;
   }
 
-  /* Bond voucher printing isolation */
+  /* Universal modal print isolation */
+  body:has(#bond-printable-voucher) > *:not(:has(#bond-printable-voucher)) {
+    display: none !important;
+  }
+
   #bond-printable-voucher {
-    position: fixed !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
     width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     margin: 0 !important;
-    padding: 24px !important;
-    background: white !important;
-    color: black !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     box-shadow: none !important;
-    border: 1px solid #cbd5e1 !important;
-    z-index: 99999 !important;
+    border: none !important;
   }
 }
 
@@ -2315,12 +2319,16 @@ a:focus-visible {
 }
 
 /* ============================================================
-   Print Styles
+   Universal Print Styles (High Contrast, Balanced Geometry)
    ============================================================ */
 
 @media print {
   .no-print {
     display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
   }
 
   .print-full-width {
@@ -2330,38 +2338,53 @@ a:focus-visible {
 
   .print-break-before {
     page-break-before: always;
+    break-before: page;
   }
 
   .print-break-after {
     page-break-after: always;
+    break-after: page;
   }
 
-  /* Print-optimized layout */
-  body {
-    background: white !important;
-    color: #1a1a2e !important;
-    font-size: 12pt !important;
+  /* Print-optimized layout: pristine white paper & crisp text */
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11pt !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  [data-theme-scope] {
-    background: white !important;
+  /* Neutralize dark-mode styles in print to prevent dark/washed-out paper output */
+  .dark, [data-theme="dark"], [data-theme-scope] {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
   }
 
-  /* Ensure all content visible */
+  .dark [class*="dark:text-white"],
+  .dark [class*="dark:text-slate-100"],
+  .dark [class*="dark:text-slate-200"],
+  .dark [class*="dark:text-slate-300"] {
+    color: #0f172a !important;
+  }
+
+  .dark [class*="dark:bg-slate-900"],
+  .dark [class*="dark:bg-slate-950"],
+  .dark [class*="dark:bg-slate-800"] {
+    background-color: #ffffff !important;
+  }
+
+  .dark [class*="dark:border-slate-800"],
+  .dark [class*="dark:border-slate-700"] {
+    border-color: #cbd5e1 !important;
+  }
+
+  /* Ensure all content is fully visible */
   [class*="overflow-"] {
     overflow: visible !important;
   }
 
-  /* Hide scrollbars and neutralise decorative effects for print.
-     ملاحظة إصلاح: كانت مكتوبة سابقاً على الصورة
-       .custom-scrollbar::-webkit-scrollbar,
-       .shadow-*, .backdrop-blur-*, .animate-* { display: none !important; }
-     وهي CSS غير صالحة (‎.shadow-*‎ ليس محدِّداً)، وقاعدة CSS تسقط بالكامل إذا
-     احتوت قائمتها محدِّداً واحداً غير صالح — فحتى قاعدة شريط التمرير لم تكن
-     تُطبَّق إطلاقاً، وكان esbuild يحذّر منها عند التصغير. الصيغة الصحيحة لمطابقة
-     أصناف Tailwind المولَّدة هي محدِّدات السمات.
-     كما أن المطلوب تعطيل التأثيرات لا حجب العنصر: display:none على
-     [class*="shadow-"] كان سيحذف محتوى حقيقياً لا زخرفة. */
+  /* Disable scrollbars and decorative drop shadows in print */
   .custom-scrollbar::-webkit-scrollbar {
     display: none !important;
   }
@@ -2380,7 +2403,7 @@ a:focus-visible {
     transition: none !important;
   }
 
-  /* Table improvements */
+  /* Balanced, high-contrast tables */
   table {
     border-collapse: collapse !important;
     page-break-inside: auto !important;
@@ -2388,28 +2411,37 @@ a:focus-visible {
 
   tr {
     page-break-inside: avoid !important;
-    page-break-after: auto !important;
+    break-inside: avoid !important;
   }
 
   th, td {
-    border: 1px solid #ddd !important;
-    padding: 6px 8px !important;
-    color: #1a1a2e !important;
-    background: white !important;
+    border-color: #cbd5e1;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   th {
-    background: #f8fafc !important;
-    font-weight: 700 !important;
+    font-weight: 800 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* Margins */
+  /* Balanced page margins for standard A4 and commercial printing */
   @page {
-    margin: 1.5cm;
-    size: A4;
+    margin: 8mm 10mm;
+    size: auto;
   }
 
-  /* Links show URL */
+  /* Thermal POS receipt print formatting (78-80mm roll) */
+  .thermal-receipt-print {
+    width: 78mm !important;
+    max-width: 78mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    font-size: 11px !important;
+  }
+
+  /* Hide raw link destinations */
   a[href]:after {
     content: none !important;
   }

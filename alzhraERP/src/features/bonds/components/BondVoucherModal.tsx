@@ -7,8 +7,6 @@ import {
   X,
   Maximize2,
   Minimize2,
-  Calendar,
-  Building2,
   CreditCard,
   User,
   ShieldCheck,
@@ -133,7 +131,7 @@ export const BondVoucherModal: React.FC<BondVoucherModalProps> = ({ isOpen, onCl
         }}
       >
         {/* Header toolbar */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-950/60">
+        <div className="no-print flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-950/60">
           <div className="flex items-center gap-3">
             <div
               className={cn(
@@ -216,183 +214,122 @@ export const BondVoucherModal: React.FC<BondVoucherModalProps> = ({ isOpen, onCl
         </div>
 
         {/* Voucher Paper Area */}
-        <div className="flex-1 overflow-y-auto bg-slate-100/70 p-4 dark:bg-slate-950 sm:p-8">
+        <div className="flex-1 overflow-y-auto bg-slate-100/70 p-4 dark:bg-slate-950 print:m-0 print:overflow-visible print:bg-white print:p-0 sm:p-8">
           <div
             ref={printRef}
             id="bond-printable-voucher"
-            className="mx-auto max-w-3xl rounded-2xl border border-slate-200/80 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900 sm:p-10"
+            className="mx-auto max-w-3xl rounded-2xl border border-slate-200/80 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900 print:m-0 print:max-w-none print:border-none print:bg-white print:p-6 print:text-black print:shadow-none sm:p-10"
           >
             {/* Header: Company and Voucher Meta */}
-            {headerConfig?.isTemplateAppliedToAll ? (
-              <div className="mb-6">
-                <UniversalDocumentHeader
-                  config={headerConfig}
-                  company={{
-                    name: company.name_ar,
-                    phone: company.phone || undefined,
-                    address: company.address || undefined,
-                    tax_number: company.tax_number || undefined,
-                    logo_url: company.logo_url || undefined,
-                  }}
-                  documentTitle={voucherTitle}
-                  documentNumber={bond.payment_number}
-                  documentDate={bond.date}
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col justify-between gap-4 border-b-2 border-slate-200 pb-6 dark:border-slate-800 sm:flex-row sm:items-start">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Building2 size={22} className="text-blue-600 dark:text-blue-400" />
-                    <h2 className="text-lg font-black text-slate-900 dark:text-white">
-                      {company.name_ar}
-                    </h2>
-                  </div>
-                  {company.tax_number && (
-                    <p className="font-mono text-xs text-slate-500">
-                      الرقم الضريبي: {company.tax_number}
-                    </p>
-                  )}
-                  {company.phone && (
-                    <p className="text-xs text-slate-500">الهاتف: {company.phone}</p>
-                  )}
-                  {company.address && (
-                    <p className="text-xs text-slate-500">العنوان: {company.address}</p>
-                  )}
-                </div>
-
-                {company.logo_url && (
-                  <div className="flex items-center justify-center">
-                    <img
-                      src={company.logo_url}
-                      alt="شعار المنشأة"
-                      className="h-16 w-auto max-w-[120px] object-contain"
-                    />
-                  </div>
-                )}
-
-                <div className="flex flex-col items-start space-y-2 sm:items-end">
-                  <div
-                    className={cn(
-                      'rounded-xl px-5 py-2 text-center shadow-sm',
-                      isReceipt
-                        ? 'bg-emerald-600 text-white'
-                        : isPayment
-                          ? 'bg-rose-600 text-white'
-                          : 'bg-blue-600 text-white'
-                    )}
-                  >
-                    <span className="text-sm font-black tracking-wide">{voucherTitle}</span>
-                  </div>
-                  <div className="space-y-1 text-left font-mono text-xs sm:text-right">
-                    <div className="text-slate-600 dark:text-slate-400">
-                      رقم السند:{' '}
-                      <span className="font-bold text-slate-900 dark:text-slate-100">
-                        {bond.payment_number}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
-                      <Calendar size={12} />
-                      <span>التاريخ: {bond.date}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="mb-6 w-full">
+              <UniversalDocumentHeader
+                config={headerConfig}
+                company={{
+                  name: company.name_ar,
+                  phone: company.phone || undefined,
+                  address: company.address || undefined,
+                  tax_number: company.tax_number || undefined,
+                  logo_url: company.logo_url || undefined,
+                }}
+                documentTitle={voucherTitle}
+                documentNumber={bond.payment_number}
+                documentDate={bond.date}
+              />
+            </div>
 
             {/* Amount Banner */}
-            <div className="my-6 flex flex-col items-center justify-between gap-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-800/40 sm:flex-row">
+            <div className="my-6 flex flex-col items-center justify-between gap-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-800/40 print:border-solid print:border-slate-800 print:bg-slate-50 print:p-4 print:text-black sm:flex-row">
               <div>
-                <span className="mb-1 block text-[11px] font-bold uppercase text-slate-400">
+                <span className="mb-1 block text-[11px] font-bold uppercase text-slate-400 print:text-slate-700">
                   المبلغ المالي بالأرقام
                 </span>
                 <div className="flex items-baseline gap-2">
                   <span
                     className={cn(
-                      'font-mono text-3xl font-black tracking-tight',
+                      'font-mono text-3xl font-black tracking-tight print:text-black',
                       isReceipt ? 'text-emerald-600' : 'text-rose-600'
                     )}
                   >
                     {formatCurrency(bond.amount, bond.currency_code)}
                   </span>
                   {bond.currency_code !== 'SAR' && bond.base_amount !== undefined && (
-                    <span className="font-mono text-xs font-bold text-slate-500">
+                    <span className="font-mono text-xs font-bold text-slate-500 print:text-slate-700">
                       (يعادل {formatCurrency(bond.base_amount, 'SAR')})
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <CreditCard size={16} className="text-slate-400" />
-                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-800 print:border-slate-400 print:bg-white print:shadow-none">
+                <CreditCard size={16} className="text-slate-400 print:text-slate-700" />
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 print:text-black">
                   طريقة الدفع: {bond.payment_method === 'bank' ? 'حوالة بنكية' : 'نقداً'}
                 </span>
               </div>
             </div>
 
             {/* Voucher Body Details */}
-            <div className="space-y-4 text-xs font-bold text-slate-700 dark:text-slate-300">
-              <div className="flex flex-col gap-2 border-b border-slate-100 py-3 dark:border-slate-800 sm:flex-row sm:items-center">
-                <span className="flex w-40 shrink-0 items-center gap-1.5 text-slate-400">
+            <div className="space-y-4 text-xs font-bold text-slate-700 dark:text-slate-300 print:text-black">
+              <div className="flex flex-col gap-2 border-b border-slate-100 py-3 dark:border-slate-800 print:border-slate-300 sm:flex-row sm:items-center">
+                <span className="flex w-40 shrink-0 items-center gap-1.5 text-slate-400 print:text-slate-700">
                   <User size={14} />
                   {personLabel}
                 </span>
-                <span className="text-sm font-black text-slate-900 dark:text-white">
+                <span className="text-sm font-black text-slate-900 dark:text-white print:text-black">
                   {bond.party_name || bond.account_name}
                 </span>
               </div>
 
-              <div className="flex flex-col gap-2 border-b border-slate-100 py-3 dark:border-slate-800 sm:flex-row sm:items-center">
-                <span className="w-40 shrink-0 text-slate-400">المبلغ كتابة (تفقيط):</span>
-                <span className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-600 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-400">
+              <div className="flex flex-col gap-2 border-b border-slate-100 py-3 dark:border-slate-800 print:border-slate-300 sm:flex-row sm:items-center">
+                <span className="w-40 shrink-0 text-slate-400 print:text-slate-700">المبلغ كتابة (تفقيط):</span>
+                <span className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-600 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-400 print:border-slate-400 print:bg-slate-100 print:text-black">
                   {tafqeetText}
                 </span>
               </div>
 
-              <div className="flex flex-col gap-2 border-b border-slate-100 py-3 dark:border-slate-800 sm:flex-row sm:items-center">
-                <span className="w-40 shrink-0 text-slate-400">الحساب المالي (الصندوق/البنك):</span>
-                <span className="font-mono text-slate-800 dark:text-slate-200">
+              <div className="flex flex-col gap-2 border-b border-slate-100 py-3 dark:border-slate-800 print:border-slate-300 sm:flex-row sm:items-center">
+                <span className="w-40 shrink-0 text-slate-400 print:text-slate-700">الحساب المالي (الصندوق/البنك):</span>
+                <span className="font-mono text-slate-800 dark:text-slate-200 print:text-black">
                   {bond.account_name}
                 </span>
               </div>
 
-              <div className="flex flex-col gap-2 border-b border-slate-100 py-3 dark:border-slate-800 sm:flex-row sm:items-start">
-                <span className="w-40 shrink-0 pt-0.5 text-slate-400">{forWhatLabel}</span>
-                <span className="flex-1 font-medium leading-relaxed text-slate-800 dark:text-slate-200">
+              <div className="flex flex-col gap-2 border-b border-slate-100 py-3 dark:border-slate-800 print:border-slate-300 sm:flex-row sm:items-start">
+                <span className="w-40 shrink-0 pt-0.5 text-slate-400 print:text-slate-700">{forWhatLabel}</span>
+                <span className="flex-1 font-medium leading-relaxed text-slate-800 dark:text-slate-200 print:text-black">
                   {bond.description || 'سداد حساب مالي'}
                 </span>
               </div>
             </div>
 
             {/* Signatures Row */}
-            <div className="mt-12 border-t border-slate-200 pt-6 dark:border-slate-800">
-              <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="mt-12 border-t border-slate-200 pt-6 dark:border-slate-800 print:mt-8 print:border-slate-800 print:pt-4">
+              <div className="grid grid-cols-3 gap-6 text-center">
                 <div className="space-y-6">
-                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400 print:text-black">
                     توقيع المستلم / المودع
                   </span>
-                  <div className="h-10 border-b-2 border-dotted border-slate-300 dark:border-slate-700"></div>
+                  <div className="h-10 border-b-2 border-dotted border-slate-300 dark:border-slate-700 print:border-slate-800"></div>
                 </div>
 
                 <div className="space-y-6">
-                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400 print:text-black">
                     أمين الصندوق
                   </span>
-                  <div className="h-10 border-b-2 border-dotted border-slate-300 dark:border-slate-700"></div>
+                  <div className="h-10 border-b-2 border-dotted border-slate-300 dark:border-slate-700 print:border-slate-800"></div>
                 </div>
 
                 <div className="space-y-6">
-                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400">
-                    المحاسب المسؤول
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-slate-400 print:text-black">
+                    المحاسب المسؤول / الاعتماد
                   </span>
-                  <div className="h-10 border-b-2 border-dotted border-slate-300 dark:border-slate-700"></div>
+                  <div className="h-10 border-b-2 border-dotted border-slate-300 dark:border-slate-700 print:border-slate-800"></div>
                 </div>
               </div>
 
-              <div className="mt-8 flex items-center justify-between border-t border-slate-100 pt-3 text-[10px] text-slate-400 dark:border-slate-800/80">
-                <span className="flex items-center gap-1 font-mono">
-                  <ShieldCheck size={12} className="text-emerald-500" />
+              <div className="mt-8 flex items-center justify-between border-t border-slate-100 pt-3 text-[10px] text-slate-400 dark:border-slate-800/80 print:border-slate-300 print:text-slate-700">
+                <span className="flex items-center gap-1 font-mono font-bold">
+                  <ShieldCheck size={12} className="text-emerald-500 print:text-black" />
                   مستند محاسبي معتمد بنظام الجعفري الذكي ERP
                 </span>
                 <span className="font-mono">طُبع في: {formatLocalDate()}</span>

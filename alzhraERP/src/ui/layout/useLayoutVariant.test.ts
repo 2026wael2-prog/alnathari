@@ -35,10 +35,10 @@ describe('اقتراح الشكل في الثيمات', () => {
     expect(preset?.layout).toBe('classic');
   });
 
-  it('لا ثيم آخر يفرض الشكل الكلاسيكي — التغيير يبقى مقصوداً', () => {
+  it('الثيمات الكلاسيكية المعلنة تقتصر على ثيمات الميزان والذهبي المحددة', () => {
     const classicPresets = THEME_PRESETS.filter(item => item.layout === 'classic').map(
       item => item.id
     );
-    expect(classicPresets).toEqual(['al-mizan-classic']);
+    expect(classicPresets).toEqual(['classic-golden-erp', 'al-mizan-classic', 'al-mizan-pro']);
   });
 });
