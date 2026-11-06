@@ -38,6 +38,7 @@ export const ROUTES = {
     VIN: '/vin',
     // Debts & Collection module (each main service = its own route)
     DEBTS: '/debts',
+    DEBTS_AGENT: '/debts/agent',
     DEBTS_FOLLOWUP: '/debts/followup',
     DEBTS_TASKS: '/debts/tasks',
     DEBTS_PROMISES: '/debts/promises',

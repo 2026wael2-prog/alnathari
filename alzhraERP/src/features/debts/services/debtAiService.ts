@@ -1,6 +1,40 @@
 import { generateAIContent } from '../../ai/core/provider';
 import { logger } from '../../../core/utils/logger';
+import { formatLocalDate } from '../../../core/utils/dateUtils';
 import type { FollowUpDashboardRow } from '../types';
+
+export interface WhatsAppCurrencySummary {
+  currency: string;
+  totalDebit: number;
+  totalCredit: number;
+  finalBalance: number;
+}
+
+export interface WhatsAppMovementRow {
+  date: string;
+  ref?: string | undefined;
+  desc?: string | undefined;
+  debit?: number | undefined;
+  credit?: number | undefined;
+  balance?: number | undefined;
+  currency?: string | undefined;
+}
+
+export interface WhatsAppStatementSummaryParams {
+  partyName: string;
+  companyName?: string | undefined;
+  dateRangeText?: string | undefined;
+  bankInfo?: string | undefined;
+  // Single currency fallback
+  totalDebit?: number | undefined;
+  totalCredit?: number | undefined;
+  finalBalance?: number | undefined;
+  currency?: string | undefined;
+  // Multi-currency structured breakdown
+  currencies?: WhatsAppCurrencySummary[] | undefined;
+  // Recent transactions grid preview
+  movements?: WhatsAppMovementRow[] | undefined;
+}
 
 export type ReminderTone = 'friendly' | 'formal' | 'urgent' | 'legal';
 
@@ -239,48 +273,102 @@ ${toneInstructions[tone]}
   },
 
   /**
-   * Format an ultra-clean WhatsApp Account Statement Summary
+   * Format a high-precision WhatsApp Account Statement Summary
+   * Supports both multi-currency (SAR and YER partitioned) and single-currency
    */
-  generateWhatsAppStatementSummary: (params: {
-    partyName: string;
-    totalDebit: number;
-    totalCredit: number;
-    finalBalance: number;
-    currency: string;
-    companyName?: string;
-    dateRangeText?: string;
-    bankInfo?: string;
-  }): string => {
+  generateWhatsAppStatementSummary: (params: WhatsAppStatementSummaryParams): string => {
     const {
       partyName,
-      totalDebit,
-      totalCredit,
-      finalBalance,
-      currency,
       companyName,
       dateRangeText,
       bankInfo,
+      totalDebit = 0,
+      totalCredit = 0,
+      finalBalance = 0,
+      currency = 'SAR',
+      currencies,
+      movements,
     } = params;
 
-    const balanceText =
-      finalBalance >= 0
-        ? `المبلغ المطلوب سداده: *${finalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${currency}*`
-        : `رصيد دائن لصالحكم: *${Math.abs(finalBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })} ${currency}*`;
+    const todayDate = formatLocalDate();
+    const parts: string[] = [];
 
-    return `🧾 *كشف حساب مالي ملخص*
-━━━━━━━━━━━━━━━━━━
-🏢 *المنشأة:* ${companyName || 'منظومة الجعفري'}
-👤 *العميل:* ${partyName}
-📅 *الفترة:* ${dateRangeText || new Date().toLocaleDateString('en-GB')}
-━━━━━━━━━━━━━━━━━━
-📊 *الملخص المالي:*
-▫️ إجمالي الحركات المدينة: ${totalDebit.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${currency}
-▫️ إجمالي المدفوعات والسندات: ${totalCredit.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${currency}
-━━━━━━━━━━━━━━━━━━
-📌 *الرصيد النهائي المستحق:*
-👉 ${balanceText}
-━━━━━━━━━━━━━━━━━━
-${bankInfo ? `💳 *بيانات السداد البنكي:*\n${bankInfo}\n━━━━━━━━━━━━━━━━━━\n` : ''}📄 _مرفق مع هذه الرسالة ملف كشف الحساب التفصيلي (Excel)_
-شاكرين ومقدرين تعاملكم الدائم معنا 🌸`;
+    parts.push(`🧾 *كشف حساب مالي تفصيلي*`);
+    parts.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    parts.push(`🏢 *المنشأة:* ${companyName || 'منظومة الجعفري'}`);
+    parts.push(`👤 *الجهة / العميل:* ${partyName}`);
+    parts.push(`📅 *الفترة:* ${dateRangeText || `حتى تاريخ ${todayDate}`}`);
+    parts.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
+    // Handle currencies breakdown
+    const activeCurrencies: WhatsAppCurrencySummary[] =
+      currencies && currencies.length > 0
+        ? currencies
+        : [{ currency, totalDebit, totalCredit, finalBalance }];
+
+    parts.push(`📊 *الخلاصة المالية وموقف الأرصدة:*`);
+    activeCurrencies.forEach((item, idx) => {
+      const isSar = item.currency.toUpperCase() === 'SAR';
+      const isYer = item.currency.toUpperCase() === 'YER';
+      const flag = isSar ? '🇸🇦' : isYer ? '🇾🇪' : '🌐';
+      const currTitle = isSar
+        ? 'حساب الريال السعودي (SAR)'
+        : isYer
+          ? 'حساب الريال اليمني (YER)'
+          : `حساب ${item.currency}`;
+
+      const balanceText =
+        item.finalBalance > 0
+          ? `المبلغ المطلوب سداده (مدين): *${item.finalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${item.currency}*`
+          : item.finalBalance < 0
+            ? `رصيد دائن لصالحكم (له): *${Math.abs(item.finalBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })} ${item.currency}*`
+            : `الرصيد خالص ومصفر: *0.00 ${item.currency}*`;
+
+      parts.push(``);
+      parts.push(`${flag} *${currTitle}:*`);
+      parts.push(
+        `▫️ إجمالي المبيعات / مدين (+): ${item.totalDebit.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${item.currency}`
+      );
+      parts.push(
+        `▫️ إجمالي المدفوعات / دائن (-): ${item.totalCredit.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${item.currency}`
+      );
+      parts.push(`📌 ${balanceText}`);
+      if (idx < activeCurrencies.length - 1) {
+        parts.push(`──────────────────────────`);
+      }
+    });
+
+    // Optional transactions list (up to 12 most recent)
+    if (movements && movements.length > 0) {
+      parts.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      parts.push(`📑 *تفاصيل الحركات (جريد تفصيلي):*`);
+      const recent = movements.slice(-12);
+      recent.forEach(m => {
+        const mCurr = m.currency || 'SAR';
+        const debitVal = Number(m.debit) || 0;
+        const creditVal = Number(m.credit) || 0;
+        const amountStr =
+          debitVal > 0
+            ? `+${debitVal.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${mCurr}`
+            : `-${creditVal.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${mCurr}`;
+        const refStr = m.ref ? `[${m.ref}] ` : '';
+        const descStr = m.desc || 'حركة محاسبية';
+        parts.push(`▫️ ${m.date} | ${refStr}${descStr} | *${amountStr}*`);
+      });
+      if (movements.length > 12) {
+        parts.push(`_(يوجد عدد ${movements.length - 12} حركة إضافية موضحة بملف Excel المرفق)_`);
+      }
+    }
+
+    parts.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    if (bankInfo) {
+      parts.push(`💳 *بيانات السداد البنكي:*\n${bankInfo}`);
+      parts.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    }
+
+    parts.push(`📁 _مرفق كشف حساب إكسل تفصيلي عصري ملون بالشبكة الكاملة وفصل العملات (.xlsx)_`);
+    parts.push(`شاكرين ومقدرين تعاملكم الدائم معنا 🌸`);
+
+    return parts.join('\n');
   },
 };

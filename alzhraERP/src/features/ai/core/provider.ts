@@ -106,7 +106,29 @@ export async function generateAIContent(
   const startTime = performance.now();
 
   try {
+    // 1. Ensure user has a valid authenticated session before hitting ai-proxy
+    const { data: sessionData } = await supabase.auth.getSession();
+    let session = sessionData?.session;
+
+    if (session && session.expires_at && session.expires_at * 1000 - Date.now() < 60_000) {
+      try {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        if (refreshData?.session) {
+          session = refreshData.session;
+        }
+      } catch {
+        /* proceed with existing session */
+      }
+    }
+
+    if (!session?.access_token) {
+      throw new Error('AUTH_MISSING: يرجى تسجيل الدخول لاستخدام ميزات المساعد الذكي.');
+    }
+
     const { data, error } = await supabase.functions.invoke('ai-proxy', {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
       body: {
         prompt,
         model,
@@ -132,7 +154,12 @@ export async function generateAIContent(
         errorType = 'rate_limit';
       } else if (errorCode === 'CONFIG_ERROR') {
         errorType = 'config_error';
-      } else if (errorCode === 'AUTH_MISSING') {
+      } else if (
+        errorCode === 'AUTH_MISSING' ||
+        errorCode === 'AUTH_INVALID' ||
+        errorMessage.includes('401') ||
+        errorMessage.toLowerCase().includes('unauthorized')
+      ) {
         errorType = 'auth_error';
       }
 
@@ -160,7 +187,7 @@ export async function generateAIContent(
           'خطأ في إعدادات الخادم: مفتاح OpenRouter غير مُكوّن. يرجى التواصل مع مسؤول النظام.'
         );
       } else if (errorType === 'auth_error') {
-        throw new Error('غير مصرح: يرجى تسجيل الدخول مرة أخرى.');
+        throw new Error('غير مصرح: يرجى تسجيل الدخول مرة أخرى لاستخدام الذكاء الاصطناعي.');
       }
 
       throw new Error(`تعذر الاتصال بالمساعد الذكي: ${errorMessage}`);

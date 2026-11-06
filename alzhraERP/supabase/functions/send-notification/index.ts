@@ -65,8 +65,36 @@ async function sendTelegramPhoto(botToken: string, chatId: string, imageBase64: 
 }
 
 // ---- WhatsApp: Text ----
-async function sendWhatsAppText(apiUrl: string, apiKey: string, phone: string, message: string): Promise<{ ok: boolean; error?: string }> {
+async function sendWhatsAppText(
+    apiUrl: string,
+    apiKey: string,
+    phone: string,
+    message: string,
+    referenceId?: string
+): Promise<{ ok: boolean; error?: string }> {
     try {
+        if (apiUrl.includes('ultramsg.com')) {
+            const cleanUrl = apiUrl.replace(/\/+$/, '');
+            const endpoint = cleanUrl.endsWith('/messages/chat') ? cleanUrl : `${cleanUrl}/messages/chat`;
+            const params = new URLSearchParams({
+                token: apiKey,
+                to: phone,
+                body: message,
+                priority: '5',
+                referenceId: referenceId || '',
+            });
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString()
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || (data?.sent !== 'true' && data?.sent !== true)) {
+                return { ok: false, error: data?.error || data?.message || `UltraMsg error: ${res.status}` };
+            }
+            return { ok: true };
+        }
+
         if (apiUrl.includes('api.callmebot.com')) {
             const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(message)}&apikey=${encodeURIComponent(apiKey)}`;
             const res = await fetch(url);
@@ -97,6 +125,22 @@ async function sendWhatsAppText(apiUrl: string, apiKey: string, phone: string, m
 // ---- WhatsApp: Image ----
 async function sendWhatsAppImage(apiUrl: string, apiKey: string, phone: string, imageBase64: string, caption: string): Promise<{ ok: boolean; error?: string }> {
     try {
+        if (apiUrl.includes('ultramsg.com')) {
+            const cleanUrl = apiUrl.replace(/\/+$/, '');
+            const endpoint = cleanUrl.endsWith('/messages/image') ? cleanUrl : `${cleanUrl}/messages/image`;
+            const imageUri = imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: apiKey, to: phone, image: imageUri, caption })
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || (data?.sent !== 'true' && data?.sent !== true)) {
+                return await sendWhatsAppText(apiUrl, apiKey, phone, caption);
+            }
+            return { ok: true };
+        }
+
         const imageBytes = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
         const blob = new Blob([imageBytes], { type: 'image/png' });
 
@@ -264,7 +308,7 @@ Deno.serve(async (req: Request) => {
         const eventToggleMap: Record<string, string> = {
             sale: 'notify_on_sale',
             purchase: 'notify_on_purchase',
-            bond: 'notify_on_bond',
+            bond: 'notify_on_payment_bond',
             expense: 'notify_on_expense',
             stock_transfer: 'notify_on_stock_transfer',
             low_stock: 'notify_on_low_stock',
@@ -310,7 +354,7 @@ Deno.serve(async (req: Request) => {
             if (image_base64) {
                 whatsappResult = await sendWhatsAppImage(config.whatsapp_api_url, config.whatsapp_api_key, config.whatsapp_phone, image_base64, message);
             } else {
-                whatsappResult = await sendWhatsAppText(config.whatsapp_api_url, config.whatsapp_api_key, config.whatsapp_phone, message);
+                whatsappResult = await sendWhatsAppText(config.whatsapp_api_url, config.whatsapp_api_key, config.whatsapp_phone, message, reference_id);
             }
             results.push({ channel: 'whatsapp', success: whatsappResult.ok, error: whatsappResult.error });
 

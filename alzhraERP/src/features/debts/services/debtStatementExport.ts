@@ -57,6 +57,7 @@ export const toStatementEntries = (movements: readonly StatementMovement[]): Sta
     credit: movement.credit,
     balance: movement.balance ?? 0,
     payment_status: movement.payment_status,
+    currency: movement.currency,
   }));
 
 /**

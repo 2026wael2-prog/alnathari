@@ -53,15 +53,45 @@ const isServiceCaller = (authHeader: string): boolean => {
   }
 };
 
-/** WhatsApp: Meta Cloud API endpoint, or CallMeBot when the url points there. */
+/** WhatsApp: Meta Cloud API endpoint, UltraMsg, or CallMeBot. */
 async function sendWhatsApp(
   url: string | null,
   key: string | null,
   phone: string,
-  text: string
+  text: string,
+  options?: { priority?: number; referenceId?: string }
 ): Promise<SendResult> {
   if (!url || !key) return { ok: false, error: 'whatsapp provider not configured' };
   try {
+    // 1) UltraMsg Gateway API
+    if (url.includes('ultramsg.com')) {
+      const cleanUrl = url.replace(/\/+$/, '');
+      const endpoint = cleanUrl.endsWith('/messages/chat') ? cleanUrl : `${cleanUrl}/messages/chat`;
+      const params = new URLSearchParams({
+        token: key,
+        to: phone,
+        body: text,
+        priority: String(options?.priority ?? 5),
+        referenceId: options?.referenceId ?? '',
+      });
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
+      const body = (await res.json().catch(() => null)) as {
+        sent?: string | boolean;
+        message?: string;
+        id?: number | string;
+        error?: string;
+      } | null;
+      if (!res.ok || (body?.sent !== 'true' && body?.sent !== true)) {
+        return { ok: false, error: body?.error ?? body?.message ?? `ultramsg ${res.status}` };
+      }
+      return { ok: true, providerId: String(body?.id ?? '') };
+    }
+
+    // 2) CallMeBot
     if (url.includes('api.callmebot.com')) {
       const res = await fetch(
         `${url}?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(key)}`
@@ -70,6 +100,8 @@ async function sendWhatsApp(
         ? { ok: true }
         : { ok: false, error: `callmebot ${res.status}: ${(await res.text()).slice(0, 200)}` };
     }
+
+    // 3) Meta Cloud API / Standard Gateway
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
@@ -238,7 +270,10 @@ Deno.serve(async (req: Request) => {
               recipient,
               row.message_text
             )
-          : await sendWhatsApp(row.provider_url, row.provider_key, recipient, row.message_text);
+          : await sendWhatsApp(row.provider_url, row.provider_key, recipient, row.message_text, {
+              priority: 5,
+              referenceId: row.queue_id,
+            });
 
       await admin.rpc('log_debt_reminder_result', {
         p_queue_id: row.queue_id,

@@ -7,6 +7,7 @@ import { logger } from '../../../../core/utils/logger';
 import { useAuthStore } from '../../../auth/store';
 import { useCompany } from '../../../settings/hooks';
 import { SmartPartySelect } from '../SmartPartySelect';
+import { StatementWhatsAppModal } from './StatementWhatsAppModal';
 
 interface StatementControlsProps {
   partyType: PartyType;
@@ -34,13 +35,14 @@ export const StatementControls: React.FC<StatementControlsProps> = ({
   companyNameAr,
 }) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const user = useAuthStore(state => state.user);
   const { data: settingsCompany } = useCompany();
 
   const selectedParty = parties?.find(p => p.id === selectedPartyId);
   const filteredStatement = statement || [];
 
-  // تحويل StatementMovement[] → StatementEntry[] (يضمن balance إلزامياً) لتمريره للمصدِّرات.
+  // تحويل StatementMovement[] → StatementEntry[] (يضمن balance إلزامياً و currency) لتمريره للمصدِّرات.
   const statementEntries = filteredStatement.map(r => ({
     date: r.date,
     operation_type: r.operation_type ?? '',
@@ -50,44 +52,12 @@ export const StatementControls: React.FC<StatementControlsProps> = ({
     credit: Number(r.credit) || 0,
     balance: Number(r.balance) || 0,
     payment_status: r.payment_status,
+    currency: r.currency || 'SAR',
   }));
 
-  const handleWhatsAppShare = async () => {
-    if (!selectedPartyId || !statement || !user?.company_id || !selectedParty) return;
-    const totalDebit = filteredStatement.reduce((s, r) => s + (Number(r.debit) || 0), 0);
-    const totalCredit = filteredStatement.reduce((s, r) => s + (Number(r.credit) || 0), 0);
-    const finalBal =
-      filteredStatement.length > 0
-        ? Number(filteredStatement[filteredStatement.length - 1].balance) || 0
-        : 0;
-
-    const { debtAiService } = await import('../../../debts/services/debtAiService');
-    const { buildWhatsAppLink } = await import('../../../debts/lib/whatsapp');
-
-    const summaryText = debtAiService.generateWhatsAppStatementSummary({
-      partyName: selectedParty.name,
-      totalDebit,
-      totalCredit,
-      finalBalance: finalBal,
-      currency: filteredStatement[0]?.currency || 'SAR',
-      companyName: companyNameAr,
-      ...(startDate && endDate ? { dateRangeText: `من ${startDate} إلى ${endDate}` } : {}),
-      ...((settingsCompany as { bank_name?: string } | null | undefined)?.bank_name
-        ? {
-            bankInfo: `البنك: ${(settingsCompany as { bank_name?: string }).bank_name} | الآيبان: ${
-              (settingsCompany as { bank_account_iban?: string })?.bank_account_iban || '—'
-            }`,
-          }
-        : {}),
-    });
-
-    if (selectedParty.phone) {
-      const link = buildWhatsAppLink(selectedParty.phone, summaryText);
-      window.open(link, '_blank', 'noopener,noreferrer');
-    } else {
-      navigator.clipboard.writeText(summaryText);
-      alert('تم نسخ ملخص كشف الحساب إلى الحافظة (لا يوجد رقم هاتف مسجل للعميل).');
-    }
+  const handleWhatsAppShare = () => {
+    if (!selectedPartyId || !statement || !selectedParty) return;
+    setIsWhatsAppModalOpen(true);
   };
 
   const handleShareExcel = async () => {
@@ -109,7 +79,6 @@ export const StatementControls: React.FC<StatementControlsProps> = ({
         selectedParty.name,
         statementEntries,
         {
-          currencyCode: filteredStatement[0]?.currency || 'SAR',
           partyType: partyType === 'supplier' ? 'supplier' : 'customer',
           ...(selectedParty.phone ? { partyPhone: selectedParty.phone } : {}),
           dateFrom: startDate,
@@ -130,7 +99,6 @@ export const StatementControls: React.FC<StatementControlsProps> = ({
       } else {
         const { exportStatementToExcel } = await import('../../utils/statementExcelExporter');
         await exportStatementToExcel(companyObj, selectedParty.name, statementEntries, {
-          currencyCode: filteredStatement[0]?.currency || 'SAR',
           partyType: partyType === 'supplier' ? 'supplier' : 'customer',
           ...(selectedParty.phone ? { partyPhone: selectedParty.phone } : {}),
           dateFrom: startDate,
@@ -161,7 +129,6 @@ export const StatementControls: React.FC<StatementControlsProps> = ({
         selectedParty.name,
         statementEntries,
         {
-          currencyCode: filteredStatement[0]?.currency || 'SAR',
           ...(selectedParty.phone ? { partyPhone: selectedParty.phone } : {}),
           dateFrom: startDate,
           dateTo: endDate,
@@ -246,6 +213,27 @@ export const StatementControls: React.FC<StatementControlsProps> = ({
             طباعة
           </Button>
         </div>
+      )}
+
+      {selectedParty && isWhatsAppModalOpen && (
+        <StatementWhatsAppModal
+          isOpen={isWhatsAppModalOpen}
+          onClose={() => setIsWhatsAppModalOpen(false)}
+          party={selectedParty}
+          partyType={partyType}
+          movements={filteredStatement}
+          startDate={startDate}
+          endDate={endDate}
+          company={{
+            name_ar: companyNameAr,
+            address: settingsCompany?.address || '',
+            phone: settingsCompany?.phone || '',
+            tax_number: settingsCompany?.tax_number || '',
+            bank_name: (settingsCompany as { bank_name?: string } | null | undefined)?.bank_name || '',
+            bank_account_iban: (settingsCompany as { bank_account_iban?: string } | null | undefined)?.bank_account_iban || '',
+          }}
+          companyNameAr={companyNameAr}
+        />
       )}
     </div>
   );

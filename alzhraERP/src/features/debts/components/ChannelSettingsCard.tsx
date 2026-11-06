@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, Smartphone, ShieldCheck } from 'lucide-react';
+import { MessageSquare, Smartphone, ShieldCheck, QrCode } from 'lucide-react';
 import { useDebtChannelConfig } from '../hooks/useDebtQueries';
 import { useDebtMutations } from '../hooks/useDebtMutations';
 import { EMPTY_CHANNEL_CONFIG } from '../api/debtApi';
 import type { DebtChannelConfig, DebtChannelConfigPatch } from '../types';
+import { WhatsAppSessionModal } from './agent/WhatsAppSessionModal';
 
 const INPUT_CLASS =
   'w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-hover)] px-2.5 py-2 text-xs font-bold text-[var(--app-text)] focus:outline-none focus:ring-2 focus:ring-blue-500/40';
@@ -92,6 +93,7 @@ interface ChannelFieldsProps {
   keys: ChannelKeys;
   patch: (part: Partial<DebtChannelConfig>) => void;
   patchKey: (channel: DebtChannel, value: string) => void;
+  onOpenQrModal?: (() => void) | undefined;
 }
 
 export interface ChannelKeys {
@@ -101,9 +103,9 @@ export interface ChannelKeys {
 
 type DebtChannel = 'whatsapp' | 'sms';
 
-const WhatsAppFields: React.FC<ChannelFieldsProps> = ({ form, keys, patch, patchKey }) => (
+const WhatsAppFields: React.FC<ChannelFieldsProps> = ({ form, keys, patch, patchKey, onOpenQrModal }) => (
   <ChannelBlock
-    title="قناة واتساب (Cloud API أو CallMeBot)"
+    title="قناة واتساب (UltraMsg أو Cloud API أو CallMeBot)"
     icon={<MessageSquare size={14} className="text-emerald-600" />}
     enabled={form.whatsapp_enabled}
     onToggle={enabled => {
@@ -114,16 +116,16 @@ const WhatsAppFields: React.FC<ChannelFieldsProps> = ({ form, keys, patch, patch
       id="wa-url"
       label="رابط الـ API"
       value={form.whatsapp_api_url}
-      placeholder="https://graph.facebook.com/v20.0/<id>/messages"
+      placeholder="https://api.ultramsg.com/instance.../ أو Meta Cloud API"
       onChange={value => {
         patch({ whatsapp_api_url: value });
       }}
     />
     <Field
       id="wa-key"
-      label="مفتاح الـ API (اكتبه مرة واحدة — لا يُقرأ بعدها)"
+      label="مفتاح الـ API (Token — اكتبه مرة واحدة ويُحفظ بأمان)"
       value={keys.whatsapp}
-      placeholder={form.has_whatsapp_key ? 'مضبوط — اكتب مفتاحاً جديداً للتغيير' : '••••••••'}
+      placeholder={form.has_whatsapp_key ? 'مضبوط ✓ — اكتب مفتاحاً جديداً للتغيير' : '••••••••'}
       isConfigured={form.has_whatsapp_key}
       onChange={value => {
         patchKey('whatsapp', value);
@@ -131,13 +133,25 @@ const WhatsAppFields: React.FC<ChannelFieldsProps> = ({ form, keys, patch, patch
     />
     <Field
       id="wa-phone"
-      label="رقم الإرسال / المعرّف"
+      label="رقم الهاتف المتصل بالبوابة"
       value={form.whatsapp_phone}
       placeholder="9677xxxxxxxx"
       onChange={value => {
         patch({ whatsapp_phone: value });
       }}
     />
+    {onOpenQrModal && (
+      <div className="flex items-end">
+        <button
+          type="button"
+          onClick={onOpenQrModal}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+        >
+          <QrCode size={13} />
+          <span>فحص الجلسة ومسح QR</span>
+        </button>
+      </div>
+    )}
   </ChannelBlock>
 );
 
@@ -208,6 +222,7 @@ const ChannelSettingsCard: React.FC = () => {
   const { saveChannelConfig, isSaving } = useDebtMutations();
   const [form, setForm] = useState<DebtChannelConfig>(EMPTY_CHANNEL_CONFIG);
   const [keys, setKeys] = useState<ChannelKeys>({ whatsapp: '', sms: '' });
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   useEffect(() => {
     if (config) setForm(config);
@@ -235,7 +250,13 @@ const ChannelSettingsCard: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      <WhatsAppFields form={form} keys={keys} patch={patch} patchKey={patchKey} />
+      <WhatsAppFields
+        form={form}
+        keys={keys}
+        patch={patch}
+        patchKey={patchKey}
+        onOpenQrModal={() => setIsQrModalOpen(true)}
+      />
       <SmsFields form={form} keys={keys} patch={patch} patchKey={patchKey} />
       <SaveRow
         isSaving={isSaving}
@@ -245,6 +266,15 @@ const ChannelSettingsCard: React.FC = () => {
               setKeys({ whatsapp: '', sms: '' });
             },
           });
+        }}
+      />
+
+      <WhatsAppSessionModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        credentials={{
+          url: form.whatsapp_api_url,
+          token: keys.whatsapp,
         }}
       />
     </div>

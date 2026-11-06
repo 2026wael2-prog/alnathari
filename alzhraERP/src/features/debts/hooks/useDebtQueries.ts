@@ -208,6 +208,17 @@ export const useDebtCollectors = (): UseQueryResult<DebtCollector[]> =>
     fetcher: companyId => debtsService.getCollectors(companyId),
   });
 
+/** خريطة إسناد المحصلين للعملاء (partyId -> { collectorId, collectorName }). */
+export const useDebtCollectorAssignments = (): UseQueryResult<
+  Record<string, { collectorId: string; collectorName: string }>
+> =>
+  useDebtQuery<Record<string, { collectorId: string; collectorName: string }>>({
+    scope: 'collector_assignments',
+    empty: {},
+    staleTime: 60 * 1000,
+    fetcher: companyId => debtMessageApi.getCollectorAssignments(companyId),
+  });
+
 export const useDebtPromises = (filters?: {
   partyId?: string;
   status?: string;

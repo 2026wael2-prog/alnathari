@@ -128,10 +128,11 @@ serve(async req => {
       global: { headers: { Authorization: authHeader } },
     });
 
+    const jwtToken = authHeader.replace(/^Bearer\s+/i, '').trim();
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getUser(jwtToken);
 
     if (authError || !user) {
       return new Response(

@@ -53,6 +53,7 @@ const CommissionReportsPage = lazy(
 // Debts & Collection module — one lazy page per main service
 const DebtsLayout = lazy(() => import('../features/debts/pages/DebtsLayout'));
 const DebtOverviewPage = lazy(() => import('../features/debts/pages/OverviewPage'));
+const DebtAgentPage = lazy(() => import('../features/debts/pages/AgentPage'));
 const DebtFollowUpPage = lazy(() => import('../features/debts/pages/FollowUpPage'));
 const DebtTasksPage = lazy(() => import('../features/debts/pages/TasksPage'));
 const DebtPromisesPage = lazy(() => import('../features/debts/pages/PromisesPage'));
@@ -419,6 +420,7 @@ export const AppRoutes: React.FC = () => {
           }
         >
           <Route index element={<DebtOverviewPage />} />
+          <Route path="agent" element={<DebtAgentPage />} />
           <Route path="followup" element={<DebtFollowUpPage />} />
           <Route path="tasks" element={<DebtTasksPage />} />
           <Route path="promises" element={<DebtPromisesPage />} />

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { CheckCircle, XCircle, Send, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Send, Loader2, Eye, EyeOff, Sparkles, Check, QrCode } from 'lucide-react';
 import Card from '@/ui/base/Card';
 import type { MessagingConfig } from '@/features/notifications/messagingApi';
 import { messagingApi } from '@/features/notifications/messagingApi';
 import { useAuthStore } from '@/features/auth/store';
 import { useFeedbackStore } from '@/features/feedback/store';
+import { WhatsAppSessionModal } from '@/features/debts/components/agent/WhatsAppSessionModal';
 
 const WhatsAppIcon = () => (
   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
@@ -19,8 +20,34 @@ interface Props {
 
 const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
   const [isTesting, setIsTesting] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const companyId = useAuthStore(s => s.user?.company_id);
   const { showToast } = useFeedbackStore();
+
+  // فحص إذا كان المفتاح يحتوي على رقم هاتف ملتصق بالمفتاح (مثل 779816860mkojxebwykcncp10)
+  const tokenMatch = (config.whatsapp_api_key || '').match(/^(\d{9,12})([a-zA-Z0-9]{10,})$/);
+
+  const handleSeparateTokenAndPhone = () => {
+    if (!tokenMatch) return;
+    const phonePart = tokenMatch[1];
+    const keyPart = tokenMatch[2];
+    onUpdate({
+      whatsapp_api_key: keyPart,
+      whatsapp_phone: config.whatsapp_phone ? config.whatsapp_phone : phonePart,
+    });
+    showToast('تم فصل المفتاح عن رقم الهاتف بنجاح ✅', 'success');
+  };
+
+  const handleApplyPresetUltraMsg = () => {
+    onUpdate({
+      whatsapp_enabled: true,
+      whatsapp_api_url: 'https://api.ultramsg.com/instance196299/',
+      whatsapp_api_key: 'mkojxebwykcncp10',
+      whatsapp_phone: '967771147694',
+    });
+    showToast('تم ضبط إعدادات بوابة UltraMsg الخاصة بالمؤسسة بنجاح ✅', 'success');
+  };
 
   const handleTest = async () => {
     if (!config.whatsapp_api_url || !config.whatsapp_api_key || !config.whatsapp_phone) {
@@ -60,27 +87,38 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-white">WhatsApp</h3>
-              <p className="text-xs text-slate-500">إرسال الإشعارات عبر واتساب بيزنس API</p>
+              <p className="text-xs text-slate-500">إرسال الإشعارات وتذكيرات الديون عبر واتساب (UltraMsg)</p>
             </div>
           </div>
-          <div
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
-              config.whatsapp_enabled
-                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-            }`}
-          >
-            {config.whatsapp_enabled ? (
-              <>
-                <CheckCircle className="h-3.5 w-3.5" />
-                <span>مفعل</span>
-              </>
-            ) : (
-              <>
-                <XCircle className="h-3.5 w-3.5" />
-                <span>معطل</span>
-              </>
-            )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleApplyPresetUltraMsg}
+              className="flex items-center gap-1 rounded-lg border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-bold text-green-700 hover:bg-green-100 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300"
+              title="تعبئة بيانات بوابة UltraMsg الخاصة بمؤسسة الجعفري تلقائياً"
+            >
+              <Sparkles size={12} />
+              <span>تعبئة بوابة المتجر (UltraMsg)</span>
+            </button>
+            <div
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
+                config.whatsapp_enabled
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+              }`}
+            >
+              {config.whatsapp_enabled ? (
+                <>
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  <span>مفعل</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-3.5 w-3.5" />
+                  <span>معطل</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -96,56 +134,84 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
             className="h-5 w-5 cursor-pointer rounded-lg text-green-600 focus:ring-green-500"
           />
           <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-            تفعيل إشعارات واتساب
+            تفعيل إشعارات وتذكيرات واتساب
           </span>
         </label>
+
+        {tokenMatch && (
+          <div className="flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+            <span>
+              ⚠️ تم رصد رقم هاتف مدمج بالخطأ مع المفتاح ({tokenMatch[1]} + {tokenMatch[2]})
+            </span>
+            <button
+              type="button"
+              onClick={handleSeparateTokenAndPhone}
+              className="flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1 text-white hover:bg-amber-700"
+            >
+              <Check size={12} />
+              فصلهما وتصحيح الحقول تلقائياً
+            </button>
+          </div>
+        )}
 
         {config.whatsapp_enabled && (
           <div className="animate-in fade-in mr-8 space-y-4 duration-300">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-600 dark:text-slate-300">
-                  رابط API
+                  رابط API البوابة
                 </label>
                 <input
                   type="text"
                   value={config.whatsapp_api_url}
                   onChange={e => {
-                    onUpdate({ whatsapp_api_url: e.target.value });
+                    onUpdate({ whatsapp_api_url: e.target.value.trim() });
                   }}
-                  placeholder="https://graph.facebook.com/v18.0/..."
+                  placeholder="https://api.ultramsg.com/instance196299/"
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-mono text-sm text-slate-800 focus:border-transparent focus:ring-2 focus:ring-green-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   dir="ltr"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-bold text-slate-600 dark:text-slate-300">
-                  API Key / Token
-                </label>
-                <input
-                  type="password"
-                  value={config.whatsapp_api_key}
-                  onChange={e => {
-                    onUpdate({ whatsapp_api_key: e.target.value });
-                  }}
-                  placeholder="Bearer Token..."
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-mono text-sm text-slate-800 focus:border-transparent focus:ring-2 focus:ring-green-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  dir="ltr"
-                />
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="block text-sm font-bold text-slate-600 dark:text-slate-300">
+                    API Key / Token
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowToken(!showToken)}
+                    className="flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                  >
+                    {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
+                    {showToken ? 'إخفاء' : 'إظهار'}
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showToken ? 'text' : 'password'}
+                    value={config.whatsapp_api_key}
+                    onChange={e => {
+                      onUpdate({ whatsapp_api_key: e.target.value.trim() });
+                    }}
+                    placeholder="mkojxebwykcncp10"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-mono text-sm text-slate-800 focus:border-transparent focus:ring-2 focus:ring-green-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    dir="ltr"
+                  />
+                </div>
               </div>
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-[240px] flex-1">
                 <label className="mb-2 block text-sm font-bold text-slate-600 dark:text-slate-300">
-                  رقم الهاتف المستلم
+                  رقم الهاتف المتصل بالبوابة (لإرسال الاختبار)
                 </label>
                 <input
                   type="text"
                   value={config.whatsapp_phone}
                   onChange={e => {
-                    onUpdate({ whatsapp_phone: e.target.value });
+                    onUpdate({ whatsapp_phone: e.target.value.trim() });
                   }}
-                  placeholder="966500000000"
+                  placeholder="967771147694"
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-mono text-sm text-slate-800 focus:border-transparent focus:ring-2 focus:ring-green-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   dir="ltr"
                 />
@@ -159,10 +225,29 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
                 {isTesting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                 <span>اختبار الإرسال</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setIsQrModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700 transition-all hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                title="فحص الجلسة الحية ومسح رمز الاستجابة السريعة QR للاتصال"
+              >
+                <QrCode size={14} />
+                <span>فحص الجلسة ومسح QR</span>
+              </button>
             </div>
           </div>
         )}
       </div>
+
+      <WhatsAppSessionModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        credentials={{
+          url: config.whatsapp_api_url,
+          token: config.whatsapp_api_key,
+        }}
+      />
     </Card>
   );
 };

@@ -537,6 +537,36 @@ export const debtMessageApi = {
     return data ?? [];
   },
 
+  /** خريطة إسناد المحصلين للعملاء (partyId -> collectorId & collectorName). */
+  getCollectorAssignments: async (
+    companyId: string
+  ): Promise<Record<string, { collectorId: string; collectorName: string }>> => {
+    try {
+      const { data, error } = await supabase
+        .from('debt_collector_assignments')
+        .select('party_id, collector_id, profiles:collector_id(full_name)')
+        .eq('company_id', companyId)
+        .eq('is_active', true);
+
+      if (error || !data) return {};
+
+      const map: Record<string, { collectorId: string; collectorName: string }> = {};
+      for (const item of data as unknown as Array<{
+        party_id: string;
+        collector_id: string;
+        profiles?: { full_name?: string | null } | null;
+      }>) {
+        map[item.party_id] = {
+          collectorId: item.collector_id,
+          collectorName: item.profiles?.full_name || 'مسند',
+        };
+      }
+      return map;
+    } catch {
+      return {};
+    }
+  },
+
   /** إتمام مهمة مجدولة (+ إجراء تالٍ اختياري) — idempotent على الخادم. */
   completeTask: async (params: {
     activityId: string;

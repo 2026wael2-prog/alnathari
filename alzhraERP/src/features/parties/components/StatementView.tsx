@@ -289,7 +289,7 @@ const StatementView: React.FC<StatementViewProps> = ({ partyType, initialPartyId
     }));
 
     await exportStatementToExcel(companyObj, selectedParty.name, entries, {
-      currencyCode: selectedMovements[0]?.currency || 'SAR',
+      ...(selectedCurrency !== 'ALL' ? { currencyCode: selectedCurrency } : {}),
       partyType: partyType === 'supplier' ? 'supplier' : 'customer',
       dateFrom: startDate,
       dateTo: endDate,

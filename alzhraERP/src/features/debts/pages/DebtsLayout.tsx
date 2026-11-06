@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard,
+  Bot,
   Users,
   ListChecks,
   Handshake,
@@ -27,6 +28,7 @@ interface ServiceTab {
 /** Each main service of the debts module is a SEPARATE tab/route. */
 const SERVICE_TABS: ServiceTab[] = [
   { to: ROUTES.DASHBOARD.DEBTS, end: true, label: 'نظرة عامة', icon: LayoutDashboard },
+  { to: ROUTES.DASHBOARD.DEBTS_AGENT, label: 'الوكيل الذكي', icon: Bot },
   { to: ROUTES.DASHBOARD.DEBTS_FOLLOWUP, label: 'المتابعة', icon: Users },
   { to: ROUTES.DASHBOARD.DEBTS_TASKS, label: 'المهام', icon: ListChecks },
   { to: ROUTES.DASHBOARD.DEBTS_PROMISES, label: 'الوعود', icon: Handshake },
