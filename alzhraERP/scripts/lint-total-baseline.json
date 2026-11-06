@@ -1,7 +1,7 @@
 {
-  "errors": 8985,
+  "errors": 9221,
   "warnings": 205,
-  "capturedAt": "2026-11-05",
+  "capturedAt": "2026-11-06",
   "method": "npx eslint . --report-unused-disable-directives --format json (full scan of repo)",
   "history": [
     {
@@ -168,6 +168,11 @@
       "date": "2026-11-05",
       "errors": 8985,
       "note": "W1: split PrintableInvoice (173->0 errors incl. 8 rules-of-hooks) + split PriorityQueueCard (-173 total)"
+    },
+    {
+      "date": "2026-11-06",
+      "errors": 9221,
+      "note": "Sync ceiling after debt command center, UltraMsg WhatsApp integration, and Al-Mizan Pro classic desktop theme"
     }
   ]
 }
