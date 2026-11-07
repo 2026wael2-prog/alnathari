@@ -6,6 +6,7 @@ import { useFeedbackStore } from '../../feedback/store';
 import { parseError } from '../../../core/utils/errorUtils';
 import type { CreatePurchaseDTO } from '../types';
 import type { PurchaseListRow } from '../service';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 
 const hasCompanyId = (companyId: string | null | undefined): companyId is string =>
   typeof companyId === 'string' && companyId.length > 0;
@@ -13,11 +14,12 @@ const hasCompanyId = (companyId: string | null | undefined): companyId is string
 export const usePurchaseReturns = (): UseQueryResult<PurchaseListRow[]> => {
   const { user } = useAuthStore();
   const companyId = user?.company_id;
+  const { branchId } = useBranchFilter();
   return useQuery({
-    queryKey: ['purchase_returns', companyId],
+    queryKey: ['purchase_returns', companyId, branchId],
     queryFn: () =>
       hasCompanyId(companyId)
-        ? purchasesService.getPurchaseReturns(companyId)
+        ? purchasesService.getPurchaseReturns(companyId, branchId)
         : Promise.resolve([]),
     enabled: hasCompanyId(companyId),
   });
@@ -30,11 +32,12 @@ export const usePurchaseReturnsStats = (): UseQueryResult<{
 } | null> => {
   const { user } = useAuthStore();
   const companyId = user?.company_id;
+  const { branchId } = useBranchFilter();
   return useQuery({
-    queryKey: ['purchase_returns_stats', companyId],
+    queryKey: ['purchase_returns_stats', companyId, branchId],
     queryFn: () =>
       hasCompanyId(companyId)
-        ? purchasesService.getPurchaseReturnsStats(companyId)
+        ? purchasesService.getPurchaseReturnsStats(companyId, branchId)
         : Promise.resolve(null),
     enabled: hasCompanyId(companyId),
   });
@@ -44,13 +47,24 @@ export const useCreatePurchaseReturn = (): UseMutationResult<unknown, unknown, C
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { showToast } = useFeedbackStore();
+  const { branchId } = useBranchFilter();
   return useMutation({
     mutationFn: async (data: CreatePurchaseDTO) => {
       const companyId = user?.company_id;
       const userId = user?.id;
       if (!hasCompanyId(companyId) || !hasCompanyId(userId))
         throw new Error('جلسة العمل منتهية — يرجى تسجيل الدخول مجدداً');
-      return purchasesService.processPurchaseReturn(data, companyId, userId);
+      return purchasesService.processPurchaseReturn(
+        {
+          ...data,
+          branchId:
+            data.branchId !== null && data.branchId !== undefined && data.branchId !== ''
+              ? data.branchId
+              : branchId,
+        },
+        companyId,
+        userId
+      );
     },
     onSuccess: () => {
       showToast('تم إنشاء مرتجع المشتريات بنجاح', 'success');
@@ -80,14 +94,16 @@ export const usePurchaseInvoicesForReturn = (
 ): UseQueryResult<PurchaseInvoicesForReturnRow[] | null> => {
   const { user } = useAuthStore();
   const companyId = user?.company_id;
+  const { branchId } = useBranchFilter();
   const isEnabled = (options?.enabled ?? true) && hasCompanyId(companyId);
   return useQuery({
-    queryKey: ['purchase_invoices_for_return', companyId, supplierId],
+    queryKey: ['purchase_invoices_for_return', companyId, branchId, supplierId],
     queryFn: async () => {
       if (!hasCompanyId(companyId)) return [];
       const { data, error } = await purchasesApi.getPurchaseInvoicesForReturn(
         companyId,
-        supplierId
+        supplierId,
+        branchId
       );
       if (error) throw error;
       return data;

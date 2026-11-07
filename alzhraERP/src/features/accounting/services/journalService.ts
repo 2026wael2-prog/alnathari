@@ -40,9 +40,14 @@ export const journalService = {
   /**
    * إنشاء قيد محاسبي جديد باستخدام المحرك المركزي
    */
-  createJournal: async (formData: JournalEntryFormData, companyId: string, userId: string) => {
+  createJournal: async (
+    formData: JournalEntryFormData,
+    companyId: string,
+    userId: string,
+    branchId?: string | null
+  ) => {
     // نفوض الأمر للـ Usecase الذي يستخدم الـ RPC
-    return await PostTransactionUsecase.execute(formData, companyId, userId);
+    return await PostTransactionUsecase.execute(formData, companyId, userId, branchId);
   },
 
   /**

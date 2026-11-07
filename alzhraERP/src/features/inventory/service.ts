@@ -37,22 +37,24 @@ export const inventoryService = {
   // Product Operations (delegated to productService)
   // ==========================================
 
+  /* eslint-disable-next-line max-params -- legacy facade signature */
   getProducts: async (
     companyId: string,
     page?: number,
     limitNum?: number,
     warehouseId?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    branchId?: string | null
   ): Promise<Product[]> => {
-    return productService.getProducts(companyId, page, limitNum, warehouseId, signal);
+    return productService.getProducts(companyId, page, limitNum, warehouseId, signal, branchId);
   },
 
   getProductsWithStock: async (companyId: string, signal?: AbortSignal) => {
     return productService.getProductsWithStock(companyId, signal);
   },
 
-  searchProducts: async (companyId: string, term: string) => {
-    return productService.searchProducts(companyId, term);
+  searchProducts: async (companyId: string, term: string, branchId?: string | null) => {
+    return productService.searchProducts(companyId, term, branchId);
   },
 
   getProductById: async (id: string) => {
@@ -83,16 +85,16 @@ export const inventoryService = {
     return productService.getMinimalProducts(companyId);
   },
 
-  getItemMovement: async (productId: string, companyId: string) => {
-    return productService.getItemMovement(productId, companyId);
+  getItemMovement: async (productId: string, companyId: string, branchId?: string | null) => {
+    return productService.getItemMovement(productId, companyId, branchId);
   },
 
   // ==========================================
   // Warehouse Operations (delegated to warehouseService)
   // ==========================================
 
-  getWarehouses: async (companyId: string, _branchId?: string | null) => {
-    return warehouseService.getWarehouses(companyId);
+  getWarehouses: async (companyId: string, branchId?: string | null) => {
+    return warehouseService.getWarehouses(companyId, branchId);
   },
 
   getProductsForWarehouse: async (_companyId: string, warehouseId: string) => {
@@ -107,8 +109,8 @@ export const inventoryService = {
     return transferService.createTransfer(data);
   },
 
-  getTransfers: async (companyId: string) => {
-    return transferService.getTransfers(companyId);
+  getTransfers: async (companyId: string, branchId?: string | null) => {
+    return transferService.getTransfers(companyId, branchId);
   },
 
   // ==========================================
@@ -142,8 +144,8 @@ export const inventoryService = {
     return auditService.finalizeAudit(sessionId, items, userId, companyId);
   },
 
-  getAuditSessions: async (companyId: string) => {
-    return auditService.getAuditSessions(companyId);
+  getAuditSessions: async (companyId: string, branchId?: string | null) => {
+    return auditService.getAuditSessions(companyId, branchId);
   },
 
   getAuditSessionDetails: async (sessionId: string) => {

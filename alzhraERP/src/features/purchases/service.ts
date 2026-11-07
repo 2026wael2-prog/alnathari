@@ -95,24 +95,35 @@ export const purchasesService = {
   getPurchases: async (companyId: string, branchId?: string | null, limit = 500) => {
     const { data, error } = await purchasesApi.getPurchases(companyId, branchId, limit);
     if (error) throw error;
-    return (data || []).map((row: any) => ({
-      ...row,
-      party_phone: (row.party as any)?.phone ?? null,
-      matched_items: Array.isArray(row.invoice_items)
-        ? (row.invoice_items as any[]).map((item: any) => ({
+    type RawRow = NonNullable<typeof data>[number];
+    return (data ?? []).map((row: RawRow) => {
+      const party = row.party as { phone?: string | null } | null;
+      const items = Array.isArray(row.invoice_items) ? row.invoice_items : [];
+      return {
+        ...row,
+        party_phone: party?.phone ?? null,
+        matched_items: items.map(item => {
+          const prod = item.product as {
+            name_ar?: string | null;
+            sku?: string | null;
+            part_number?: string | null;
+            brand?: string | null;
+          } | null;
+          return {
             id: item.id,
             product_id: item.product_id ?? '',
-            product_name: item.product?.name_ar || item.description || 'صنف غير محدد',
-            sku: item.product?.sku || null,
-            part_number: item.product?.part_number || null,
-            brand: item.product?.brand || null,
-            quantity: Number(item.quantity) || 0,
-            unit_price: Number(item.cost_price ?? item.unit_price) || 0,
-            total: Number(item.total) || 0,
+            product_name: prod?.name_ar ?? item.description ?? 'صنف غير محدد',
+            sku: prod?.sku ?? null,
+            part_number: prod?.part_number ?? null,
+            brand: prod?.brand ?? null,
+            quantity: item.quantity ?? 0,
+            unit_price: (item.cost_price ?? item.unit_price) ?? 0,
+            total: item.total ?? 0,
             is_direct_match: false,
-          }))
-        : [],
-    }));
+          };
+        }),
+      };
+    });
   },
 
   searchPurchases: async (
@@ -148,32 +159,54 @@ export const purchasesService = {
     return rows.map(r => ({
       id: r.id,
       invoice_number: r.invoice_number,
-      party: r.party_name ? { name: r.party_name } : null,
-      party_phone: r.party_phone,
+      party: r.party_name ? { name: r.party_name, phone: r.party_phone ?? null } : null,
+      party_phone: r.party_phone ?? null,
 
       issue_date: r.issue_date,
-      total_amount: Number(r.total_amount) || 0,
+      total_amount: r.total_amount ?? 0,
       currency_code: r.currency_code,
-      exchange_rate: Number(r.exchange_rate) || 1,
+      exchange_rate: r.exchange_rate ?? 1,
       status: r.status,
       type: r.type,
       payment_method: r.payment_method,
-      notes: r.notes,
-      reference_invoice_id: r.reference_invoice_id,
+      notes: r.notes ?? null,
+      reference_invoice_id: r.reference_invoice_id ?? null,
+      reference_invoice: null as { id: string; invoice_number: string } | null,
       return_reason: null as string | null,
       created_at: r.issue_date,
       invoice_items: [] as Array<{
         id: string;
-        cost_price: number;
+        product_id: string | null;
+        cost_price: number | null;
         quantity: number;
         unit_price: number;
         total: number;
         description: string | null;
+        product: {
+          id: string;
+          name_ar: string | null;
+          sku: string | null;
+          part_number: string | null;
+          brand: string | null;
+        } | null;
       }>,
 
-      item_count: Number(r.item_count) || 0,
-      matched_items: Array.isArray(r.matched_items) ? r.matched_items : [],
-      total_matching_count: Number(r.total_matching_count) || 0,
+      item_count: r.item_count ?? 0,
+      matched_items: Array.isArray(r.matched_items)
+        ? r.matched_items.map((item) => ({
+            id: item.id ?? '',
+            product_id: item.product_id ?? '',
+            product_name: item.product_name ?? '',
+            sku: item.sku ?? null,
+            part_number: item.part_number ?? null,
+            brand: item.brand ?? null,
+            quantity: Number(item.quantity ?? 0),
+            unit_price: Number(item.unit_price ?? 0),
+            total: Number(item.total ?? 0),
+            is_direct_match: Boolean(item.is_direct_match),
+          }))
+        : [],
+      total_matching_count: r.total_matching_count ?? 0,
     }));
   },
 
@@ -307,7 +340,9 @@ export const purchasesService = {
       throw error;
     }
 
-    const returns = data.filter(isPurchaseReturn);
+    const returns = data.filter(
+      p => isPurchaseReturn(p) && p.status !== 'void' && p.status !== 'cancelled'
+    );
     const totalReturns = returns.reduce((sum, purchase) => sum + safeToBase(purchase), 0);
     const pendingCount = returns.filter(
       purchase => purchase.status === 'draft' || purchase.status === 'pending'

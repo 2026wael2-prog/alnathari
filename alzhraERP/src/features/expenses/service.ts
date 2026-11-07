@@ -11,7 +11,7 @@ import { supabase } from '../../lib/supabaseClient';
 const safeToBase = (expense: Expense): number => {
   try {
     return toBaseCurrency({
-      amount: Number(expense.amount),
+      amount: expense.amount,
       currency_code: expense.currency_code,
       exchange_rate: expense.exchange_rate,
     });
@@ -117,9 +117,10 @@ export const expensesService = {
   },
 
   // ⚡ Server-side stats via RPC — no frontend aggregation
-  getStatsFromServer: async (companyId: string): Promise<ExpenseStats> => {
+  getStatsFromServer: async (companyId: string, branchId?: string | null): Promise<ExpenseStats> => {
     const { data, error } = await supabase.rpc('get_expense_stats', {
       p_company_id: companyId,
+      ...(branchId ? { p_branch_id: branchId } : {}),
     });
     if (error) throw error;
     const result = data as {
@@ -152,11 +153,11 @@ export const expensesService = {
 
     const totalExpensesYER = active
       .filter(e => (e.currency_code || '').toUpperCase() === 'YER')
-      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
 
     const totalExpensesSAR = active
       .filter(e => (e.currency_code || '').toUpperCase() === 'SAR')
-      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
 
     return {
       totalExpenses,

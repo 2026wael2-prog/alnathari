@@ -31,6 +31,20 @@ const DENIED_PREFIX = 'عذراً، لا تمتلك صلاحية';
 const deniedMessage = (label: string) =>
   `${DENIED_PREFIX} كافية لتنفيذ: [${label}] - يرجى مراجعة الصلاحيات في النظام`;
 
+function isServerPermissionDenied(err: unknown): boolean {
+  if (!err) return false;
+  if (err instanceof Error && err.message.startsWith(DENIED_PREFIX)) return true;
+  if (typeof err === 'object') {
+    const code = (err as { code?: string }).code;
+    const msg = (err as { message?: string }).message ?? '';
+    if (code === '42501') return true;
+    if (msg.startsWith(DENIED_PREFIX) || msg.includes(DENIED_PREFIX) || /access_denied|permission denied/i.test(msg)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * assertPermission — server-side permission check to be awaited INSIDE
  * mutationFn / handlers (unlike the usePermission hook which runs at render time).
@@ -65,8 +79,10 @@ export async function assertPermission(permission: string, arabicLabel?: string)
     return;
   } catch (err) {
     // A genuine denial from the server must NOT be swallowed by the fallback.
-    if (err instanceof Error && err.message.startsWith(DENIED_PREFIX)) {
-      throw err;
+    if (isServerPermissionDenied(err)) {
+      throw err instanceof Error && err.message.startsWith(DENIED_PREFIX)
+        ? err
+        : new Error(deniedMessage(label));
     }
 
     logger.warn(
@@ -114,6 +130,9 @@ export function usePermission(permission: string) {
           ...(user.company_id != null ? { p_company_id: user.company_id } : {}),
         });
         if (rpcError) {
+          if (isServerPermissionDenied(rpcError)) {
+            return false;
+          }
           logger.warn(
             'usePermission',
             `RPC error for "${permission}" — using client-side fallback`,
@@ -123,6 +142,9 @@ export function usePermission(permission: string) {
         }
         return data ?? false;
       } catch (err) {
+        if (isServerPermissionDenied(err)) {
+          return false;
+        }
         logger.warn(
           'usePermission',
           `Error checking permission "${permission}" — using client-side fallback`,
@@ -166,12 +188,18 @@ export function useAllPermissions() {
             ? await supabase.rpc('get_user_permissions', { p_company_id: user.company_id })
             : await supabase.rpc('get_user_permissions');
         if (error) {
+          if (isServerPermissionDenied(error)) {
+            return [];
+          }
           logger.warn('useAllPermissions', 'RPC error — using fallback', error.message);
           const normalized = (user.role?.toLowerCase() === 'owner' ? 'admin' : user.role) as Role;
           return OFFLINE_ROLE_PERMISSIONS[normalized] || [];
         }
         return (perms as Array<{ permission: string }>)?.map(p => p.permission) ?? [];
       } catch (err) {
+        if (isServerPermissionDenied(err)) {
+          return [];
+        }
         logger.warn('useAllPermissions', 'Error — using fallback', err);
         const normalized = (user.role?.toLowerCase() === 'owner' ? 'admin' : user.role) as Role;
         return OFFLINE_ROLE_PERMISSIONS[normalized] || [];

@@ -12,9 +12,10 @@ import type { Invoice, Party, InvoiceItem } from '../../../core/types/supabase-h
 import type { InvoiceStatus } from '../types';
 import { toReturnPayloadItems } from '../../returns/utils/returnHelpers';
 import type { Json } from '../../../core/database.types';
-import { normalizeSearch } from '../../../core/utils';
+import { normalizeSearch, toBaseCurrency } from '../../../core/utils';
 import { formatLocalDate } from '../../../core/utils/dateUtils';
 import { parseError } from '../../../core/utils/errorUtils';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 
 export interface SalesReturn {
   id: string;
@@ -99,9 +100,10 @@ export const useSalesReturns = (filters?: {
   endDate?: string | undefined;
 }) => {
   const { user } = useAuthStore();
+  const { branchId } = useBranchFilter();
 
   return useQuery({
-    queryKey: ['sales-returns', filters],
+    queryKey: ['sales-returns', user?.company_id, branchId, filters],
     queryFn: async () => {
       if (!user?.company_id) return [];
 
@@ -137,6 +139,10 @@ export const useSalesReturns = (filters?: {
         .eq('company_id', user.company_id)
         .eq('type', 'sale_return')
         .is('deleted_at', null);
+
+      if (branchId) {
+        query = query.eq('branch_id', branchId);
+      }
 
       if (filters?.status) {
         query = query.eq('status', filters.status);
@@ -182,33 +188,46 @@ export const useSalesReturns = (filters?: {
 // Fetch sales returns statistics
 export const useSalesReturnsStats = () => {
   const { user } = useAuthStore();
+  const { branchId } = useBranchFilter();
 
   return useQuery({
-    queryKey: ['sales-returns-stats', user?.company_id],
+    queryKey: ['sales-returns-stats', user?.company_id, branchId],
     queryFn: async () => {
       if (!user?.company_id) {
         return { returnCount: 0, totalReturns: 0, avgReturn: 0, pendingCount: 0 };
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('invoices')
         .select('id, total_amount, status, currency_code, exchange_rate')
         .eq('company_id', user.company_id)
         .eq('type', 'sale_return')
+        .neq('status', 'void')
+        .neq('status', 'cancelled')
         .is('deleted_at', null);
+
+      if (branchId) {
+        query = query.eq('branch_id', branchId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       const returns = data || [];
       const returnCount = returns.length;
       const totalReturns = returns.reduce((sum: number, r: any) => {
-        const amount = Number(r.total_amount) || 0;
-        const rate = Number(r.exchange_rate) || 1;
-        const code = r.currency_code || 'SAR';
-        let baseAmount = amount;
-        if (code === 'YER' && rate > 0) {
-          baseAmount = rate < 1 ? amount * rate : amount / rate;
+        try {
+          return (
+            sum +
+            toBaseCurrency({
+              amount: Number(r.total_amount) || 0,
+              currency_code: r.currency_code || 'SAR',
+              exchange_rate: Number(r.exchange_rate) || 1,
+            })
+          );
+        } catch {
+          return sum + (Number(r.total_amount) || 0);
         }
-        return sum + baseAmount;
       }, 0);
       const avgReturn = returnCount > 0 ? totalReturns / returnCount : 0;
       const pendingCount = returns.filter(
@@ -292,10 +311,11 @@ export const useSalesInvoicesForReturn = (
   options?: { enabled?: boolean }
 ) => {
   const { user } = useAuthStore();
+  const { branchId } = useBranchFilter();
   const isEnabled = (options?.enabled ?? true) && !!user?.company_id;
 
   return useQuery({
-    queryKey: ['sales-invoices-for-return', user?.company_id, customerId],
+    queryKey: ['sales-invoices-for-return', user?.company_id, branchId, customerId],
     queryFn: async () => {
       if (!user?.company_id) return [];
 
@@ -320,6 +340,10 @@ export const useSalesInvoicesForReturn = (
         .neq('status', 'void')
         .neq('status', 'cancelled')
         .is('deleted_at', null);
+
+      if (branchId) {
+        query = query.eq('branch_id', branchId);
+      }
 
       if (customerId) {
         query = query.eq('party_id', customerId);

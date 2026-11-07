@@ -191,9 +191,9 @@ export const bondsApi = {
     });
 
     if (rpcError) {
-      // Must fail strictly to prevent double-entry imbalance
+      // Must fail strictly to prevent double-entry imbalance and preserve permission/fiscal-year messages
       logger.error('api', 'Fatal: void_bond RPC failed', rpcError);
-      throw new Error('تعذر إلغاء السند: فشل في إنشاء القيود العكسية');
+      throw parseError(rpcError);
     }
 
     return { error: null };

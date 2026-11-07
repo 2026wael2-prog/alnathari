@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { parseError } from '@/core/utils/errorUtils';
 import { formatLocalDate } from '@/core/utils/dateUtils';
+import { toBaseCurrency } from '@/core/utils/currencyUtils';
 import type { CreateInvoicePayload, InvoiceResponse } from '../types';
 import { logger } from '@/core/utils/logger';
 import type { Invoice, Party } from '@/core/types/supabase-helpers';
@@ -252,7 +253,7 @@ export const salesApi = {
         p_notes: payload.notes || '',
         p_issue_date: payload.issueDate || formatLocalDate(),
         p_currency_code: payload.currency || 'SAR',
-        p_exchange_rate: payload.exchangeRate ? Number(payload.exchangeRate) : 1,
+        p_exchange_rate: payload.exchangeRate ? payload.exchangeRate : 1,
         p_company_id: companyId,
         p_user_id: userId,
       });
@@ -260,6 +261,19 @@ export const salesApi = {
       if (error) throw error;
       return result as unknown as InvoiceResponse;
     } catch (err) {
+      const errCode = (err as { code?: string })?.code;
+      const errMsg =
+        typeof (err as { message?: string })?.message === 'string'
+          ? (err as { message: string }).message
+          : '';
+      if (
+        errCode === '42501' ||
+        errCode === 'P0001' ||
+        errMsg.includes('عذراً، لا تمتلك صلاحية') ||
+        errMsg.includes('تتجاوز')
+      ) {
+        throw parseError(err);
+      }
       logger.warn(
         'salesApi',
         'process_sales_return failed, attempting fallback to commit_sale_return:',
@@ -272,7 +286,7 @@ export const salesApi = {
         p_items: returnItems,
         ...(payload.notes ? { p_notes: payload.notes } : {}),
         ...(payload.currency ? { p_currency: payload.currency } : {}),
-        ...(payload.exchangeRate ? { p_exchange_rate: Number(payload.exchangeRate) } : {}),
+        ...(payload.exchangeRate ? { p_exchange_rate: payload.exchangeRate } : {}),
         ...(payload.referenceInvoiceId
           ? { p_reference_invoice_id: payload.referenceInvoiceId }
           : {}),
@@ -366,7 +380,101 @@ export const salesApi = {
     company_id: string;
     start_date?: string;
     end_date?: string;
+    branch_id?: string | null;
   }) => {
+    if (params.branch_id) {
+      let query = supabase
+        .from('invoices')
+        .select('id, type, total_amount, issue_date, payment_method, currency_code, exchange_rate, party:party_id(id, name)')
+        .eq('company_id', params.company_id)
+        .eq('branch_id', params.branch_id)
+        .in('type', ['sale', 'sale_return'])
+        .neq('status', 'void')
+        .neq('status', 'cancelled')
+        .is('deleted_at', null);
+
+      if (params.start_date) query = query.gte('issue_date', params.start_date);
+      if (params.end_date) query = query.lte('issue_date', params.end_date);
+
+      const { data: invRows, error: invErr } = await query;
+      if (invErr) return { data: null, error: invErr };
+
+      let totalSales = 0;
+      let totalReturns = 0;
+      let invoiceCount = 0;
+      const byDay = new Map<string, { sales: number; returns: number }>();
+      const byMethod = new Map<string, number>();
+      const byCust = new Map<string, { customerName: string; totalAmount: number; invoiceCount: number }>();
+
+      for (const r of invRows || []) {
+        const amt = r.total_amount ?? 0;
+        const rate = r.exchange_rate ?? 1;
+        let baseAmt = amt;
+        try {
+          baseAmt = toBaseCurrency({
+            amount: amt,
+            currency_code: r.currency_code || 'SAR',
+            exchange_rate: rate,
+          });
+        } catch {
+          baseAmt = amt;
+        }
+        const day = r.issue_date || '';
+        const dEntry = byDay.get(day) ?? { sales: 0, returns: 0 };
+
+        if (r.type === 'sale') {
+          totalSales += baseAmt;
+          invoiceCount += 1;
+          dEntry.sales += baseAmt;
+          const m = r.payment_method || 'cash';
+          byMethod.set(m, (byMethod.get(m) ?? 0) + baseAmt);
+          const rawParty = (r as unknown as { party?: { id?: string; name?: string } | Array<{ id?: string; name?: string }> | null }).party;
+          const pObj = Array.isArray(rawParty) ? (rawParty[0] ?? null) : (rawParty ?? null);
+          if (pObj?.id) {
+            const cEntry = byCust.get(pObj.id) ?? {
+              customerName: pObj.name || 'عميل نقدي',
+              totalAmount: 0,
+              invoiceCount: 0,
+            };
+            cEntry.totalAmount += baseAmt;
+            cEntry.invoiceCount += 1;
+            byCust.set(pObj.id, cEntry);
+          }
+        } else if (r.type === 'sale_return') {
+          totalReturns += baseAmt;
+          dEntry.returns += baseAmt;
+        }
+        if (day) byDay.set(day, dEntry);
+      }
+
+      const netSales = totalSales - totalReturns;
+      return {
+        data: {
+          totalSales,
+          totalReturns,
+          netSales,
+          invoiceCount,
+          averageInvoiceValue: invoiceCount > 0 ? totalSales / invoiceCount : 0,
+          prevTotalSales: 0,
+          prevTotalReturns: 0,
+          prevNetSales: 0,
+          topProducts: [],
+          topCustomers: Array.from(byCust.entries())
+            .map(([customerId, v]) => ({ customerId, ...v }))
+            .sort((a, b) => b.totalAmount - a.totalAmount)
+            .slice(0, 10),
+          salesByDay: Array.from(byDay.entries())
+            .map(([date, v]) => ({ date, ...v }))
+            .sort((a, b) => a.date.localeCompare(b.date)),
+          salesByPaymentMethod: Array.from(byMethod.entries()).map(([method, amount]) => ({
+            method,
+            amount,
+          })),
+        },
+        error: null,
+      };
+    }
+
     const rpcParams = {
       p_company_id: params.company_id,
       ...(params.start_date ? { p_start_date: params.start_date } : {}),

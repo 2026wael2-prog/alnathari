@@ -9,7 +9,7 @@ import { Sparkles } from 'lucide-react';
 
 const TransferSuggestionsView: React.FC = () => {
     const { products, isLoading: isProductsLoading } = useProducts('');
-    const { data: warehouses, isLoading: isWarehousesLoading } = useWarehouses();
+    const { data: warehouses, isLoading: isWarehousesLoading } = useWarehouses(null);
     const { suggestions } = useSmartTransferSuggestions(products, warehouses);
 
     if (isProductsLoading || isWarehousesLoading) {

@@ -5,10 +5,10 @@ import { parseError } from '@/core/utils/errorUtils';
 export type DeleteAuditItemParams =
   | string
   | {
-      itemId?: string | undefined;
-      sessionId?: string | undefined;
-      productId?: string | undefined;
-    };
+    itemId?: string | undefined;
+    sessionId?: string | undefined;
+    productId?: string | undefined;
+  };
 
 interface AuditItemInput {
   id?: string;
@@ -52,7 +52,7 @@ export const auditService = {
     const session = response.data as unknown as { id: string };
     const error = response.error;
 
-    if (error) throw error;
+    if (error) throw parseError(error);
 
     // The session starts empty, allowing the user to scan and add items manually.
 
@@ -73,7 +73,7 @@ export const auditService = {
       const rpc = supabase.rpc as unknown as (
         fn: string,
         params: Record<string, unknown>
-      ) => Promise<{ data: unknown; error: unknown }>;
+      ) => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>;
       const { data: rpcData, error: rpcError } = await rpc('add_audit_session_item', {
         p_session_id: sessionId,
         p_product_id: productId,
@@ -81,7 +81,18 @@ export const auditService = {
       if (!rpcError && rpcData) {
         return rpcData as Record<string, unknown>;
       }
-    } catch {
+      if (
+        rpcError &&
+        (rpcError.code === '42501' ||
+          (typeof rpcError.message === 'string' &&
+            rpcError.message.includes('عذراً، لا تمتلك صلاحية')))
+      ) {
+        throw parseError(rpcError);
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('عذراً، لا تمتلك صلاحية')) {
+        throw err;
+      }
       // fallback to legacy path below
     }
 
@@ -120,7 +131,7 @@ export const auditService = {
       })
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw parseError(error);
     return data;
   },
 
@@ -153,24 +164,29 @@ export const auditService = {
       p_user_id: userId,
       p_items: payloadItems,
     });
-    if (error) throw error;
+    if (error) throw parseError(error);
   },
 
   /**
-   * Get all audit sessions for a company
+   * Get all audit sessions for a company (optionally scoped to a specific branch's warehouses)
    */
-  getAuditSessions: async (companyId: string) => {
+  getAuditSessions: async (companyId: string, branchId?: string | null) => {
     const { data, error } = await supabase
       .from('audit_sessions')
-      .select('*, warehouses(name_ar)')
+      .select('*, warehouses(name_ar, branch_id)')
       .eq('company_id', companyId)
       .neq('status', 'cancelled')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data || []).map((s: Record<string, unknown>) => ({
+    const rows = (data || []).map((s: Record<string, unknown>) => ({
       ...s,
       warehouse_name: (s.warehouses as { name_ar?: string })?.name_ar,
+      branch_id: (s.warehouses as { branch_id?: string | null })?.branch_id ?? null,
     }));
+    if (branchId) {
+      return rows.filter(r => r.branch_id === branchId);
+    }
+    return rows;
   },
 
   /**
@@ -265,7 +281,7 @@ export const auditService = {
           rpc: (
             fn: string,
             params: Record<string, unknown>
-          ) => Promise<{ data: unknown; error: unknown }>;
+          ) => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>;
         };
         const { data, error } = await rpcClient.rpc('save_audit_progress', {
           p_session_id: sessionId,
@@ -275,7 +291,16 @@ export const auditService = {
         if (!error) {
           return data;
         }
-      } catch {
+        if (
+          error.code === '42501' ||
+          (typeof error.message === 'string' && error.message.includes('عذراً، لا تمتلك صلاحية'))
+        ) {
+          throw parseError(error);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('عذراً، لا تمتلك صلاحية')) {
+          throw err;
+        }
         // Fall back to direct update below
       }
     }
@@ -341,7 +366,7 @@ export const auditService = {
           rpc: (
             fn: string,
             args: Record<string, unknown>
-          ) => Promise<{ data: unknown; error: { message: string } | null }>;
+          ) => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>;
         };
         const { error } = await rpcClient.rpc('delete_audit_session_item', {
           p_session_id: sessionId,
@@ -349,7 +374,16 @@ export const auditService = {
           p_product_id: productId || null,
         });
         if (!error) return;
-      } catch {
+        if (
+          error.code === '42501' ||
+          (typeof error.message === 'string' && error.message.includes('عذراً، لا تمتلك صلاحية'))
+        ) {
+          throw parseError(error);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('عذراً، لا تمتلك صلاحية')) {
+          throw err;
+        }
         // Fall back to direct delete query
       }
     }

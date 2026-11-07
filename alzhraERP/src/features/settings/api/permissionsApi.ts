@@ -1,5 +1,6 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { logger } from '../../../core/utils/logger';
+import { parseError } from '../../../core/utils/errorUtils';
 
 // الأنواع المولّدة تقيّد supabase.rpc بالدوال المعروفة وقت التوليد؛
 // دوال الصلاحيات الدقيقة أحدث من تلك اللقطة — نوسّع التوقيع عمداً
@@ -15,8 +16,7 @@ const looseRpc = async (
   return await rpcFn(name, args);
 };
 
-const toError = (error: unknown): Error =>
-  error instanceof Error ? error : new Error(typeof error === 'string' ? error : 'عملية RPC فشلت');
+const toError = (error: unknown): Error => parseError(error);
 
 /** طبقة api لصلاحيات/أعضاء المنشأة — تستدعيها الهوكات (Hook → API). */
 export const permissionsApi = {

@@ -66,18 +66,20 @@ export const useStatement = (
 ) => {
   const { user } = useAuthStore();
   const companyId = user?.company_id;
+  const { branchId } = useBranchFilter();
   return useQuery({
     queryKey: [
       'party_statement_v4',
       partyId,
       companyId,
+      branchId,
       options?.startDate,
       options?.endDate,
       options?.currencyCode,
     ],
     queryFn: () =>
       partyId && companyId
-        ? partiesService.getStatement(partyId, type, options, companyId)
+        ? partiesService.getStatement(partyId, type, { ...options, branchId }, companyId)
         : Promise.resolve([]),
     enabled: !!partyId && !!companyId,
   });
@@ -114,6 +116,8 @@ export const usePartyMutations = (type: PartyType) => {
           mutationKey: ['parties', 'save'],
           variables: {
             ...variables.data,
+            branch_id:
+              (variables.data as { branch_id?: string | null })?.branch_id || branchId || null,
             id: variables.id,
             company_id: currentUser?.company_id,
             type,

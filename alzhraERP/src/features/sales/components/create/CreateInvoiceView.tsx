@@ -217,9 +217,16 @@ const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({ onSuccess }) => {
   };
 
   const executeSave = (statusToSave: InvoiceStatus) => {
+    if (isPending) return;
     const validItems = items.filter(
       item => item.productId && item.name && item.quantity > 0 && item.price > 0
     );
+
+    const whList = (rawWarehouses ?? []) as Array<{ id: string; is_primary?: boolean }>;
+    const effectiveWarehouseId =
+      warehouseId && warehouseId !== 'wh_main' && (whList.length === 0 || whList.some(w => w.id === warehouseId))
+        ? warehouseId
+        : (whList.find(w => w.is_primary)?.id ?? whList[0]?.id ?? warehouseId);
 
     createInvoice(
       {
@@ -232,7 +239,7 @@ const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({ onSuccess }) => {
           quantity: item.quantity,
           unitPrice: item.price,
           costPrice: item.costPrice || 0,
-          warehouseId,
+          warehouseId: effectiveWarehouseId,
           maxStock: item.warehouse_distribution
             ? item.warehouse_distribution.reduce((sum, w) => sum + w.quantity, 0)
             : 9999,

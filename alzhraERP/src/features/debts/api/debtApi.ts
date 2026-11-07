@@ -318,18 +318,21 @@ export const debtMessageApi = {
   getMessageLog: async (
     companyId: string,
     status?: string,
-    limit = 200
+    limit = 200,
+    branchId?: string | null
   ): Promise<DebtMessageLogWithParty[]> => {
     let query = supabase
       .from('debt_message_log')
-      .select('*, parties(name, phone)')
+      .select(branchId ? '*, parties!inner(name, phone, branch_id)' : '*, parties(name, phone)')
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
       .limit(limit);
     if (status) query = query.eq('status', status);
+    if (branchId) query = query.eq('parties.branch_id', branchId);
     const { data, error } = await query;
     if (error) throw error;
-    return data;
+    const rows: unknown = data ?? [];
+    return rows as DebtMessageLogWithParty[];
   },
 
   /**
@@ -337,12 +340,18 @@ export const debtMessageApi = {
    * يُستخدم لشارة «فاشلة» في الصادر حتى لا يتأثر العدّ بحد 200 صفاً
    * ولا بفلتر الحالة المعروض (رقم واحد صادق دائماً).
    */
-  countByStatus: async (companyId: string, status: string): Promise<number> => {
-    const { count, error } = await supabase
+  countByStatus: async (
+    companyId: string,
+    status: string,
+    branchId?: string | null
+  ): Promise<number> => {
+    let query = supabase
       .from('debt_message_log')
-      .select('id', { count: 'exact', head: true })
+      .select(branchId ? 'id, parties!inner(branch_id)' : 'id', { count: 'exact', head: true })
       .eq('company_id', companyId)
       .eq('status', status);
+    if (branchId) query = query.eq('parties.branch_id', branchId);
+    const { count, error } = await query;
     if (error) throw error;
     return count ?? 0;
   },
@@ -539,14 +548,25 @@ export const debtMessageApi = {
 
   /** خريطة إسناد المحصلين للعملاء (partyId -> collectorId & collectorName). */
   getCollectorAssignments: async (
-    companyId: string
+    companyId: string,
+    branchId?: string | null
   ): Promise<Record<string, { collectorId: string; collectorName: string }>> => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('debt_collector_assignments')
-        .select('party_id, collector_id, profiles:collector_id(full_name)')
+        .select(
+          branchId
+            ? 'party_id, collector_id, profiles:collector_id(full_name), parties!inner(branch_id)'
+            : 'party_id, collector_id, profiles:collector_id(full_name)'
+        )
         .eq('company_id', companyId)
         .eq('is_active', true);
+
+      if (branchId) {
+        query = query.eq('parties.branch_id', branchId);
+      }
+
+      const { data, error } = await query;
 
       if (error || !data) return {};
 
@@ -696,13 +716,18 @@ export const debtMessageApi = {
   // ── Opening balances (legacy debts) ──
   getOpeningBalances: async (
     companyId: string,
-    partyId?: string
+    partyId?: string,
+    branchId?: string | null
   ): Promise<PartyOpeningBalance[]> => {
-    let query = supabase.from('party_opening_balances').select('*').eq('company_id', companyId);
+    let query = supabase
+      .from('party_opening_balances')
+      .select(branchId ? '*, parties!inner(branch_id)' : '*')
+      .eq('company_id', companyId);
     if (partyId) query = query.eq('party_id', partyId);
+    if (branchId) query = query.eq('parties.branch_id', branchId);
     const { data, error } = await query.order('entry_date', { ascending: false });
     if (error) throw error;
-    return data;
+    return data as unknown as PartyOpeningBalance[];
   },
 
   upsertOpeningBalance: async (

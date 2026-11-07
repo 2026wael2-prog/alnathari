@@ -20,23 +20,31 @@ export const transferService = {
   },
 
   /**
-   * Get all transfers for a company
+   * Get all transfers for a company (optionally scoped to a specific branch's warehouses)
    */
-  getTransfers: async (companyId: string) => {
+  getTransfers: async (companyId: string, branchId?: string | null) => {
     const { data, error } = await supabase
       .from('stock_transfers')
       .select(
         `
                 *,
-                from_warehouse:warehouses!fk_stock_transfers_company_from_wh(name_ar),
-                to_warehouse:warehouses!fk_stock_transfers_company_to_wh(name_ar),
+                from_warehouse:warehouses!fk_stock_transfers_company_from_wh(name_ar, branch_id),
+                to_warehouse:warehouses!fk_stock_transfers_company_to_wh(name_ar, branch_id),
                 items:stock_transfer_items!fk_sti_company_transfer(*, product:products!fk_sti_company_product(name_ar, sku))
             `
       )
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    const rows = data || [];
+    if (branchId) {
+      return rows.filter(row => {
+        const fromBranch = (row.from_warehouse as { branch_id?: string | null } | null)?.branch_id;
+        const toBranch = (row.to_warehouse as { branch_id?: string | null } | null)?.branch_id;
+        return fromBranch === branchId || toBranch === branchId;
+      });
+    }
+    return rows;
   },
 };
 

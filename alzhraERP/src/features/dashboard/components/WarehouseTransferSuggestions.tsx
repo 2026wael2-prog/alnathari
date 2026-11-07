@@ -29,11 +29,11 @@ type FilterTab = 'all' | 'critical' | 'my_branch';
 
 const WarehouseTransferSuggestions: React.FC<Props> = ({ className }) => {
   const { data: products } = useStockedProducts();
-  const { data: warehousesRaw } = useWarehouses();
+  const { data: warehousesRaw } = useWarehouses(null);
   const { data: branches = [] } = useBranches();
   const { branchId: activeBranchId, branchName: activeBranchName } = useBranchFilter();
 
-  const warehouses = useMemo(() => (warehousesRaw || []) as Warehouse[], [warehousesRaw]);
+  const warehouses = useMemo(() => (warehousesRaw ?? []) as Warehouse[], [warehousesRaw]);
   const [activeModalSuggestion, setActiveModalSuggestion] = useState<TransferSuggestion | null>(
     null
   );
@@ -44,7 +44,7 @@ const WarehouseTransferSuggestions: React.FC<Props> = ({ className }) => {
   // Compute suggestions via the rebalancing engine
   const { suggestions: allSuggestions, summary } = useMemo(() => {
     return computeTransferSuggestions({
-      products: products || [],
+      products: products ?? [],
       warehouses,
       branches: branches,
       activeBranchId,
@@ -59,7 +59,7 @@ const WarehouseTransferSuggestions: React.FC<Props> = ({ className }) => {
       .filter(s => {
         if (filterTab === 'critical') return s.priority === 'critical';
         if (filterTab === 'my_branch') {
-          if (!activeBranchId) return true;
+          if (activeBranchId === null || activeBranchId === '') return true;
           return s.toBranch.id === activeBranchId || s.fromBranch.id === activeBranchId;
         }
         return true;
@@ -69,15 +69,15 @@ const WarehouseTransferSuggestions: React.FC<Props> = ({ className }) => {
         const term = searchTerm.toLowerCase();
         return (
           s.product.name_ar.toLowerCase().includes(term) ||
-          (s.product.part_number && s.product.part_number.toLowerCase().includes(term)) ||
-          (s.product.brand && s.product.brand.toLowerCase().includes(term)) ||
+          Boolean(s.product.part_number?.toLowerCase().includes(term)) ||
+          Boolean(s.product.brand?.toLowerCase().includes(term)) ||
           s.fromBranch.name.toLowerCase().includes(term) ||
           s.toBranch.name.toLowerCase().includes(term)
         );
       });
   }, [allSuggestions, dismissedIds, filterTab, activeBranchId, searchTerm]);
 
-  const handleDismiss = (id: string, e: React.MouseEvent) => {
+  const handleDismiss = (id: string, e: React.MouseEvent): void => {
     e.stopPropagation();
     setDismissedIds(prev => new Set(prev).add(id));
   };

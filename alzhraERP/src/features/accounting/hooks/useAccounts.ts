@@ -5,15 +5,17 @@ import type { AccountFormData } from '../types/index';
 import { useFeedbackStore } from '../../feedback/store';
 import { useNetworkStatus } from '../../../lib/hooks/useNetworkStatus';
 import { syncStore } from '../../../core/lib/sync-store';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 
 export const useAccounts = () => {
   const { user } = useAuthStore();
+  const { branchId } = useBranchFilter();
 
   return useQuery({
-    queryKey: ['accounts', user?.company_id],
+    queryKey: ['accounts', user?.company_id, branchId],
     queryFn: () =>
       user?.company_id
-        ? accountingService.getAccounts(user.company_id, { includeBalances: true })
+        ? accountingService.getAccounts(user.company_id, { includeBalances: true, branchId })
         : Promise.resolve([]),
     enabled: !!user?.company_id,
   });

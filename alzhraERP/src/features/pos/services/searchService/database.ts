@@ -11,7 +11,8 @@ import type { BarcodeSearchRow, POSSearchFilters, POSSearchResult } from './type
 interface SearchStockRow {
   quantity: number | string;
   warehouse_id: string;
-  warehouses?: { name_ar?: string } | null;
+  branch_id?: string | null;
+  warehouses?: { name_ar?: string; branch_id?: string | null } | null;
 }
 
 /** Row shape returned by the `search_inventory_paginated` RPC. */
@@ -92,7 +93,8 @@ export async function searchDatabase(
   companyId: string,
   query: string,
   filters?: POSSearchFilters,
-  limit = 20
+  limit = 20,
+  branchId?: string | null
 ): Promise<POSSearchResult[]> {
   try {
     // Use the paginated search RPC for server-side normalized search
@@ -103,11 +105,12 @@ export async function searchDatabase(
       p_offset: 0,
       p_sort_key: 'updated_at',
       p_sort_dir: 'desc',
+      ...(branchId ? { p_branch_id: branchId } : {}),
     });
 
     if (error) {
       logger.warn('database', 'POS Search RPC error, falling back to ILIKE:', error.message);
-      return searchDatabaseFallback(companyId, query, filters, limit);
+      return searchDatabaseFallback(companyId, query, filters, limit, branchId);
     }
 
     // Optimize: Skip fetching sales counts on every keystroke to resolve search slowness.
@@ -116,7 +119,13 @@ export async function searchDatabase(
 
     const results = ((data || []) as unknown as RpcSearchRow[]).map(row => {
       const stockList = Array.isArray(row.stock) ? row.stock : [];
-      const totalStock = stockList.reduce(
+      const scopedStock = branchId
+        ? stockList.filter(s => {
+            const bId = s.branch_id ?? s.warehouses?.branch_id;
+            return !bId || bId === branchId;
+          })
+        : stockList;
+      const totalStock = scopedStock.reduce(
         (sum: number, s: SearchStockRow) => sum + (Number(s.quantity) || 0),
         0
       );
@@ -167,7 +176,7 @@ export async function searchDatabase(
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     logger.warn('database', 'POS Search failed, using fallback:', errMsg);
-    return searchDatabaseFallback(companyId, query, filters, limit);
+    return searchDatabaseFallback(companyId, query, filters, limit, branchId);
   }
 }
 
@@ -178,7 +187,8 @@ export async function searchDatabaseFallback(
   companyId: string,
   query: string,
   _filters?: POSSearchFilters,
-  limit = 20
+  limit = 20,
+  branchId?: string | null
 ): Promise<POSSearchResult[]> {
   const { data, error } = await supabase
     .from('products')
@@ -187,7 +197,7 @@ export async function searchDatabaseFallback(
             id, name_ar, sku, part_number, brand, size, sale_price,
             purchase_price, unit, image_url, alternative_numbers, barcode,
             category_id, product_categories!inner(name),
-            product_stock(quantity, warehouse_id, warehouses(name_ar))
+            product_stock(quantity, warehouse_id, warehouses(name_ar, branch_id))
         `
     )
     .eq('company_id', companyId)
@@ -214,7 +224,10 @@ export async function searchDatabaseFallback(
 
   return ((data || []) as unknown as FallbackSearchRow[]).map(row => {
     const stockList = Array.isArray(row.product_stock) ? row.product_stock : [];
-    const totalStock = stockList.reduce(
+    const scopedStock = branchId
+      ? stockList.filter(s => !s.warehouses?.branch_id || s.warehouses.branch_id === branchId)
+      : stockList;
+    const totalStock = scopedStock.reduce(
       (sum: number, s: SearchStockRow) => sum + (Number(s.quantity) || 0),
       0
     );
@@ -259,7 +272,8 @@ export async function searchDatabaseFallback(
  */
 export async function searchByBarcode(
   companyId: string,
-  barcode: string
+  barcode: string,
+  branchId?: string | null
 ): Promise<POSSearchResult | null> {
   const { data, error } = await supabase
     .from('products')
@@ -267,7 +281,7 @@ export async function searchByBarcode(
       `
             id, name_ar, sku, part_number, brand, size, sale_price,
             purchase_price, unit, image_url, alternative_numbers, barcode,
-            product_stock(quantity, warehouse_id, warehouses(name_ar))
+            product_stock(quantity, warehouse_id, warehouses(name_ar, branch_id))
         `
     )
     .eq('company_id', companyId)
@@ -282,7 +296,12 @@ export async function searchByBarcode(
 
   const row = data as unknown as BarcodeSearchRow;
   const stockList = Array.isArray(row.product_stock) ? row.product_stock : [];
-  const totalStock = stockList.reduce((sum: number, s) => sum + (Number(s.quantity) || 0), 0);
+  const scopedStock = branchId
+    ? stockList.filter(
+        (s: SearchStockRow) => !s.warehouses?.branch_id || s.warehouses.branch_id === branchId
+      )
+    : stockList;
+  const totalStock = scopedStock.reduce((sum: number, s) => sum + (Number(s.quantity) || 0), 0);
 
   return {
     id: row.id,

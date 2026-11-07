@@ -6,6 +6,7 @@ import { toBaseCurrency, formatLocalDate } from '../../../core/utils';
 import { bucketForDays as bucketForOverdueDays } from '../../debts/lib/aging';
 import { daysDiffLocal } from '../../../core/utils/dateBucket';
 import { type AgingPartyRow, type DebtAgingData, AGING_LABELS } from '../types/debtAging';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 
 /**
  * Hook لحساب أعمار الديون بناءً على تاريخ الاستحقاق المحلي (لا انزياح UTC)
@@ -13,13 +14,17 @@ import { type AgingPartyRow, type DebtAgingData, AGING_LABELS } from '../types/d
  */
 export const useDebtAging = () => {
   const { user } = useAuthStore();
+  const { branchId } = useBranchFilter();
   return useQuery<DebtAgingData | null>({
-    queryKey: ['debt_aging', user?.company_id],
+    queryKey: ['debt_aging', user?.company_id, branchId],
     queryFn: async () => {
       if (!user?.company_id) return null;
 
       // Get unpaid/partial invoices with party info
-      const { data: invoices, error } = await reportsApi.getDebtAgingInvoices(user.company_id);
+      const { data: invoices, error } = await reportsApi.getDebtAgingInvoices(
+        user.company_id,
+        branchId
+      );
 
       if (error !== null) throw new Error(error.message);
 

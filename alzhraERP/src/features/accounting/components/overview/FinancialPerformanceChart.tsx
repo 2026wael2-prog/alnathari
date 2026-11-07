@@ -108,7 +108,7 @@ const FinancialPerformanceChart: React.FC = () => {
               dy={10}
             />
             <YAxis
-              tick={{ fontSize: 9, fill: '#94a3b8' }}
+              tick={{ fontSize: 10, fill: '#94a3b8' }}
               axisLine={false}
               tickLine={false}
               width={40}

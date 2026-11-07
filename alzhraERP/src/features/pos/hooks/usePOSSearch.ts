@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../auth/store';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 import {
   posSearchService,
   type POSSearchResult,
@@ -45,6 +46,7 @@ export function usePOSSearch(options: UsePOSSearchOptions = {}) {
   } = options;
 
   const { user } = useAuthStore();
+  const { branchId } = useBranchFilter();
   const companyId = user?.company_id || '';
 
   // ── State ──────────────────────────────────────────────────────
@@ -87,8 +89,8 @@ export function usePOSSearch(options: UsePOSSearchOptions = {}) {
 
   // ── Search Query ───────────────────────────────────────────────
   const searchQuery = useQuery({
-    queryKey: ['pos_search', companyId, debouncedQuery, filters, limit],
-    queryFn: () => posSearchService.search(companyId, debouncedQuery, filters, limit),
+    queryKey: ['pos_search', companyId, branchId, debouncedQuery, filters, limit],
+    queryFn: () => posSearchService.search(companyId, debouncedQuery, filters, limit, branchId),
     enabled: !!companyId && debouncedQuery.length >= minChars,
     staleTime: 15_000, // 15 seconds stale time
     gcTime: 60_000, // 1 minute garbage collection
@@ -97,8 +99,8 @@ export function usePOSSearch(options: UsePOSSearchOptions = {}) {
 
   // Empty query search - popular products
   const popularQuery = useQuery({
-    queryKey: ['pos_popular', companyId, limit],
-    queryFn: () => posSearchService.getPopularProducts(companyId, limit),
+    queryKey: ['pos_popular', companyId, branchId, limit],
+    queryFn: () => posSearchService.getPopularProducts(companyId, limit, branchId),
     enabled: !!companyId && query.length < minChars,
     staleTime: 60_000,
     gcTime: 120_000,

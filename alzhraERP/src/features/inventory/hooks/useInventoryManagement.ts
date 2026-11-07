@@ -22,6 +22,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryService } from '../service';
 import { useAuthStore } from '../../auth/store';
 import { useFeedbackStore } from '../../feedback/store';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 
 export const useInventoryCategories = () => {
   const { user } = useAuthStore();
@@ -69,11 +70,12 @@ export const useInventoryCategoryMutations = () => {
 // Transfers
 export const useTransfers = () => {
   const { user } = useAuthStore();
+  const { branchId } = useBranchFilter();
   return useQuery({
-    queryKey: ['transfers', user?.company_id],
+    queryKey: ['transfers', user?.company_id, branchId],
     queryFn: () =>
       user?.company_id
-        ? inventoryService.getTransfers(user.company_id)
+        ? inventoryService.getTransfers(user.company_id, branchId)
         : Promise.resolve<Awaited<ReturnType<typeof inventoryService.getTransfers>>>([]),
     enabled: !!user?.company_id,
   });

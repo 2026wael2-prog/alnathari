@@ -163,6 +163,8 @@ export interface ProductFormData {
   category?: string | undefined;
   is_core?: boolean | undefined;
   uoms?: ProductUOM[] | undefined;
+  warehouse_id?: string | null | undefined;
+  branch_id?: string | null | undefined;
 }
 
 export interface ProductFilters {

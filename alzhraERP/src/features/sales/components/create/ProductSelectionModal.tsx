@@ -9,7 +9,7 @@ import { useProductSelectionTable } from '../../hooks/useProductSelectionTable';
 import ProductDetailModal from '../../../inventory/components/ProductDetailModal';
 import AddProductModal from '../../../inventory/components/AddProductModal';
 import { productService } from '../../../inventory/service';
-import { useBranchFilterStore } from '../../../branches/store';
+import { useBranchFilter } from '../../../branches/hooks/useBranchFilter';
 import { useBranches } from '../../../settings/hooks';
 import { useAuthStore } from '../../../auth/store';
 import { logger } from '../../../../core/utils/logger';
@@ -47,7 +47,7 @@ const ProductSelectionModal: React.FC<Props> = ({
 
   const { user } = useAuthStore();
   const isManager = user?.role === 'owner' || user?.role === 'admin';
-  const { activeBranchId } = useBranchFilterStore();
+  const { branchId: activeBranchId } = useBranchFilter();
   const { data: branches } = useBranches();
   const activeBranches = Array.isArray(branches) ? branches.filter(b => b.status === 'active') : [];
 
@@ -87,7 +87,7 @@ const ProductSelectionModal: React.FC<Props> = ({
       const created = await saveProduct({ data });
       setShowAddProduct(false);
 
-      const mapped = productService.mapRawProducts([created])[0];
+      const mapped = productService.mapRawProducts([created], undefined, effectiveBranchId)[0];
       if (mapped) {
         onSelect(mapped);
         onClose();

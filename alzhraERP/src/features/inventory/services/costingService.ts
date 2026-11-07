@@ -14,7 +14,8 @@ export const costingService = {
   ): number => {
     if (newQty <= 0) return currentAvgCost; // No change on negative/zero qty (returns/adjustments out)
 
-    const stock = new Decimal(currentStock);
+    // Clamp negative stock to 0 so negative inventory never distorts WAC
+    const stock = new Decimal(Math.max(0, currentStock));
     const cost = new Decimal(currentAvgCost);
     const qty = new Decimal(newQty);
     const price = new Decimal(newUnitPrice);
@@ -34,7 +35,9 @@ export const costingService = {
    */
   getInventoryAssetValue: (products: Product[]): number => {
     return products.reduce(
-      (acc, p) => acc + new Decimal(p.stock_quantity || 0).times(p.cost_price || 0).toNumber(),
+      (acc, p) =>
+        acc +
+        new Decimal(Math.max(0, p.stock_quantity || 0)).times(p.cost_price || 0).toNumber(),
       0
     );
   },

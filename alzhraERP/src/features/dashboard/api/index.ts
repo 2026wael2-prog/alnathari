@@ -366,6 +366,7 @@ export const dashboardApi = {
             p_company_id: companyId,
             p_days: 30,
             p_limit: 20,
+            ...(branchParam !== undefined ? { p_branch_id: branchParam } : {}),
           },
           activeSignal
         ),

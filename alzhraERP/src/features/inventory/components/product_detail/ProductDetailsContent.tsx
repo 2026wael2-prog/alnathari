@@ -29,6 +29,8 @@ import { useProductDetails } from '../../hooks/useProductDetails';
 import { useAIPartLookup } from '../../hooks/useAIPartLookup';
 import { useProductMutations } from '../../hooks/useProducts';
 import { useBranches } from '../../../settings/hooks';
+import { useBranchFilter } from '../../../branches/hooks/useBranchFilter';
+import StockTransferRequestModal from '../StockTransferRequestModal';
 
 interface Props {
   product: Product;
@@ -44,12 +46,15 @@ interface BranchData {
 
 interface WarehouseRef {
   id: string;
-  name: string;
+  name?: string;
+  name_ar?: string;
 }
 
 interface WarehouseDist {
   warehouse_id?: string;
   warehouse_name?: string;
+  branch_id?: string;
+  branch_name?: string;
   quantity?: number;
   location?: string | null;
 }
@@ -57,6 +62,12 @@ interface WarehouseDist {
 const ProductDetailsContent: React.FC<Props> = ({ product }) => {
   const { stats, margin, supplierName, selling } = useProductDetails(product);
   const { saveProduct } = useProductMutations();
+  const { branchId: activeBranchId } = useBranchFilter();
+  const [transferModalTarget, setTransferModalTarget] = useState<{
+    sourceBranchId: string;
+    sourceBranchName: string;
+    availableQty: number;
+  } | null>(null);
   const [currentAlternatives, setCurrentAlternatives] = useState<string | null>(
     product.alternative_numbers ?? null
   );
@@ -95,9 +106,10 @@ const ProductDetailsContent: React.FC<Props> = ({ product }) => {
       name: branch.name,
       warehouses: whDistribution
         .filter((wh: WarehouseDist) => {
+          if (wh.branch_id && wh.branch_id === branch.id) return true;
           const branchWarehouses = Array.isArray(branch.warehouses) ? branch.warehouses : [];
           return (
-            wh.warehouse_id &&
+            Boolean(wh.warehouse_id) &&
             branchWarehouses.some((bw: WarehouseRef) => bw.id === wh.warehouse_id)
           );
         })
@@ -105,7 +117,7 @@ const ProductDetailsContent: React.FC<Props> = ({ product }) => {
           id: wh.warehouse_id,
           name: wh.warehouse_name,
           quantity: wh.quantity,
-          location: wh.location || null,
+          location: wh.location ?? null,
         })),
     }));
   }, [branches, product.warehouse_distribution]);
@@ -115,11 +127,11 @@ const ProductDetailsContent: React.FC<Props> = ({ product }) => {
     label: string;
     icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
   }> = [
-    { id: 'overview', label: 'نظرة عامة', icon: Info },
-    { id: 'inventory', label: 'المخزون', icon: Box },
-    { id: 'relations', label: 'الارتباطات', icon: Link2 },
-    { id: 'history', label: 'السجل', icon: FileClock },
-  ];
+      { id: 'overview', label: 'نظرة عامة', icon: Info },
+      { id: 'inventory', label: 'المخزون', icon: Box },
+      { id: 'relations', label: 'الارتباطات', icon: Link2 },
+      { id: 'history', label: 'السجل', icon: FileClock },
+    ];
 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-slate-950">
@@ -235,11 +247,11 @@ const ProductDetailsContent: React.FC<Props> = ({ product }) => {
                   {/* Details Grid */}
                   <div className="grid grid-cols-1 divide-x divide-x-reverse divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950 md:grid-cols-2 lg:grid-cols-3">
                     {[
-                      { label: 'الشركة الصانعة', value: product.brand || '—' },
+                      { label: 'الشركة الصانعة', value: product.brand ?? '—' },
                       { label: 'المورد الأساسي', value: supplierName },
-                      { label: 'تصنيف الصنف', value: product.category || 'عام' },
-                      { label: 'المقاس الحالي', value: product.size || '—' },
-                      { label: 'موقع التخزين', value: product.location || '—' },
+                      { label: 'تصنيف الصنف', value: product.category ?? 'عام' },
+                      { label: 'المقاس الحالي', value: product.size ?? '—' },
+                      { label: 'موقع التخزين', value: product.location ?? '—' },
                       {
                         label: 'حالة المخزون',
                         value:
@@ -278,9 +290,9 @@ const ProductDetailsContent: React.FC<Props> = ({ product }) => {
                   <div className="grid grid-cols-1 gap-3 border-t border-slate-200 bg-slate-50/20 p-3 dark:border-slate-800 dark:bg-slate-900/20 md:grid-cols-2">
                     <ProductAnalyticsChart
                       data={{
-                        totalSales: Number(stats.total_sales) || 0,
-                        totalPurchases: Number(stats.total_purchases) || 0,
-                        profit: Number(stats.profit) || 0,
+                        totalSales: stats.total_sales || 0,
+                        totalPurchases: stats.total_purchases || 0,
+                        profit: stats.profit || 0,
                         margin: margin,
                       }}
                     />
@@ -300,12 +312,28 @@ const ProductDetailsContent: React.FC<Props> = ({ product }) => {
                 </div>
                 <BranchStockBreakdown
                   warehouseDistribution={
-                    (product.warehouse_distribution || []) as unknown as warehouseStock[]
+                    (product.warehouse_distribution ?? []) as unknown as warehouseStock[]
                   }
                   branches={branchStockData as unknown as BranchInfo[]}
                   totalStock={product.stock_quantity}
                   minStockLevel={product.min_stock_level}
+                  currentBranchId={activeBranchId ?? branches[0]?.id ?? null}
+                  onRequestTransfer={(sourceBranchId, sourceBranchName, availableQty) => {
+                    setTransferModalTarget({ sourceBranchId, sourceBranchName, availableQty });
+                  }}
                 />
+                {transferModalTarget && (
+                  <StockTransferRequestModal
+                    product={product}
+                    sourceBranchId={transferModalTarget.sourceBranchId}
+                    sourceBranchName={transferModalTarget.sourceBranchName}
+                    requesterBranchId={activeBranchId ?? branches[0]?.id ?? ''}
+                    availableQty={transferModalTarget.availableQty}
+                    onClose={() => {
+                      setTransferModalTarget(null);
+                    }}
+                  />
+                )}
               </div>
             )}
 

@@ -34,11 +34,12 @@ export const posSearchService = {
     companyId: string,
     query: string,
     filters?: POSSearchFilters,
-    limit = 20
+    limit = 20,
+    branchId?: string | null
   ): Promise<POSSearchResponse> {
     try {
       const startTime = now();
-      const cacheKey = `${companyId}:${query}:${JSON.stringify(filters)}:${limit}`;
+      const cacheKey = `${companyId}:${branchId ?? 'all'}:${query}:${JSON.stringify(filters)}:${limit}`;
 
       // Cache hit
       const cached = getCachedSearch(cacheKey);
@@ -50,7 +51,7 @@ export const posSearchService = {
 
       // If empty query, return popular products
       if (!normalizedQuery) {
-        const popular = await getPopularProducts(companyId, limit);
+        const popular = await getPopularProducts(companyId, limit, branchId);
         const response: POSSearchResponse = {
           results: popular,
           total: popular.length,
@@ -63,8 +64,8 @@ export const posSearchService = {
 
       // Parallel: DB search + popular products + sales history
       const [dbResults, popularProducts, salesHistory] = await Promise.all([
-        searchDatabase(companyId, normalizedQuery, filters, limit),
-        getPopularProducts(companyId, 5),
+        searchDatabase(companyId, normalizedQuery, filters, limit, branchId),
+        getPopularProducts(companyId, 5, branchId),
         getRecentSales(companyId, normalizedQuery, 5),
       ]);
 

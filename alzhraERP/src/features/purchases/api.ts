@@ -66,16 +66,29 @@ const warehousePayload = (
 ): Pick<PurchaseItemPayload, 'warehouse_id'> =>
   hasText(warehouseId) ? { warehouse_id: warehouseId } : {};
 
-const itemPayload = (item: PurchaseItem): PurchaseItemPayload => {
+const itemPayload = (
+  item: PurchaseItem & {
+    product_id?: string;
+    cost_price?: number;
+    unit_price?: number;
+    unit_cost?: number;
+    warehouse_id?: string | null;
+  }
+): PurchaseItemPayload => {
   const discount = item.discount ?? 0;
+  const productId = item.productId || item.product_id || '';
+  const unitCost =
+    item.costPrice ?? item.unit_cost ?? item.cost_price ?? item.unit_price ?? 0;
+  const quantity = item.quantity ?? 0;
+  const warehouseId = item.warehouseId || item.warehouse_id;
   return {
-    product_id: item.productId,
-    quantity: item.quantity,
-    unit_cost: item.costPrice,
+    product_id: productId,
+    quantity,
+    unit_cost: unitCost,
     discount,
     discount_amount: discount,
-    line_total: Math.max(0, item.quantity * item.costPrice - discount),
-    ...warehousePayload(item.warehouseId),
+    line_total: Math.max(0, quantity * unitCost - discount),
+    ...warehousePayload(warehouseId),
   };
 };
 
@@ -161,11 +174,11 @@ export const purchasesApi = {
       offset?: number | undefined;
     }
   ): Promise<SearchInvoiceResultRow[]> => {
-    if (!companyId) return [];
+    if (companyId === '') return [];
     const { data, error } = await supabase.rpc('search_invoices_advanced', {
       p_company_id: companyId,
       p_type: params.type ?? 'purchase',
-      ...optArg('p_query', params.query?.trim() || null),
+      ...optArg('p_query', params.query?.trim() !== '' ? params.query?.trim() : null),
       ...optArg('p_date_from', params.dateFrom),
       ...optArg('p_date_to', params.dateTo),
       ...optArg('p_status', params.status),
@@ -240,7 +253,10 @@ export const purchasesApi = {
       : null;
 
     if (treasuryAccountId === null) {
-      const { data: cashboxes, error: cashboxError } = await treasuryApi.getCashboxes(companyId);
+      const { data: cashboxes, error: cashboxError } = await treasuryApi.getCashboxes(
+        companyId,
+        paymentData.branchId
+      );
       if (cashboxError !== null) throw asError(parseError(cashboxError));
       const linkedAccountId = (cashboxes ?? [])
         .map(cb => cb.account_id)
@@ -266,6 +282,7 @@ export const purchasesApi = {
       p_currency_code: paymentData.currencyCode ?? 'SAR',
       p_exchange_rate: paymentData.exchangeRate ?? 1,
       p_foreign_amount: paymentData.foreignAmount ?? paymentData.amount,
+      ...(hasText(paymentData.branchId) ? { p_branch_id: paymentData.branchId } : {}),
     });
     // [FIX] سابقاً كان خطأ الـ RPC يعود كقيمة بدون رمي → نجاح وهمي في الواجهة
     if (error !== null) throw asError(parseError(error));
@@ -281,7 +298,7 @@ export const purchasesApi = {
       .from('invoices')
       .select(
         `
-      id, invoice_number, issue_date, total_amount, status, type, payment_method,
+      id, invoice_number, issue_date, total_amount, status, type, payment_method, warehouse_id,
       currency_code, exchange_rate, party:party_id(id, name),
       invoice_items(id, product_id, description, quantity, unit_price, total, cost_price, product:products!fk_invoice_items_company_product(id, name_ar, sku, part_number, brand))
     `

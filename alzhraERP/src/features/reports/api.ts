@@ -82,11 +82,11 @@ export const reportsApi = {
 
     if (!accounts) return { data: null, error: { message: 'Failed to fetch accounts' } };
 
-    const balanceMap = new Map((balances || []).map(b => [b.account_id, Number(b.balance)]));
+    const balanceMap = new Map((balances ?? []).map(b => [b.account_id, Number(b.balance)]));
 
     const merged = accounts.map(a => ({
       ...a,
-      balance: balanceMap.get(a.id) || 0,
+      balance: (balanceMap.get(a.id) ?? 0) !== 0 ? (balanceMap.get(a.id) ?? 0) : 0,
     }));
 
     return {
@@ -96,11 +96,17 @@ export const reportsApi = {
   },
 
   // استخدام دالة SQL المحسنة لجلب ميزان المراجعة
-  getTrialBalanceRPC: async (companyId: string, fromDate: string, toDate: string) => {
+  getTrialBalanceRPC: async (
+    companyId: string,
+    fromDate: string,
+    toDate: string,
+    branchId?: string | null
+  ) => {
     return await supabase.rpc('report_trial_balance', {
       p_company_id: companyId,
       p_from: fromDate,
       p_to: toDate,
+      ...(branchId ? { p_branch_id: branchId } : {}),
     });
   },
 
@@ -172,11 +178,11 @@ export const reportsApi = {
 
     if (!parties) return { data: null, error: { message: 'Failed to fetch parties' } };
 
-    const balanceMap = new Map((balances || []).map(b => [b.party_id, Number(b.balance)]));
+    const balanceMap = new Map((balances ?? []).map(b => [b.party_id, Number(b.balance)]));
 
     const merged = parties.map(p => ({
       ...p,
-      balance: balanceMap.get(p.id) || 0,
+      balance: balanceMap.get(p.id) ?? 0,
     }));
 
     return { data: merged as PartyWithBalance[], error: null };
@@ -193,10 +199,10 @@ export const reportsApi = {
     };
   },
 
-  getDebtAgingInvoices: async (companyId: string) => {
+  getDebtAgingInvoices: async (companyId: string, branchId?: string | null) => {
     // [CROSS-BRANCH FIX] Exclude internal cross-branch invoices (suffixed -INT)
     // They are cost-price transfers, not real customer debts.
-    return (await supabase
+    let query = supabase
       .from('invoices')
       .select(
         'id, invoice_number, issue_date, due_date, total_amount, paid_amount, status, type, party_id, parties(name, type), currency_code, exchange_rate'
@@ -205,8 +211,13 @@ export const reportsApi = {
       .eq('type', 'sale')
       .is('deleted_at', null)
       .not('invoice_number', 'ilike', '%-INT')
-      .in('status', ['posted', 'confirmed', 'partially_paid'])
-      .order('due_date', { ascending: true })) as unknown as {
+      .in('status', ['posted', 'confirmed', 'partially_paid']);
+
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+
+    return (await query.order('due_date', { ascending: true })) as unknown as {
       data: Array<{
         id: string;
         invoice_number: string | null;
@@ -225,10 +236,14 @@ export const reportsApi = {
     };
   },
 
-  getDailySalesInvoices: async (companyId: string, fromDateISO: string) => {
+  getDailySalesInvoices: async (
+    companyId: string,
+    fromDateISO: string,
+    branchId?: string | null
+  ) => {
     // [CROSS-BRANCH FIX] Exclude internal cross-branch invoices (suffixed -INT)
     // from daily sales totals to prevent double-counting revenue.
-    return (await supabase
+    let query = supabase
       .from('invoices')
       .select(
         'id, invoice_number, issue_date, total_amount, status, type, party_id, parties(name), exchange_rate, currency_code'
@@ -238,8 +253,13 @@ export const reportsApi = {
       .neq('status', 'void')
       .is('deleted_at', null)
       .not('invoice_number', 'ilike', '%-INT')
-      .gte('issue_date', fromDateISO)
-      .order('issue_date', { ascending: false })) as unknown as {
+      .gte('issue_date', fromDateISO);
+
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+
+    return (await query.order('issue_date', { ascending: false })) as unknown as {
       data: Array<{
         id: string;
         invoice_number: string | null;
@@ -256,14 +276,18 @@ export const reportsApi = {
     };
   },
 
-  getOperationalExpensesLines: async (companyId: string, fromDateISO: string) => {
-    return await supabase
+  getOperationalExpensesLines: async (
+    companyId: string,
+    fromDateISO: string,
+    branchId?: string | null
+  ) => {
+    let query = supabase
       .from('journal_entry_lines')
       .select(
         `
-          id, debit_amount, credit_amount, description,
+          id, debit_amount, credit_amount, description, branch_id,
           account:accounts!inner(id, code, name_ar, type),
-          journal:journal_entries!inner(id, entry_date, status, company_id)
+          journal:journal_entries!inner(id, entry_date, status, company_id, branch_id)
         `
       )
       .eq('journal.company_id', companyId)
@@ -274,5 +298,11 @@ export const reportsApi = {
       .neq('account.code', '5100')
       .not('account.code', 'like', '51%')
       .gte('journal.entry_date', fromDateISO);
+
+    if (branchId) {
+      query = query.eq('journal.branch_id', branchId);
+    }
+
+    return await query;
   },
 };

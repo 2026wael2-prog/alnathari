@@ -14,12 +14,52 @@ interface WarehouseStockRow {
 
 export const warehouseService = {
     /**
-     * Get all warehouses for a company
+     * Get all warehouses for a company (optionally scoped to a specific branch)
      */
-    getWarehouses: async (companyId: string) => {
-        const { data, error } = await inventoryApi.getWarehouses(companyId);
+    getWarehouses: async (companyId: string, branchId?: string | null) => {
+        const [{ data, error }, { data: metaRows }] = await Promise.all([
+            inventoryApi.getWarehouses(companyId, branchId),
+            supabase
+                .from('warehouses')
+                .select('id, branch_id, is_primary, branches(id, name)')
+                .eq('company_id', companyId)
+                .is('deleted_at', null),
+        ]);
         if (error) throw error;
-        return data || [];
+
+        const metaMap = new Map<
+            string,
+            {
+                branch_id: string | null;
+                branch_name: string | null;
+                is_primary: boolean;
+            }
+        >();
+
+        for (const row of metaRows || []) {
+            const rawBranch = (row as unknown as { branches?: { name?: string } | Array<{ name?: string }> | null }).branches;
+            const branchObj = Array.isArray(rawBranch) ? (rawBranch[0] ?? null) : (rawBranch ?? null);
+            metaMap.set(row.id, {
+                branch_id: row.branch_id ?? null,
+                branch_name: branchObj?.name ?? null,
+                is_primary: row.is_primary ?? false,
+            });
+        }
+
+        const enriched = (data || []).map((w) => {
+            const meta = metaMap.get(w.id);
+            return {
+                ...w,
+                branch_id: meta?.branch_id ?? null,
+                branch_name: meta?.branch_name ?? null,
+                is_primary: meta?.is_primary ?? false,
+            };
+        });
+
+        if (branchId) {
+            return enriched.filter((w) => w.branch_id === branchId);
+        }
+        return enriched;
     },
 
     /**
@@ -53,7 +93,7 @@ export const warehouseService = {
 
             return {
                 ...product,
-                stock_quantity: Number(typed.quantity) || 0,
+                stock_quantity: typed.quantity || 0,
                 name_ar: product.name_ar || '',
                 sale_price: Number(product.sale_price) || 0,
                 location: compositeLocation

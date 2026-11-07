@@ -50,12 +50,12 @@ export const usePurchases = (options?: UsePurchasesOptions): UseQueryResult<Purc
     options?.paymentMethod
   );
 
-  return useQuery({
+  return useQuery<PurchaseList>({
     queryKey: ['purchases', companyId, branchId, options],
-    queryFn: () => {
-      if (!hasCompany) return Promise.resolve([]);
+    queryFn: async (): Promise<PurchaseList> => {
+      if (!hasCompany) return [];
       if (isSearchMode) {
-        return purchasesService.searchPurchases(companyId, {
+        return (await purchasesService.searchPurchases(companyId, {
           query: options?.searchTerm,
           dateFrom: options?.dateFrom,
           dateTo: options?.dateTo,
@@ -65,7 +65,7 @@ export const usePurchases = (options?: UsePurchasesOptions): UseQueryResult<Purc
           branchId,
           page: options?.page ?? 0,
           limit: options?.limit ?? 500,
-        });
+        })) as unknown as PurchaseList;
       }
       return purchasesService.getPurchases(companyId, branchId, options?.limit ?? 500);
     },
@@ -153,7 +153,11 @@ export const useCreatePurchase = (): UseMutationResult<
         throw new Error('Authentication failed');
 
       // نرسل الفاتورة بحالة 'posted' لتفعيل الـ Trigger المخزني والمحاسبي في SQL
-      return purchasesService.processPurchase({ ...data, branchId }, companyId, userId);
+      return purchasesService.processPurchase(
+        { ...data, branchId: data.branchId || branchId },
+        companyId,
+        userId
+      );
     },
     onSuccess: (): void => {
       showToast(`تم توريد الفاتورة بنجاح وتحديث الأرصدة المخزنية والمالية`, 'success');
@@ -163,7 +167,12 @@ export const useCreatePurchase = (): UseMutationResult<
       if (!isOnline || getErrorMessage(err, '').includes('Failed to fetch')) {
         void syncStore.enqueue({
           mutationKey: ['purchases', 'create'],
-          variables: { ...variables, company_id: user?.company_id, user_id: user?.id },
+          variables: {
+            ...variables,
+            branchId: variables.branchId || branchId,
+            company_id: user?.company_id,
+            user_id: user?.id,
+          },
         });
         showToast(
           'تم حفظ فاتورة المشتريات محلياً (وضع عدم الاتصال). سيتم المزامنة تلقائياً.',
@@ -186,6 +195,7 @@ export const useCreatePayment = (): UseMutationResult<
   const { user } = useAuthStore();
   const { showToast } = useFeedbackStore();
   const { isOnline } = useNetworkStatus();
+  const { branchId } = useBranchFilter();
   return useMutation({
     mutationFn: async (
       data: CreatePaymentDTO
@@ -194,7 +204,11 @@ export const useCreatePayment = (): UseMutationResult<
       const userId = user?.id;
       if (companyId === undefined || companyId === '' || userId === undefined || userId === '')
         throw new Error('Authentication failed');
-      return purchasesApi.createSupplierPayment(data, companyId, userId);
+      return purchasesApi.createSupplierPayment(
+        { ...data, branchId: data.branchId || branchId },
+        companyId,
+        userId
+      );
     },
     onSuccess: (): void => {
       showToast('تم تسجيل سند الصرف بنجاح', 'success');
@@ -204,7 +218,12 @@ export const useCreatePayment = (): UseMutationResult<
       if (!isOnline || getErrorMessage(err, '').includes('Failed to fetch')) {
         void syncStore.enqueue({
           mutationKey: ['purchases', 'payment'],
-          variables: { ...variables, company_id: user?.company_id, user_id: user?.id },
+          variables: {
+            ...variables,
+            branchId: variables.branchId || branchId,
+            company_id: user?.company_id,
+            user_id: user?.id,
+          },
         });
         showToast('تم حفظ السند محلياً (وضع عدم الاتصال). سيتم المزامنة تلقائياً.', 'info');
         return;
@@ -218,11 +237,12 @@ export const useCreatePayment = (): UseMutationResult<
 export const usePurchasesAnalytics = (): UseQueryResult<PurchaseAnalytics | null> => {
   const { user } = useAuthStore();
   const companyId = user?.company_id;
+  const { branchId } = useBranchFilter();
   return useQuery({
-    queryKey: ['purchases_analytics', companyId],
+    queryKey: ['purchases_analytics', companyId, branchId],
     queryFn: (): Promise<PurchaseAnalytics | null> =>
       companyId !== undefined && companyId !== ''
-        ? purchasesService.getAnalytics(companyId)
+        ? purchasesService.getAnalytics(companyId, branchId)
         : Promise.resolve(null),
     enabled: companyId !== undefined && companyId !== '',
   });

@@ -23,6 +23,7 @@ import { useWarehousesWithBranches } from '../../inventory/hooks/useWarehouseSto
 import { createIdempotencyKey } from '../../../core/utils/idempotency';
 import { QuickDrawerExpenseModal } from '../../reconciliation/components/QuickDrawerExpenseModal';
 import { useBranches } from '../../settings/hooks';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 
 const POSPage: React.FC = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -41,10 +42,31 @@ const POSPage: React.FC = () => {
 
   const { warehouses } = useWarehousesWithBranches();
   const { user } = useAuthStore();
+  const { branchId: activeBranchId } = useBranchFilter();
   const { data: branches = [] } = useBranches();
-  const currentBranchId = user?.branch_id;
+  const currentBranchId = activeBranchId ?? user?.branch_id ?? null;
   const currentBranch = branches.find(b => b.id === currentBranchId);
   const isInventoryOnly = (currentBranch as any)?.integration_mode === 'inventory_only';
+
+  const prevBranchIdRef = useRef(currentBranchId);
+  useEffect(() => {
+    if (warehouses.length === 0) return;
+    const branchChanged = prevBranchIdRef.current !== currentBranchId;
+    prevBranchIdRef.current = currentBranchId;
+    const exists = selectedWarehouseId ? warehouses.some(w => w.id === selectedWarehouseId) : false;
+    if (!selectedWarehouseId || !exists || branchChanged) {
+      const target = currentBranchId
+        ? warehouses.find(
+            w => w.branch_id === currentBranchId && (w as { is_primary?: boolean }).is_primary
+          ) ??
+          warehouses.find(w => w.branch_id === currentBranchId) ??
+          warehouses[0]
+        : warehouses.find(w => (w as { is_primary?: boolean }).is_primary) ?? warehouses[0];
+      if (target && target.id !== selectedWarehouseId) {
+        setSelectedWarehouseId(target.id);
+      }
+    }
+  }, [warehouses, currentBranchId, selectedWarehouseId]);
 
   const search = usePOSSearch({
     debounceMs: 200,
@@ -67,7 +89,11 @@ const POSPage: React.FC = () => {
       const { user } = useAuthStore.getState();
       if (!user?.company_id) return;
 
-      const result = await posSearchService.searchByBarcode(user.company_id, code);
+      const result = await posSearchService.searchByBarcode(
+        user.company_id,
+        code,
+        currentBranchId
+      );
       if (result) {
         const product = buildProductFromSearchResult(result, user.company_id);
         addProductToCart(product);
@@ -75,7 +101,7 @@ const POSPage: React.FC = () => {
         search.setQuery(code);
       }
     },
-    [addProductToCart, search]
+    [addProductToCart, search, currentBranchId]
   );
 
   const handleSearchSelect = useCallback(
@@ -121,10 +147,11 @@ const POSPage: React.FC = () => {
   }, [isProcessing, validCartItems.length]);
 
   const selectedWarehouse = warehouses.find(w => w.id === selectedWarehouseId);
-  const isCrossBranch =
+  const isCrossBranch = Boolean(
     selectedWarehouse?.branch_id &&
-    user?.branch_id &&
-    selectedWarehouse.branch_id !== user.branch_id;
+      currentBranchId &&
+      selectedWarehouse.branch_id !== currentBranchId
+  );
 
   const handlePayConfirm = useCallback(
     (result: POSPaymentResult) => {

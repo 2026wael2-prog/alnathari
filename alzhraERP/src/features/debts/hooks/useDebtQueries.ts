@@ -211,13 +211,16 @@ export const useDebtCollectors = (): UseQueryResult<DebtCollector[]> =>
 /** خريطة إسناد المحصلين للعملاء (partyId -> { collectorId, collectorName }). */
 export const useDebtCollectorAssignments = (): UseQueryResult<
   Record<string, { collectorId: string; collectorName: string }>
-> =>
-  useDebtQuery<Record<string, { collectorId: string; collectorName: string }>>({
+> => {
+  const { branchId } = useBranchFilter();
+  return useDebtQuery<Record<string, { collectorId: string; collectorName: string }>>({
     scope: 'collector_assignments',
+    extra: [branchId],
     empty: {},
     staleTime: 60 * 1000,
-    fetcher: companyId => debtMessageApi.getCollectorAssignments(companyId),
+    fetcher: companyId => debtMessageApi.getCollectorAssignments(companyId, branchId),
   });
+};
 
 export const useDebtPromises = (filters?: {
   partyId?: string;
@@ -241,24 +244,29 @@ export const useDebtTemplates = (activeOnly = true): UseQueryResult<DebtMessageT
     fetcher: companyId => debtMessageApi.getTemplates(companyId, activeOnly),
   });
 
-export const useDebtMessageLog = (status?: string): UseQueryResult<DebtMessageLogWithParty[]> =>
-  useDebtQuery<DebtMessageLogWithParty[]>({
+export const useDebtMessageLog = (status?: string): UseQueryResult<DebtMessageLogWithParty[]> => {
+  const { branchId } = useBranchFilter();
+  return useDebtQuery<DebtMessageLogWithParty[]>({
     scope: 'message_log',
-    extra: [status ?? ''],
+    extra: [branchId, status ?? ''],
     empty: [],
-    fetcher: companyId => debtMessageApi.getMessageLog(companyId, status),
+    fetcher: companyId => debtMessageApi.getMessageLog(companyId, status, 200, branchId),
   });
+};
 
 /**
  * عدد الرسائل الفاشلة على مستوى المنشأة (HEAD count) — رقم صادق لا يتأثر
  * بحد 200 صفاً في قائمة الصادر ولا بفلتر الحالة المعروض.
  */
-export const useDebtFailedMessagesCount = (): UseQueryResult<number> =>
-  useDebtQuery<number>({
+export const useDebtFailedMessagesCount = (): UseQueryResult<number> => {
+  const { branchId } = useBranchFilter();
+  return useDebtQuery<number>({
     scope: 'message_log_failed_count',
+    extra: [branchId],
     empty: 0,
-    fetcher: companyId => debtMessageApi.countByStatus(companyId, 'failed'),
+    fetcher: companyId => debtMessageApi.countByStatus(companyId, 'failed', branchId),
   });
+};
 
 export const useDebtPartyOverview = (
   partyId: string | null
@@ -282,13 +290,15 @@ export const useDebtFollowupConfig = (): UseQueryResult<DebtFollowupConfig | nul
     fetcher: companyId => debtApi.getFollowupConfig(companyId),
   });
 
-export const useDebtOpeningBalances = (partyId?: string): UseQueryResult<PartyOpeningBalance[]> =>
-  useDebtQuery<PartyOpeningBalance[]>({
+export const useDebtOpeningBalances = (partyId?: string): UseQueryResult<PartyOpeningBalance[]> => {
+  const { branchId } = useBranchFilter();
+  return useDebtQuery<PartyOpeningBalance[]>({
     scope: 'opening_balances',
-    extra: [partyId ?? ''],
+    extra: [branchId, partyId ?? ''],
     empty: [],
-    fetcher: companyId => debtMessageApi.getOpeningBalances(companyId, partyId),
+    fetcher: companyId => debtMessageApi.getOpeningBalances(companyId, partyId, branchId),
   });
+};
 
 /** Phase 2A: الخط الزمني لآخر أنشطة تحصيل الطرف (يُبطل تلقائياً بعد تسجيل نشاط). */
 export const usePartyTimeline = (partyId: string | null): UseQueryResult<PartyTimelineEntry[]> =>

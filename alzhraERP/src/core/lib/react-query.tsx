@@ -126,14 +126,11 @@ interface ReactQueryProviderProps {
 /**
  * Hook to manage background synchronization of pending mutations
  */
-const useSyncQueue = (queryClient: QueryClient) => {
+const MAX_SYNC_RETRIES = 5;
+
+const useSyncQueue = (queryClient: QueryClient): void => {
   const { isOnline } = useNetworkStatus();
   const isProcessingRef = useRef(false);
-
-  // A permanently-failing mutation (e.g. a product CONFLICT that no retry can
-  // resolve) must not wedge the whole offline queue forever. After this many
-  // failed processing cycles the mutation is dropped with a critical log.
-  const MAX_SYNC_RETRIES = 5;
 
   useEffect(() => {
     if (isOnline) {
@@ -142,49 +139,36 @@ const useSyncQueue = (queryClient: QueryClient) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline]);
 
-  const processQueue = async () => {
+  const processQueue = async (): Promise<void> => {
     if (isProcessingRef.current) return;
-
     const pending = await syncStore.getPending();
     if (pending.length === 0) return;
-
     isProcessingRef.current = true;
-
-    logger.info('SyncModule', `Starting sync for ${pending.length} pending operations...`);
-
+    logger.info('SyncModule', `Starting sync for ${String(pending.length)} pending operations...`);
     try {
       for (const mutation of pending) {
-        // Exhausted retries: drop the mutation with a critical log instead
-        // of blocking every later mutation indefinitely.
         if (mutation.retryCount >= MAX_SYNC_RETRIES) {
           logger.error(
             'SyncModule',
-            `Dropping mutation ${mutation.id} after ${MAX_SYNC_RETRIES} failed attempts`,
+            `Dropping mutation ${mutation.id} after ${String(MAX_SYNC_RETRIES)} failed attempts`,
             { key: mutation.mutationKey }
           );
           await syncStore.dequeue(mutation.id);
           continue;
         }
-
         try {
-          // We use mutationCache directly to avoid creating new observers
           await queryClient
             .getMutationCache()
             .build(queryClient, {
               mutationKey: mutation.mutationKey,
-              mutationFn: async variables => {
-                return processSyncMutation(mutation.mutationKey, variables);
-              },
+              mutationFn: async variables =>
+                processSyncMutation(mutation.mutationKey, variables, mutation.metadata) as unknown,
             })
             .execute(mutation.variables);
-
           await syncStore.dequeue(mutation.id);
         } catch (error) {
           logger.error('SyncModule', `Sync failed for mutation ${mutation.id}`, error);
           await syncStore.incrementRetry(mutation.id);
-          // Continue with the next pending mutation — a single failure
-          // must not wedge the rest of the offline queue. Ordering
-          // dependencies are resolved by retries on later cycles.
         }
       }
     } finally {

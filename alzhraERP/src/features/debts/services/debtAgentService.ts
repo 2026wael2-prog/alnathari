@@ -56,7 +56,7 @@ export const debtAgentService = {
   /**
    * حساب حالة الوكيل والمؤشرات الحية المجمعة
    */
-  getTelemetry: async (companyId: string): Promise<AgentTelemetry> => {
+  getTelemetry: async (companyId: string, branchId?: string | null): Promise<AgentTelemetry> => {
     try {
       const todayDate = formatLocalDate();
       const startOfDay = `${todayDate}T00:00:00.000Z`;
@@ -83,11 +83,11 @@ export const debtAgentService = {
       // 2. حالة بوابة UltraMsg
       const channelConfig = await debtMessageApi.getChannelConfig(companyId);
       let gatewayStatus: 'connected' | 'disconnected' | 'unconfigured' = 'unconfigured';
-      let storePhone = channelConfig.whatsapp_phone || '967771147694';
+      const storePhone = channelConfig.whatsapp_phone || '967771147694';
       let instanceId = 'instance196299';
 
       if (channelConfig.whatsapp_api_url) {
-        const match = channelConfig.whatsapp_api_url.match(/instance\d+/);
+        const match = /instance\d+/.exec(channelConfig.whatsapp_api_url);
         if (match) instanceId = match[0];
       }
 
@@ -96,22 +96,36 @@ export const debtAgentService = {
       }
 
       // 3. إحصائيات الرسائل والوعود اليوم
+      let msgQuery = supabase
+        .from('debt_message_log')
+        .select(branchId ? 'id, status, parties!inner(branch_id)' : 'id, status', { count: 'exact' })
+        .eq('company_id', companyId)
+        .gte('created_at', startOfDay);
+      if (branchId) msgQuery = msgQuery.eq('parties.branch_id', branchId);
+
+      let promQuery = supabase
+        .from('debt_payment_promises')
+        .select(
+          branchId
+            ? 'id, amount, currency_code, status, parties!inner(branch_id)'
+            : 'id, amount, currency_code, status',
+          { count: 'exact' }
+        )
+        .eq('company_id', companyId)
+        .gte('created_at', startOfDay);
+      if (branchId) promQuery = promQuery.eq('parties.branch_id', branchId);
+
+      let qQuery = supabase
+        .from('debt_reminder_queue')
+        .select(branchId ? 'id, parties!inner(branch_id)' : 'id', { count: 'exact' })
+        .eq('company_id', companyId)
+        .eq('status', 'queued');
+      if (branchId) qQuery = qQuery.eq('parties.branch_id', branchId);
+
       const [messagesRes, promisesRes, queueRes] = await Promise.all([
-        supabase
-          .from('debt_message_log')
-          .select('id, status', { count: 'exact' })
-          .eq('company_id', companyId)
-          .gte('created_at', startOfDay),
-        supabase
-          .from('debt_payment_promises')
-          .select('id, amount, currency_code, status', { count: 'exact' })
-          .eq('company_id', companyId)
-          .gte('created_at', startOfDay),
-        supabase
-          .from('debt_reminder_queue')
-          .select('id', { count: 'exact' })
-          .eq('company_id', companyId)
-          .eq('status', 'queued'),
+        msgQuery,
+        promQuery,
+        qQuery,
       ]);
 
       const sentToday = messagesRes.count ?? 0;
@@ -121,7 +135,7 @@ export const debtAgentService = {
       // حساب المبالغ المحصلة المنسوبة للوعود
       let recoveredSAR = 0;
       let recoveredYER = 0;
-      (promisesRes.data ?? []).forEach(p => {
+      ((promisesRes.data ?? []) as unknown as Array<{ status?: string; amount?: number | string; currency_code?: string }>).forEach(p => {
         if (p.status === 'kept') {
           const amt = Number(p.amount) || 0;
           if (p.currency_code === 'YER') {
@@ -186,9 +200,13 @@ export const debtAgentService = {
   /**
    * جلب سجل التفاعل المباشر ومحلل النوايا
    */
-  getActivityFeed: async (companyId: string, limit = 30): Promise<AgentActivityItem[]> => {
+  getActivityFeed: async (
+    companyId: string,
+    limit = 30,
+    branchId?: string | null
+  ): Promise<AgentActivityItem[]> => {
     try {
-      const logs = await debtMessageApi.getMessageLog(companyId, undefined, limit);
+      const logs = await debtMessageApi.getMessageLog(companyId, undefined, limit, branchId);
 
       return logs.map((l: DebtMessageLogWithParty) => {
         const isDelivered = l.delivery_status === 'delivered' || l.status === 'sent_delivered';
@@ -225,7 +243,10 @@ export const debtAgentService = {
   /**
    * جلب طابور العمليات المجدولة القادمة
    */
-  getUpcomingQueue: async (companyId: string): Promise<AgentQueueItem[]> => {
+  getUpcomingQueue: async (
+    companyId: string,
+    _branchId?: string | null
+  ): Promise<AgentQueueItem[]> => {
     try {
       const queue = await debtMessageApi.getReminderQueue(companyId, 'queued', 25);
 

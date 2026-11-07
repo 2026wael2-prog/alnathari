@@ -1,5 +1,6 @@
 import { logger } from '../../core/utils/logger';
 import { formatLocalDate, getLocalYearStart } from '../../core/utils/dateUtils';
+import { toBaseCurrency } from '../../core/utils/currencyUtils';
 
 import { reportsApi } from './api';
 import type { PartyDebt, ReportsStats } from './types';
@@ -45,10 +46,11 @@ export const reportsService = {
   getTrialBalance: async (
     companyId: string,
     fromDate?: string,
-    toDate?: string
+    toDate?: string,
+    branchId?: string | null
   ): Promise<TrialBalanceItem[]> => {
     const { from, to } = fromDate && toDate ? { from: fromDate, to: toDate } : getYearDateRange();
-    const { data, error } = await reportsApi.getTrialBalanceRPC(companyId, from, to);
+    const { data, error } = await reportsApi.getTrialBalanceRPC(companyId, from, to, branchId);
     if (error) throw error;
 
     return (data || []).map(
@@ -84,17 +86,21 @@ export const reportsService = {
   getProfitAndLoss: async (
     companyId: string,
     fromDate?: string,
-    toDate?: string
+    toDate?: string,
+    branchId?: string | null
   ): Promise<{
     revenues: TrialBalanceItem[];
     expenses: TrialBalanceItem[];
     totalRevenues: number;
     totalExpenses: number;
+    totalCogs?: number;
+    grossProfit?: number;
+    operatingExpenses?: number;
     netProfit: number;
   }> => {
     const financials = await accountingReportService.getFinancials(
       companyId,
-      undefined,
+      branchId,
       fromDate,
       toDate
     );
@@ -123,6 +129,9 @@ export const reportsService = {
       expenses: incomeStatement.expenses.map(mapRow),
       totalRevenues: incomeStatement.totalRevenue,
       totalExpenses: incomeStatement.totalExpense,
+      totalCogs: incomeStatement.totalCogs,
+      grossProfit: incomeStatement.grossProfit,
+      operatingExpenses: incomeStatement.operatingExpenses,
       netProfit: incomeStatement.netIncome,
     };
   },
@@ -132,7 +141,8 @@ export const reportsService = {
    * RPC returns TABLE rows: {category, amount, type}
    */
   getBalanceSheet: async (
-    companyId: string
+    companyId: string,
+    branchId?: string | null
   ): Promise<{
     assets: TrialBalanceItem[];
     liabilities: TrialBalanceItem[];
@@ -149,10 +159,12 @@ export const reportsService = {
       supabase.rpc('report_balance_sheet', {
         p_company_id: companyId,
         p_as_of_date: today,
+        ...(branchId ? { p_branch_id: branchId } : {}),
       }),
       supabase.rpc('report_balance_sheet_detailed', {
         p_company_id: companyId,
         p_as_of_date: today,
+        ...(branchId ? { p_branch_id: branchId } : {}),
       }),
     ]);
 
@@ -225,42 +237,42 @@ export const reportsService = {
     } else {
       assets = assetRow
         ? [
-            {
-              id: 'asset',
-              code: '1',
-              name: assetRow.category,
-              type: 'asset',
-              totalDebit: 0,
-              totalCredit: 0,
-              netBalance: totalAssets,
-            },
-          ]
+          {
+            id: 'asset',
+            code: '1',
+            name: assetRow.category,
+            type: 'asset',
+            totalDebit: 0,
+            totalCredit: 0,
+            netBalance: totalAssets,
+          },
+        ]
         : [];
       liabilities = liabilityRow
         ? [
-            {
-              id: 'liability',
-              code: '2',
-              name: liabilityRow.category,
-              type: 'liability',
-              totalDebit: 0,
-              totalCredit: 0,
-              netBalance: totalLiabilities,
-            },
-          ]
+          {
+            id: 'liability',
+            code: '2',
+            name: liabilityRow.category,
+            type: 'liability',
+            totalDebit: 0,
+            totalCredit: 0,
+            netBalance: totalLiabilities,
+          },
+        ]
         : [];
       equity = equityRow
         ? [
-            {
-              id: 'equity',
-              code: '3',
-              name: equityRow.category,
-              type: 'equity',
-              totalDebit: 0,
-              totalCredit: 0,
-              netBalance: totalEquity,
-            },
-          ]
+          {
+            id: 'equity',
+            code: '3',
+            name: equityRow.category,
+            type: 'equity',
+            totalDebit: 0,
+            totalCredit: 0,
+            netBalance: totalEquity,
+          },
+        ]
         : [];
     }
 
@@ -289,11 +301,12 @@ export const reportsService = {
    *   { summary: { receivables, payables }, debts: [{id,name,type,remaining_amount}] }
    * type='both' rows are split by sign → customer (receivable) / supplier (payable).
    */
-  getDebtReport: async (companyId: string): Promise<ReportsStats> => {
+  getDebtReport: async (companyId: string, branchId?: string | null): Promise<ReportsStats> => {
     const [{ data: company }, { data, error }] = await Promise.all([
       supabase.from('companies').select('base_currency').eq('id', companyId).maybeSingle(),
       supabase.rpc('report_debts', {
         p_company_id: companyId,
+        ...(branchId ? { p_branch_id: branchId } : {}),
       }),
     ]);
     if (error) throw error;
@@ -337,7 +350,10 @@ export const reportsService = {
   },
 
   // ⚡ Actual currency gain/loss using exchange_rates table
-  getCurrencyDiffs: async (companyId: string): Promise<CurrencyAccount[]> => {
+  getCurrencyDiffs: async (
+    companyId: string,
+    branchId?: string | null
+  ): Promise<CurrencyAccount[]> => {
     const { data: company } = await supabase
       .from('companies')
       .select('base_currency')
@@ -367,8 +383,12 @@ export const reportsService = {
     // 2) Book value in base currency: SUM(debit_amount - credit_amount)
     const { data: lines } = await supabase
       .from('journal_entry_lines')
-      .select('account_id, debit_amount, credit_amount, foreign_amount, exchange_rate')
+      .select(
+        'account_id, branch_id, debit_amount, credit_amount, foreign_amount, exchange_rate, journal_entries!inner(status, deleted_at, branch_id)'
+      )
       .eq('company_id', companyId)
+      .eq('journal_entries.status', 'posted')
+      .is('journal_entries.deleted_at', null)
       .is('deleted_at', null)
       .in(
         'account_id',
@@ -379,11 +399,18 @@ export const reportsService = {
 
     for (const l of (lines || []) as Array<{
       account_id: string;
+      branch_id?: string | null;
       debit_amount: number | null;
       credit_amount: number | null;
       foreign_amount: number | null;
       exchange_rate: number | null;
+      journal_entries?: { branch_id?: string | null } | Array<{ branch_id?: string | null }> | null;
     }>) {
+      if (branchId) {
+        const je = Array.isArray(l.journal_entries) ? l.journal_entries[0] : l.journal_entries;
+        const effectiveLineBranch = l.branch_id ?? je?.branch_id ?? null;
+        if (effectiveLineBranch !== branchId) continue;
+      }
       const current = accountDataMap.get(l.account_id) || { foreignBalance: 0, bookValueBase: 0 };
       const debit = Number(l.debit_amount) || 0;
       const credit = Number(l.credit_amount) || 0;
@@ -415,9 +442,19 @@ export const reportsService = {
       const foreignBalance = accData.foreignBalance;
       const rate = rateMap.get(a.currency_code);
 
-      // Current market value in base currency = foreignBalance * current rate_to_base
-      // Unrealized gain = current market value - book value
-      const currentMarketValue = rate ? foreignBalance * rate : accData.bookValueBase;
+      // Current market value in base currency using toBaseCurrency (handles divide vs multiply)
+      let currentMarketValue = accData.bookValueBase;
+      if (rate && rate > 0) {
+        try {
+          currentMarketValue = toBaseCurrency({
+            amount: foreignBalance,
+            currency_code: a.currency_code,
+            exchange_rate: rate,
+          });
+        } catch {
+          currentMarketValue = accData.bookValueBase;
+        }
+      }
       const unrealizedGain = rate ? currentMarketValue - accData.bookValueBase : 0;
 
       return {
@@ -435,7 +472,8 @@ export const reportsService = {
    * RPC returns TABLE rows: {category, inflow, outflow}
    */
   getCashFlow: async (
-    companyId: string
+    companyId: string,
+    branchId?: string | null
   ): Promise<{
     currentLiquidity: number;
     monthlyTrend: MonthlyCashFlow[];
@@ -448,6 +486,7 @@ export const reportsService = {
           p_company_id: companyId,
           p_from: from,
           p_to: to,
+          ...(branchId ? { p_branch_id: branchId } : {}),
         }),
         supabase.rpc('get_cash_liquidity', { p_company_id: companyId }),
       ]

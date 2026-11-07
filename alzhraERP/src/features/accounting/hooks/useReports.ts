@@ -11,10 +11,10 @@ export const useLedger = (accountId: string | null, fromDate?: string, toDate?: 
   return useQuery({
     queryKey: ['ledger', user?.company_id, branchId, accountId, fromDate, toDate],
     queryFn: () =>
-      user?.company_id && accountId
-        ? accountingService.getLedger(user.company_id, accountId, branchId, fromDate, toDate)
+      Boolean(user?.company_id) && Boolean(accountId)
+        ? accountingService.getLedger(user?.company_id ?? '', accountId ?? '', branchId, fromDate, toDate)
         : Promise.resolve([]),
-    enabled: !!user?.company_id && !!accountId,
+    enabled: Boolean(user?.company_id) && Boolean(accountId),
   });
 };
 
@@ -24,10 +24,10 @@ export const useTrialBalance = (fromDate?: string, toDate?: string) => {
   return useQuery({
     queryKey: ['trial_balance', user?.company_id, branchId, fromDate, toDate],
     queryFn: () =>
-      user?.company_id
-        ? accountingService.getTrialBalance(user.company_id, branchId, fromDate, toDate)
+      Boolean(user?.company_id)
+        ? accountingService.getTrialBalance(user?.company_id ?? '', branchId, fromDate, toDate)
         : Promise.resolve([]),
-    enabled: !!user?.company_id,
+    enabled: Boolean(user?.company_id),
   });
 };
 
@@ -37,10 +37,10 @@ export const useFinancials = (fromDate?: string, toDate?: string) => {
   return useQuery({
     queryKey: ['financials', user?.company_id, branchId, fromDate, toDate],
     queryFn: () =>
-      user?.company_id
-        ? accountingService.getFinancials(user.company_id, branchId, fromDate, toDate)
+      Boolean(user?.company_id)
+        ? accountingService.getFinancials(user?.company_id ?? '', branchId, fromDate, toDate)
         : Promise.resolve(null),
-    enabled: !!user?.company_id,
+    enabled: Boolean(user?.company_id),
   });
 };
 
@@ -50,23 +50,24 @@ export const useAuditJournals = (enabled: boolean) => {
   return useQuery({
     queryKey: ['audit_journals', user?.company_id, branchId],
     queryFn: async () => {
-      if (!user?.company_id) return [];
+      if (user?.company_id === undefined || user.company_id === '') return [];
       const { data, error } = await reportsApi.getAuditJournals(user.company_id, branchId);
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.company_id && enabled,
+    enabled: Boolean(user?.company_id) && enabled,
   });
 };
 
 export const useVatReturnReport = (fromDate?: string, toDate?: string) => {
   const { user } = useAuthStore();
+  const { branchId } = useBranchFilter();
   return useQuery({
-    queryKey: ['vat_return_report', user?.company_id, fromDate, toDate],
+    queryKey: ['vat_return_report', user?.company_id, branchId, fromDate, toDate],
     queryFn: () =>
-      user?.company_id && fromDate && toDate
-        ? accountingService.getVatReturnReport(user.company_id, fromDate, toDate)
+      Boolean(user?.company_id) && Boolean(fromDate) && Boolean(toDate)
+        ? accountingService.getVatReturnReport(user?.company_id ?? '', fromDate ?? '', toDate ?? '', branchId)
         : Promise.resolve(null),
-    enabled: !!user?.company_id && !!fromDate && !!toDate,
+    enabled: Boolean(user?.company_id) && Boolean(fromDate) && Boolean(toDate),
   });
 };

@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import { syncStore } from '../../../core/lib/sync-store';
 import { invalidateByPreset } from '../../../lib/invalidation';
 import { normalizeSearch } from '../../../core/utils/search';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 
 /** True when the failure is a network/offline issue worth queuing for later sync. */
 const isOfflineError = (error: Error): boolean =>
@@ -22,16 +23,19 @@ const enqueueProductSaveOffline = ({
   variables,
   previousProducts,
   user,
+  branchId,
 }: {
   variables: { data: ProductFormData; id?: string };
   previousProducts: Product[] | undefined;
   user: { company_id?: string | null; id?: string | null } | null | undefined;
+  branchId?: string | null | undefined;
 }): void => {
   const originalProduct = previousProducts?.find(p => p.id === variables.id);
   void syncStore.enqueue({
     mutationKey: ['products', 'save'], // Key for identification
     variables: {
       ...variables.data,
+      branch_id: variables.data.branch_id ?? branchId ?? null,
       id: variables.id,
       company_id: user?.company_id,
       user_id: user?.id,
@@ -114,9 +118,10 @@ export const useProducts = (
 ): ProductsQueryResult => {
   const { user } = useAuthStore();
   const companyId = user?.company_id;
+  const { branchId } = useBranchFilter();
 
   const query = useQuery({
-    queryKey: ['products', companyId, options.limitNum, options.warehouseId],
+    queryKey: ['products', companyId, options.limitNum, options.warehouseId, branchId],
     // The signal lets TanStack Query cancel this heavy (up to 10000-row)
     // fetch at the network layer when it is superseded or unmounted.
     queryFn: ({ signal }) =>
@@ -126,7 +131,8 @@ export const useProducts = (
             1,
             options.limitNum ?? 500,
             options.warehouseId,
-            signal
+            signal,
+            branchId
           )
         : Promise.resolve([]),
     enabled: options.enabled ?? (companyId !== undefined && companyId !== ''),
@@ -171,11 +177,12 @@ export const useMinimalProducts = (): UseQueryResult<Product[]> => {
 export const useItemMovement = (productId: string | null): UseQueryResult<unknown[]> => {
   const { user } = useAuthStore();
   const companyId = user?.company_id;
+  const { branchId } = useBranchFilter();
   return useQuery({
-    queryKey: ['item_movement', productId, companyId],
+    queryKey: ['item_movement', productId, companyId, branchId],
     queryFn: () =>
       productId !== null && productId !== '' && companyId !== undefined && companyId !== ''
-        ? inventoryService.getItemMovement(productId, companyId)
+        ? inventoryService.getItemMovement(productId, companyId, branchId)
         : Promise.resolve([]),
     enabled: productId !== null && productId !== '' && companyId !== undefined && companyId !== '',
     staleTime: 60 * 1000,
@@ -196,6 +203,7 @@ export const useProductMutations = (): ProductMutations => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { showToast } = useFeedbackStore();
+  const { branchId } = useBranchFilter();
 
   const saveProduct = useMutation({
     mutationFn: async ({ data, id }: { data: ProductFormData; id?: string }) => {
@@ -204,7 +212,11 @@ export const useProductMutations = (): ProductMutations => {
       if (id !== undefined && id !== '') {
         return inventoryService.updateProduct(id, data, user.company_id);
       }
-      return inventoryService.createProduct(data, user.company_id, user.id);
+      return inventoryService.createProduct(
+        { ...data, branch_id: data.branch_id ?? branchId ?? null },
+        user.company_id,
+        user.id
+      );
     },
     // Optimistic Update: show changes instantly before server confirms
     onMutate: async ({ data, id }) => {
@@ -237,7 +249,12 @@ export const useProductMutations = (): ProductMutations => {
       }
 
       // Network error: enqueue for offline processing via the global syncStore
-      enqueueProductSaveOffline({ variables, previousProducts: context?.previousProducts, user });
+      enqueueProductSaveOffline({
+        variables,
+        previousProducts: context?.previousProducts,
+        user,
+        branchId,
+      });
       showToast(
         'تم الحفظ محلياً (وضع عدم الاتصال). سيتم المزامنة تلقائياً عند عودة الإنترنت.',
         'info'
@@ -333,6 +350,7 @@ export const useProductMutations = (): ProductMutations => {
 export const useSearchProducts = (searchTerm: string): UseQueryResult<Product[]> => {
   const { user } = useAuthStore();
   const companyId = user?.company_id;
+  const { branchId } = useBranchFilter();
   // [PERF-FIX] كان مفتاح الاستعلام يستخدم النص الخام، فكل مسافة أو حرف زائد
   // يُنشئ مدخلاً جديداً في الكاش ويجعل القائمة تومض. الآن نستخدم النص بعد
   // trim، ونُبقي نتائج البحث السابق معروضة أثناء جلب التالي
@@ -342,10 +360,10 @@ export const useSearchProducts = (searchTerm: string): UseQueryResult<Product[]>
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SearchResultProduct is a runtime subset of Product; full Product type expected by consumers
   return useQuery({
-    queryKey: ['products_search', companyId, normalizedTerm],
+    queryKey: ['products_search', companyId, normalizedTerm, branchId],
     queryFn: () =>
       companyId !== undefined && companyId !== '' && normalizedTerm.length > 1
-        ? inventoryService.searchProducts(companyId, normalizedTerm)
+        ? inventoryService.searchProducts(companyId, normalizedTerm, branchId)
         : Promise.resolve([]),
     enabled: isSearchable,
     staleTime: 5 * 60 * 1000,

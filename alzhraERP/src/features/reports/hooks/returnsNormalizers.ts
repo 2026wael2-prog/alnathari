@@ -58,22 +58,45 @@ export const normalizeSalesReturn = (row: SalesReturn): ReturnReportRow => ({
   invoice_items: row.invoice_items ?? null,
 });
 
+const resolveInvoiceNumber = (
+  rawRef:
+    | { invoice_number?: string | null }
+    | Array<{ invoice_number?: string | null }>
+    | null
+    | undefined
+): string | null => {
+  if (Array.isArray(rawRef)) {
+    return rawRef[0]?.invoice_number ?? null;
+  }
+  return rawRef?.invoice_number ?? null;
+};
+
 /** تحويل سجل مرتجع مشتريات إلى النوع الموحد */
-export const normalizePurchaseReturn = (row: PurchaseListRow): ReturnReportRow => ({
-  id: row.id,
-  kind: 'purchase',
-  invoice_number: row.invoice_number,
-  issue_date: row.issue_date,
-  // created_at غير متاح في استعلام المشتريات — نستخدم issue_date
-  created_at: row.issue_date,
-  total_amount: row.total_amount,
-  status: row.status,
-  notes: null,
-  currency_code: row.currency_code ?? null,
-  exchange_rate: row.exchange_rate,
-  party: row.party === null ? null : { name: row.party.name },
-  reference_invoice_id: null,
-  reference_invoice: null,
-  return_reason: null,
-  invoice_items: row.invoice_items,
-});
+export const normalizePurchaseReturn = (row: PurchaseListRow): ReturnReportRow => {
+  const rowCreatedAt = (row as { created_at?: string | null }).created_at;
+  const createdAt =
+    rowCreatedAt !== null && rowCreatedAt !== undefined && rowCreatedAt !== ''
+      ? rowCreatedAt
+      : row.issue_date;
+  const refInvoiceNumber = resolveInvoiceNumber(
+    (row as { reference_invoice?: { invoice_number?: string | null } | Array<{ invoice_number?: string | null }> | null }).reference_invoice
+  );
+  return {
+    id: row.id,
+    kind: 'purchase',
+    invoice_number: row.invoice_number,
+    issue_date: row.issue_date,
+    created_at: createdAt,
+    total_amount: row.total_amount,
+    status: row.status,
+    notes: asText((row as { notes?: string | null }).notes),
+    currency_code: row.currency_code,
+    exchange_rate: row.exchange_rate,
+    party: row.party === null ? null : { name: row.party.name },
+    reference_invoice_id:
+      (row as { reference_invoice_id?: string | null }).reference_invoice_id ?? null,
+    reference_invoice: refInvoiceNumber !== null ? { invoice_number: refInvoiceNumber } : null,
+    return_reason: (row as { return_reason?: string | null }).return_reason ?? null,
+    invoice_items: row.invoice_items,
+  };
+};

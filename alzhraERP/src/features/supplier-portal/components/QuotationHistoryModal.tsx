@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, History, FileText } from 'lucide-react';
 import { formatCurrency } from '../../../core/utils';
+import { formatLocalDate } from '../../../core/utils/dateUtils';
 import { supplierPortalService } from '../services/supplierPortalService';
 import { logger } from '../../../core/utils/logger';
 import type { QuotationRevision } from '../types';
@@ -110,7 +111,7 @@ export const QuotationHistoryModal: React.FC<Props> = ({
                       )}
                     </div>
                     <span className="font-mono text-[10px] text-slate-400">
-                      {rev.created_at.slice(0, 10)}
+                      {formatLocalDate(rev.created_at)}
                     </span>
                   </div>
 

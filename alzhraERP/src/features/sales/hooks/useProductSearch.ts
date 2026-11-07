@@ -7,6 +7,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { inventoryApi } from '../../inventory/api';
 import { normalizeArabic } from '../../../core/utils/search';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 
 interface UseProductSearchOptions {
   companyId: string;
@@ -36,6 +37,7 @@ export interface ProductSearchResult {
 
 export const useProductSearch = (searchTerm: string, options?: UseProductSearchOptions) => {
   const { companyId, debounceMs = 300, enabled = true } = options ?? {};
+  const { branchId } = useBranchFilter();
 
   const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
 
@@ -57,8 +59,8 @@ export const useProductSearch = (searchTerm: string, options?: UseProductSearchO
   );
 
   const queryKey = useMemo(
-    () => ['product_search', companyId, normalizedTerm] as const,
-    [companyId, normalizedTerm]
+    () => ['product_search', companyId, normalizedTerm, branchId] as const,
+    [companyId, normalizedTerm, branchId]
   );
 
   const {
@@ -73,7 +75,7 @@ export const useProductSearch = (searchTerm: string, options?: UseProductSearchO
         return [];
       }
 
-      const { data, error } = await inventoryApi.searchProduct(companyId, normalizedTerm);
+      const { data, error } = await inventoryApi.searchProduct(companyId, normalizedTerm, branchId);
 
       if (data === null) return [];
 

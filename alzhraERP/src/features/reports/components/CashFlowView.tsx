@@ -218,7 +218,7 @@ const CashFlowView: React.FC = () => {
                     dy={10}
                   />
                   <YAxis
-                    tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 'medium' }}
+                    tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'medium' }}
                     axisLine={false}
                     tickLine={false}
                     tickFormatter={v => (v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v)}

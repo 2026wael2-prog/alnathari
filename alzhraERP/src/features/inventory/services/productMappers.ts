@@ -4,6 +4,8 @@ interface RawStock {
   quantity?: number | string;
   warehouse_id: string;
   warehouse_name?: string;
+  branch_id?: string | null;
+  branch_name?: string | null;
   warehouses?: {
     name_ar?: string;
     branch_id?: string;
@@ -48,17 +50,28 @@ interface RawProduct {
  * Used both internally and by the paginated hook.
  * @param warehouseId Optional. If provided, `stock_quantity` will reflect ONLY this warehouse's stock.
  */
-export function mapRawProducts(rows: unknown[], warehouseId?: string): Product[] {
+export function mapRawProducts(
+  rows: unknown[],
+  warehouseId?: string,
+  branchId?: string | null
+): Product[] {
   return (rows as RawProduct[])
     .map((prod): Product | null => {
       if (!prod?.id) return null;
 
       const stockList = Array.isArray(prod.stock) ? prod.stock : [];
 
-      // Warehouse Isolation Fix: Calculate total stock based on warehouseId if provided
+      const getStockBranchId = (s: RawStock): string | undefined =>
+        s.branch_id || s.warehouses?.branch_id || s.warehouses?.branches?.id || undefined;
+
+      const hasBranchMeta = stockList.some(s => Boolean(getStockBranchId(s)));
+
+      // Warehouse & Branch Isolation: Calculate total stock based on warehouseId or branchId
       const relevantStockList = warehouseId
         ? stockList.filter(s => s.warehouse_id === warehouseId)
-        : stockList;
+        : branchId && hasBranchMeta
+          ? stockList.filter(s => getStockBranchId(s) === branchId)
+          : stockList;
 
       const totalStock = relevantStockList.reduce((sum: number, s: RawStock) => {
         const qty = Number(s.quantity);
@@ -68,8 +81,8 @@ export function mapRawProducts(rows: unknown[], warehouseId?: string): Product[]
       const warehouseDistribution = stockList.map(s => ({
         warehouse_id: s.warehouse_id,
         warehouse_name: s.warehouse_name || s.warehouses?.name_ar || 'مستودع غير معروف',
-        branch_id: s.warehouses?.branch_id || s.warehouses?.branches?.id,
-        branch_name: s.warehouses?.branches?.name,
+        branch_id: getStockBranchId(s),
+        branch_name: s.branch_name || s.warehouses?.branches?.name,
         quantity: Number(s.quantity) || 0,
       }));
 

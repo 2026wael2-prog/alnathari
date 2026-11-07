@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../auth/store';
 import { reportsApi } from '../api';
 import { formatCurrency, cn, formatLocalDate, toBaseCurrency } from '../../../core/utils';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 import {
   BarChart3,
   TrendingUp,
@@ -43,8 +44,9 @@ interface DailyInvoiceRow extends DailyInvoice {
 
 const useDailySalesReport = (days = 30) => {
   const { user } = useAuthStore();
+  const { branchId } = useBranchFilter();
   return useQuery({
-    queryKey: ['daily_sales_report', user?.company_id, days],
+    queryKey: ['daily_sales_report', user?.company_id, branchId, days],
     queryFn: async () => {
       if (!user?.company_id) return null;
       const now = new Date();
@@ -52,7 +54,8 @@ const useDailySalesReport = (days = 30) => {
 
       const { data: invoices, error } = await reportsApi.getDailySalesInvoices(
         user.company_id,
-        formatLocalDate(fromDate)
+        formatLocalDate(fromDate),
+        branchId
       );
 
       if (error) throw error;
@@ -85,7 +88,7 @@ const useDailySalesReport = (days = 30) => {
 
       const dailyData = Object.values(dailyMap)
         .sort((a, b) => a.date.localeCompare(b.date))
-        .map(d => ({ ...d, total: Math.max(0, Math.round(d.total * 100) / 100) })); // Round for display and clamp to 0
+        .map(d => ({ ...d, total: Math.round(d.total * 100) / 100 })); // Round for display without clamping net returns to 0
 
       const totalSales = Math.round(dailyData.reduce((s, d) => s + d.total, 0) * 100) / 100;
       const totalInvoices = dailyData.reduce((s, d) => s + d.count, 0);

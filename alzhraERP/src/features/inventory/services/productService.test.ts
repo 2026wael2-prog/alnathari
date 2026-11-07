@@ -224,11 +224,15 @@ describe('productService.createProduct — منع التكرار داخل نطا
     });
     // category بطول غير 36 → null (حماية من قيم غير UUID)
     expect(payload.category_id).toBeNull();
-    expect(mockInventoryApi.initializeStock).toHaveBeenCalledWith('comp-1', 'user-1', {
-      product_id: 'p-new',
-      warehouse_id: 'w1',
-      quantity: 12,
-    });
+    expect(mockInventoryApi.initializeStock).toHaveBeenCalledWith(
+      'comp-1',
+      'user-1',
+      expect.objectContaining({
+        product_id: 'p-new',
+        warehouse_id: 'w1',
+        quantity: 12,
+      })
+    );
   });
 
   it('يحوّل خطأ التكرار 23505 من الخادم إلى رسالة مُفسَّرة عبر parseError', async () => {
@@ -323,7 +327,7 @@ describe('productService.getMinimalProducts', () => {
     ]);
   });
 
-  it('يرمي خطأ الاستعلام الخام بدلاً من ابتلاعه', async () => {
+  it('يرمي خطأ الاستعلام عبر parseError بدلاً من ابتلاعه', async () => {
     enqueueQuery({ data: null, error: { message: 'boom' } });
 
     const err = await productService.getMinimalProducts('comp-1').then(
@@ -331,6 +335,6 @@ describe('productService.getMinimalProducts', () => {
       (e: unknown) => e
     );
 
-    expect(err).toEqual({ message: 'boom' });
+    expect(err).toBeInstanceOf(Error);
   });
 });

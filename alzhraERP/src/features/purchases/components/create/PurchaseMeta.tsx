@@ -434,12 +434,39 @@ const PurchaseMeta: React.FC = () => {
     }
 
     if (rateRows.length > 0) ratesLoaded.current = true;
-    if (currencyChanged) {
+    const isCashboxValid = Boolean(
+      cashboxId && paymentAccounts.some(acc => acc.id === cashboxId)
+    );
+    if ((currencyChanged || !isCashboxValid) && paymentAccounts.length > 0) {
       const matchingAccount = findMatchingAccount(paymentAccounts, currency);
-      if (matchingAccount !== undefined) setMetadata('cashboxId', matchingAccount.id);
+      setMetadata('cashboxId', matchingAccount !== undefined ? matchingAccount.id : paymentAccounts[0]?.id ?? '');
     }
+
+    const isWarehouseValid = Boolean(
+      warehouseId && warehouseRows.some(w => w.id === warehouseId)
+    );
+    if (warehouseRows.length > 0 && !isWarehouseValid) {
+      const primaryWh = warehouseRows.find(
+        w => (w as unknown as { is_primary?: boolean }).is_primary
+      );
+      const targetWh = primaryWh ?? warehouseRows[0];
+      if (targetWh) {
+        setMetadata('warehouseId', targetWh.id);
+      }
+    }
+
     prevCurrency.current = currency;
-  }, [currency, paymentAccounts, rates.data, currencyRows, exchangeRate, setMetadata]);
+  }, [
+    currency,
+    cashboxId,
+    warehouseId,
+    warehouseRows,
+    paymentAccounts,
+    rates.data,
+    currencyRows,
+    exchangeRate,
+    setMetadata,
+  ]);
 
   const handleMetadataChange = (field: string, value: string) => {
     setMetadata(field, value);

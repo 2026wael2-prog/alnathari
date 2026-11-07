@@ -167,7 +167,7 @@ const ExpensesAnalyticsView: React.FC<ExpensesAnalyticsViewProps> = ({
                   }
                 />
                 <YAxis
-                  tick={{ fontSize: 9, fill: '#94a3b8' }}
+                  tick={{ fontSize: 10, fill: '#94a3b8' }}
                   axisLine={false}
                   tickLine={false}
                   width={40}

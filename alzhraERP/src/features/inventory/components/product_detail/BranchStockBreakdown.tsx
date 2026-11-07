@@ -1,5 +1,5 @@
 import React from 'react';
-import { Warehouse, MapPin, Building2, ChevronDown, ChevronUp, Layers } from 'lucide-react';
+import { Warehouse, MapPin, Building2, ChevronDown, ChevronUp, Layers, ArrowRightLeft } from 'lucide-react';
 import { cn, formatNumberDisplay } from '../../../../core/utils';
 import type { warehouseStock } from '../../types';
 
@@ -22,6 +22,10 @@ interface Props {
     totalStock?: number;
     /** Min stock level for indicator */
     minStockLevel?: number;
+    /** Current active branch ID so we can show "Request Transfer" on other branches */
+    currentBranchId?: string | null;
+    /** Callback when user clicks to request transfer from another branch */
+    onRequestTransfer?: (sourceBranchId: string, sourceBranchName: string, availableQty: number) => void;
 }
 
 const BranchStockBreakdown: React.FC<Props> = ({
@@ -29,6 +33,8 @@ const BranchStockBreakdown: React.FC<Props> = ({
     branches,
     totalStock,
     minStockLevel = 0,
+    currentBranchId,
+    onRequestTransfer,
 }) => {
     const [expandedBranches, setExpandedBranches] = React.useState<Set<string>>(new Set());
 
@@ -154,6 +160,30 @@ const BranchStockBreakdown: React.FC<Props> = ({
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
+                                    {onRequestTransfer &&
+                                        branchTotal > 0 &&
+                                        Boolean(currentBranchId) &&
+                                        branch.id !== currentBranchId && (
+                                            <span
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onRequestTransfer(branch.id, branch.name, branchTotal);
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.stopPropagation();
+                                                        onRequestTransfer(branch.id, branch.name, branchTotal);
+                                                    }
+                                                }}
+                                                className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                                                title="طلب نقل مخزون من هذا الفرع"
+                                            >
+                                                <ArrowRightLeft size={10} />
+                                                طلب نقل
+                                            </span>
+                                        )}
                                     <span className="font-mono font-bold text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded-lg border border-indigo-100 dark:border-indigo-800">
                                         {formatNumberDisplay(branchTotal)}
                                     </span>

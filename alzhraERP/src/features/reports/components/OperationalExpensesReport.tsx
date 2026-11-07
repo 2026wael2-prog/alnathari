@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../auth/store';
 import { reportsApi } from '../api';
 import { formatCurrency, cn, formatLocalDate } from '../../../core/utils';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 import {
   Wallet,
   TrendingDown,
@@ -49,8 +50,9 @@ const useOperationalExpenses = (days = 30) => {
   }
 
   const { user } = useAuthStore();
+  const { branchId } = useBranchFilter();
   return useQuery({
-    queryKey: ['operational_expenses', user?.company_id, days],
+    queryKey: ['operational_expenses', user?.company_id, branchId, days],
     queryFn: async () => {
       if (!user?.company_id) return null;
 
@@ -60,7 +62,8 @@ const useOperationalExpenses = (days = 30) => {
       // Get all expense journal lines with their accounts
       const { data: lines, error } = await reportsApi.getOperationalExpensesLines(
         user.company_id,
-        formatLocalDate(fromDate)
+        formatLocalDate(fromDate),
+        branchId
       );
 
       if (error) throw error;

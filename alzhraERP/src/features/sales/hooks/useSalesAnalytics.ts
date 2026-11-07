@@ -6,6 +6,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { salesApi } from '@/features/sales/api';
+import { useBranchFilter } from '@/features/branches/hooks/useBranchFilter';
 
 interface SalesAnalyticsParams {
   companyId: string;
@@ -132,8 +133,9 @@ const normalizeAnalytics = (raw: RawRecord | null | undefined): SalesAnalytics |
 
 export const useSalesAnalytics = (params: SalesAnalyticsParams) => {
   const { companyId, startDate, endDate, period = 'month' } = params;
+  const { branchId } = useBranchFilter();
 
-  const queryKey = ['sales_analytics', companyId, { startDate, endDate, period }] as const;
+  const queryKey = ['sales_analytics', companyId, branchId, { startDate, endDate, period }] as const;
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey,
@@ -144,8 +146,14 @@ export const useSalesAnalytics = (params: SalesAnalyticsParams) => {
         return null;
       }
 
-      const payload: { company_id: string; start_date?: string; end_date?: string } = {
+      const payload: {
+        company_id: string;
+        start_date?: string;
+        end_date?: string;
+        branch_id?: string | null;
+      } = {
         company_id: companyId,
+        branch_id: branchId,
       };
       if (startDate) payload.start_date = startDate;
       if (endDate) payload.end_date = endDate;

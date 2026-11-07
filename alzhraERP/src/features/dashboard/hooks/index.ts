@@ -3,7 +3,7 @@ import { useAuthStore } from '../../auth/store';
 import { dashboardApi } from '../api/index';
 import { calculateDashboardInsights, resolveNetProfit } from '../services/dashboardInsights';
 import { buildTopCategoryData } from '../services/topCategoryData';
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import { useFeedbackStore } from '../../feedback/store';
 import type {
   DashboardDataPayload,
@@ -198,6 +198,10 @@ export const useDashboardData = (period: DashboardPeriod = 'today'): UseDashboar
   const { user } = useAuthStore();
   const companyId = user?.company_id;
   const { branchId } = useBranchFilter();
+  const branchIdRef = useRef<string | null>(branchId);
+  useEffect(() => {
+    branchIdRef.current = branchId;
+  }, [branchId]);
 
   const { dateFrom, dateTo } = useMemo(() => getPeriodDates(period), [period]);
 
@@ -233,8 +237,12 @@ export const useDashboardData = (period: DashboardPeriod = 'today'): UseDashboar
             filter: `company_id=eq.${companyId}`,
           },
           (payload: any) => {
+            const activeBr = branchIdRef.current;
+            const matchesBranch = activeBr === null || activeBr === '' || payload.new?.branch_id === activeBr;
             if (payload.new?.type === 'sale') {
-              showToast(`مبيعات جديدة بقيمة ${payload.new.total_amount} ر.س`, 'success');
+              if (matchesBranch) {
+                showToast(`مبيعات جديدة بقيمة ${payload.new.total_amount} ر.س`, 'success');
+              }
               invalidateByPreset(queryClient, 'sale');
             } else if (
               payload.new?.type === 'purchase' ||

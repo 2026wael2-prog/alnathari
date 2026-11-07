@@ -105,7 +105,12 @@ export const useCreateInvoice = () => {
         // useSyncQueue via processSyncMutation(['sales', 'create']).
         void syncStore.enqueue({
           mutationKey: ['sales', 'create'],
-          variables: { ...variables, company_id: user?.company_id, user_id: user?.id },
+          variables: {
+            ...variables,
+            branchId: variables.branchId ?? branchId,
+            company_id: user?.company_id,
+            user_id: user?.id,
+          },
         });
         showToast('تم حفظ الفاتورة محلياً. سيتم مزامنتها عند عودة الاتصال.', 'info');
         return;

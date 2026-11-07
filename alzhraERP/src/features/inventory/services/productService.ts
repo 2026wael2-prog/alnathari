@@ -7,6 +7,7 @@ import type { TableUpdate } from '@/core/types/supabase-helpers';
 import { logger } from '../../../core/utils/logger';
 import { parseError } from '../../../core/utils/errorUtils';
 import { normalizeArabic } from '../../../core/utils/search';
+import { useBranchFilterStore } from '../../branches/store';
 
 /** Shape returned by the product search RPC — minimal fields for dropdowns/rows. */
 export interface SearchResultProduct {
@@ -61,25 +62,34 @@ function mapSearchRow(row: SearchRow): SearchResultProduct {
 async function searchProductsFallback(
   companyId: string,
   term: string,
-  limit = 50
+  limit = 50,
+  branchId?: string | null
 ): Promise<SearchResultProduct[]> {
   const { data, error } = await supabase
     .from('products')
     .select(
-      'id, name_ar, sku, part_number, brand, size, stock:product_stock(warehouse_id, quantity)'
+      'id, name_ar, sku, part_number, brand, size, stock:product_stock(warehouse_id, quantity, warehouses(branch_id))'
     )
     .eq('company_id', companyId)
     .eq('status', 'active')
     .or(
       `normalized_search_text.ilike.%${term}%,` +
-        `name_ar.ilike.%${term}%,sku.ilike.%${term}%,` +
-        `part_number.ilike.%${term}%,alternative_numbers.ilike.%${term}%,` +
-        `barcode.ilike.%${term}%`
+      `name_ar.ilike.%${term}%,sku.ilike.%${term}%,` +
+      `part_number.ilike.%${term}%,alternative_numbers.ilike.%${term}%,` +
+      `barcode.ilike.%${term}%`
     )
     .limit(limit);
 
   if (error) return [];
-  return (data as unknown as SearchRow[]).map(mapSearchRow);
+  return (data as unknown as SearchRow[]).map(row => {
+    if (branchId && Array.isArray(row.stock)) {
+      const filteredStock = (row.stock as Array<{ warehouse_id: string; quantity: number; warehouses?: { branch_id?: string | null } | null }>).filter(
+        s => !s.warehouses || s.warehouses.branch_id === branchId
+      );
+      return mapSearchRow({ ...row, stock: filteredStock });
+    }
+    return mapSearchRow(row);
+  });
 }
 
 let isSimilarProductsRpcAvailable = true;
@@ -238,11 +248,12 @@ export const productService = {
     page = 1,
     limitNum = 500,
     warehouseId?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    branchId?: string | null
   ): Promise<Product[]> => {
     const { data, error } = await inventoryApi.getProducts(companyId, page, limitNum, signal);
-    if (error) throw error;
-    return productService.mapRawProducts(data || [], warehouseId);
+    if (error) throw parseError(error);
+    return productService.mapRawProducts(data || [], warehouseId, branchId);
   },
 
   /**
@@ -252,7 +263,7 @@ export const productService = {
   getProductsWithStock: async (companyId: string, signal?: AbortSignal): Promise<Product[]> => {
     try {
       const { data, error } = await inventoryApi.getProductsWithStock(companyId, signal);
-      if (error) throw error;
+      if (error) throw parseError(error);
       return productService.mapRawProducts(data || []);
     } catch {
       // Graceful fallback to paginated getProducts
@@ -267,7 +278,7 @@ export const productService = {
    */
   getProductById: async (id: string) => {
     const { data, error } = await inventoryApi.getProductById(id);
-    if (error) throw error;
+    if (error) throw parseError(error);
     return { data };
   },
 
@@ -294,13 +305,13 @@ export const productService = {
       });
       if (error) {
         logger.warn('inventory', 'searchProducts RPC error, falling back to ILIKE:', error.message);
-        return await searchProductsFallback(companyId, cleanTerm);
+        return await searchProductsFallback(companyId, cleanTerm, 50, branchId);
       }
       return (data as unknown as SearchRow[]).map(mapSearchRow);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       logger.warn('inventory', 'searchProducts failed, using fallback:', message);
-      return searchProductsFallback(companyId, cleanTerm);
+      return searchProductsFallback(companyId, cleanTerm, 50, branchId);
     }
   },
 
@@ -354,35 +365,59 @@ export const productService = {
         await inventoryApi.saveProductUoMs(product.id, data.uoms);
       }
 
-      // Initialize stock in default warehouse
-      if (product) {
-        const { data: warehouses } = await supabase
-          .from('warehouses')
-          .select('id')
-          .eq('company_id', companyId)
-          .limit(1);
+      // Initialize stock in active branch's primary warehouse (or company primary warehouse) only when initial quantity > 0
+      const initialQty = Number(data.stock_quantity) || 0;
+      if (product && initialQty > 0) {
+        const activeBranchId =
+          (typeof data.branch_id === 'string' && data.branch_id.trim() !== ''
+            ? data.branch_id.trim()
+            : null) ?? useBranchFilterStore.getState().activeBranchId;
+        let targetWarehouseId: string | undefined =
+          typeof data.warehouse_id === 'string' && data.warehouse_id.trim() !== ''
+            ? data.warehouse_id.trim()
+            : undefined;
 
-        if (warehouses && warehouses.length > 0) {
-          const warehouse = warehouses[0];
-          await inventoryApi.initializeStock(companyId, _userId, {
+        if (!targetWarehouseId && activeBranchId) {
+          const { data: branchWh } = await supabase
+            .from('warehouses')
+            .select('id')
+            .eq('company_id', companyId)
+            .eq('branch_id', activeBranchId)
+            .is('deleted_at', null)
+            .order('is_primary', { ascending: false })
+            .limit(1);
+          if (branchWh && branchWh.length > 0) {
+            targetWarehouseId = branchWh[0].id;
+          }
+        }
+
+        if (!targetWarehouseId) {
+          const { data: defaultWh } = await supabase
+            .from('warehouses')
+            .select('id')
+            .eq('company_id', companyId)
+            .is('deleted_at', null)
+            .order('is_primary', { ascending: false })
+            .limit(1);
+          if (defaultWh && defaultWh.length > 0) {
+            targetWarehouseId = defaultWh[0].id;
+          }
+        }
+
+        if (targetWarehouseId) {
+          const { error: stockError } = await inventoryApi.initializeStock(companyId, _userId, {
             product_id: product.id,
-            warehouse_id: warehouse.id,
-            quantity: Number(data.stock_quantity) || 0,
+            warehouse_id: targetWarehouseId,
+            quantity: initialQty,
+            unit_cost: Number(data.cost_price) || 0,
           });
+          if (stockError) throw parseError(stockError);
         }
       }
 
       return product;
     } catch (error: unknown) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        (error as { code: string }).code === '23505'
-      ) {
-        throw parseError(error);
-      }
-      throw error;
+      throw error instanceof Error ? error : parseError(error);
     }
   },
 
@@ -459,15 +494,7 @@ export const productService = {
       return product;
     } catch (err) {
       logger.error('ProductService', `Critical failure in updateProduct`, err);
-      if (
-        typeof err === 'object' &&
-        err !== null &&
-        'code' in err &&
-        (err as { code: string }).code === '23505'
-      ) {
-        throw parseError(err);
-      }
-      throw err;
+      throw err instanceof Error ? err : parseError(err);
     }
   },
 
@@ -476,7 +503,7 @@ export const productService = {
    */
   deleteProduct: async (id: string) => {
     const { error } = await inventoryApi.deleteProduct(id);
-    if (error) throw error;
+    if (error) throw parseError(error);
   },
 
   /**
@@ -484,7 +511,7 @@ export const productService = {
    */
   bulkDeleteProducts: async (ids: string[]) => {
     const { error } = await inventoryApi.bulkDeleteProducts(ids);
-    if (error) throw error;
+    if (error) throw parseError(error);
   },
 
   /**
@@ -496,7 +523,7 @@ export const productService = {
       .select('id, name_ar, sku, sale_price')
       .eq('company_id', companyId)
       .eq('status', 'active');
-    if (error) throw error;
+    if (error) throw parseError(error);
     return (data || []).map(
       (p: { id: string; name_ar: string; sku: string | null; sale_price: number | null }) => ({
         id: p.id,
@@ -510,15 +537,40 @@ export const productService = {
   /**
    * Get item movement history with date filtering and detail resolution, now processed on the DB side
    */
-  getItemMovement: async (productId: string, companyId: string) => {
-    const { data, error } = await supabase.rpc('get_item_movements_with_balance', {
-      p_company_id: companyId,
-      p_product_id: productId,
-    });
+  getItemMovement: async (
+    productId: string,
+    companyId: string,
+    branchId?: string | null
+  ) => {
+    const [{ data, error }, { data: whRows }] = await Promise.all([
+      supabase.rpc('get_item_movements_with_balance', {
+        p_company_id: companyId,
+        p_product_id: productId,
+      }),
+      branchId
+        ? supabase
+          .from('warehouses')
+          .select('id, name_ar')
+          .eq('company_id', companyId)
+          .eq('branch_id', branchId)
+          .is('deleted_at', null)
+        : Promise.resolve({ data: null }),
+    ]);
 
-    if (error) throw error;
+    if (error) throw parseError(error);
 
-    return data || [];
+    const rows = data || [];
+    if (branchId && whRows && whRows.length > 0) {
+      const branchWhIds = new Set(whRows.map(w => w.id));
+      const branchWhNames = new Set(whRows.map(w => w.name_ar).filter(Boolean));
+      return rows.filter((r: Record<string, unknown>) => {
+        if (typeof r.warehouse_id === 'string') return branchWhIds.has(r.warehouse_id);
+        if (typeof r.warehouse_name === 'string') return branchWhNames.has(r.warehouse_name);
+        return true;
+      });
+    }
+
+    return rows;
   },
 
   /**
@@ -589,7 +641,7 @@ export const productService = {
    */
   toggleCoreProduct: async (id: string, isCore: boolean) => {
     const { data, error } = await inventoryApi.toggleCoreProduct(id, isCore);
-    if (error) throw error;
+    if (error) throw parseError(error);
     return data;
   },
 
@@ -598,14 +650,15 @@ export const productService = {
    */
   bulkSetCoreProducts: async (ids: string[], isCore: boolean) => {
     const { error } = await inventoryApi.bulkSetCoreProducts(ids, isCore);
-    if (error) throw error;
+    if (error) throw parseError(error);
   },
 
   /**
    * Get accurate aggregate counts for favorite products (total, critical, out_of_stock, safe)
    */
   getCoreProductsStats: async (
-    companyId: string
+    companyId: string,
+    branchId?: string | null
   ): Promise<{
     total: number;
     critical: number;
@@ -615,13 +668,13 @@ export const productService = {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, min_stock_level, stock:product_stock(quantity)')
+        .select('id, min_stock_level, stock:product_stock(quantity, warehouses(branch_id))')
         .eq('company_id', companyId)
         .eq('is_core', true)
         .is('deleted_at', null)
         .or('status.eq.active,status.is.null');
 
-      if (error) throw error;
+      if (error) throw parseError(error);
 
       let critical = 0;
       let outOfStock = 0;
@@ -631,11 +684,17 @@ export const productService = {
       interface CoreProductRow {
         id: string;
         min_stock_level: number | null;
-        stock?: Array<{ quantity: number | string | null }> | null;
+        stock?: Array<{
+          quantity: number | string | null;
+          warehouses?: { branch_id?: string | null } | null;
+        }> | null;
       }
 
       ((data || []) as unknown as CoreProductRow[]).forEach(row => {
-        const stockQty = (row.stock || []).reduce(
+        const filteredStock = branchId
+          ? (row.stock || []).filter(s => !s.warehouses || s.warehouses.branch_id === branchId)
+          : row.stock || [];
+        const stockQty = filteredStock.reduce(
           (sum: number, s) => sum + (Number(s.quantity) || 0),
           0
         );

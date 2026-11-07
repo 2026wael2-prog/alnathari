@@ -39,17 +39,30 @@ export interface Branch {
   id: string;
   name: string;
   company_id: string;
+  code?: string | null;
+  is_main?: boolean | null;
   address?: string | null;
   phone?: string | null;
   email?: string | null;
   status: string;
-  integration_mode?: 'independent' | 'full_integration' | 'inventory_only' | string | null;
+  integration_mode?: string | null;
+  warehouses?: Array<{
+    id: string;
+    name?: string;
+    name_ar?: string;
+    location?: string | null;
+    is_primary?: boolean | null;
+    deleted_at?: string | null;
+  }>;
   created_at: string;
   updated_at: string;
 }
 
 export interface BranchFormData {
   name: string;
+  code?: string | null;
+  is_main?: boolean | null;
+  integration_mode?: string;
   address?: string | null;
   phone?: string | null;
   email?: string | null;

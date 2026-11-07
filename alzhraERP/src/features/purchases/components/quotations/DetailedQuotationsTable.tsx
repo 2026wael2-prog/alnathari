@@ -1,6 +1,7 @@
 /* eslint-disable max-lines-per-function */
 import React, { useMemo } from 'react';
 import { formatCurrency } from '../../../../core/utils';
+import { formatLocalDate } from '../../../../core/utils/dateUtils';
 import { STATUS_CONFIG } from './statusConfig';
 import QuotationActionIcons from '../../../sales/components/quotations/QuotationActionIcons';
 import type { QuotationRowAction } from '../../../sales/components/quotations/QuotationActionIcons';
@@ -99,7 +100,7 @@ const DetailedQuotationsTableRow: React.FC<DetailedQuotationsTableRowProps> = ({
         </span>
       </td>
       <td className="px-3 py-3 text-center font-mono text-xs text-gray-400">
-        {item.createdAt !== '' ? item.createdAt.split('T')[0] : '—'}
+        {item.createdAt !== '' ? formatLocalDate(item.createdAt) : '—'}
       </td>
       <td className="px-3 py-3">
         {isFirstItem && onQuotationAction !== undefined && (

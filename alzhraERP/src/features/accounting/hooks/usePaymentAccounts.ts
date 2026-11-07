@@ -70,14 +70,20 @@ export const usePaymentAccounts = (): { data: PaymentAccount[]; isLoading: boole
   const data = useMemo<PaymentAccount[]>(() => {
     const list: PaymentAccount[] = [...cash, ...exchanges];
 
-    // Source-of-truth fallback: If cashboxes or exchange companies are not yet configured or
-    // missing sub-boxes, pull all active postable cash/bank accounts directly from Chart of Accounts (1010xxx, 1020xxx, 1030xxx)
+    // Source-of-truth fallback:
+    // - 102% (Bank accounts) are company-wide and not stored in fin_cashboxes / fin_exchange_companies, so always include active leaf 102% accounts.
+    // - 101% (Cashboxes) and 103% (Exchange companies) are branch-scoped via fin_cashboxes and fin_exchange_companies.
+    //   Only fall back to Chart of Accounts 101% / 103% if the active branch has 0 cashboxes / 0 exchange companies configured.
     if (allAccounts && allAccounts.length > 0) {
       const existingAccountIds = new Set(list.map(p => p.id));
+      const hasBranchCashboxes = cash.length > 0;
+      const hasBranchExchanges = exchanges.length > 0;
       const operationalTreasuryAccounts = allAccounts.filter(
         a =>
           Boolean(a.allow_posting) &&
-          (a.code.startsWith('101') || a.code.startsWith('102') || a.code.startsWith('103')) &&
+          (a.code.startsWith('102') ||
+            (!hasBranchCashboxes && a.code.startsWith('101')) ||
+            (!hasBranchExchanges && a.code.startsWith('103'))) &&
           !allAccounts.some(child => child.parent_id === a.id) && // leaf nodes only
           !existingAccountIds.has(a.id)
       );

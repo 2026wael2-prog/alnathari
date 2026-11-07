@@ -331,7 +331,8 @@ export const useBranchMutations = () => {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['branches'] });
-      showToast('تمت إضافة الفرع الجديد بنجاح', 'success');
+      await queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+      showToast('تمت إضافة الفرع ومستودعه الرئيسي بنجاح', 'success');
     },
     onError: (err: unknown) => {
       showToast(`خطأ في إضافة الفرع: ${parseError(err).message}`, 'error');

@@ -95,7 +95,14 @@ export function useProductSelectionTable({
 
         if (error) {
           logger.warn('useProductSelectionTable', 'RPC search error, falling back:', error.message);
-          const fallbackProds = await productService.getProducts(companyId, 1, 250);
+          const fallbackProds = await productService.getProducts(
+            companyId,
+            1,
+            250,
+            undefined,
+            undefined,
+            effectiveBranchId
+          );
           const q = submittedQuery.trim().toLowerCase();
           if (!q) return fallbackProds;
           return fallbackProds.filter(
@@ -108,7 +115,7 @@ export function useProductSelectionTable({
           );
         }
 
-        return productService.mapRawProducts(data ?? []);
+        return productService.mapRawProducts(data ?? [], undefined, effectiveBranchId);
       } catch (err) {
         logger.error('useProductSelectionTable', 'Failed to fetch products:', err);
         return [];

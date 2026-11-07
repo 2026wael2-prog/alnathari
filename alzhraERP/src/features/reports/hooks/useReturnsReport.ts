@@ -161,6 +161,9 @@ export const useReturnsReport = () => {
   // Filter returns based on status and reason
   const filteredSalesReturns = useMemo(() => {
     return normalizedSalesReturns.filter((r: ReturnReportRow) => {
+      if (filters.status === 'all' && (r.status === 'void' || r.status === 'cancelled')) {
+        return false;
+      }
       if (filters.status !== 'all' && r.status !== filters.status) return false;
       if (filters.reason !== 'all' && r.return_reason !== filters.reason) return false;
       return true;
@@ -169,11 +172,23 @@ export const useReturnsReport = () => {
 
   const filteredPurchaseReturns = useMemo(() => {
     return normalizedPurchaseReturns.filter((r: ReturnReportRow) => {
+      if (filters.status === 'all' && (r.status === 'void' || r.status === 'cancelled')) {
+        return false;
+      }
       if (filters.status !== 'all' && r.status !== filters.status) return false;
       if (filters.reason !== 'all' && r.return_reason !== filters.reason) return false;
+      const issueDate = r.issue_date ?? '';
+      if (dateRange.startDate && issueDate && issueDate < dateRange.startDate) return false;
+      if (dateRange.endDate && issueDate && issueDate > dateRange.endDate) return false;
       return true;
     });
-  }, [normalizedPurchaseReturns, filters.status, filters.reason]);
+  }, [
+    normalizedPurchaseReturns,
+    filters.status,
+    filters.reason,
+    dateRange.startDate,
+    dateRange.endDate,
+  ]);
 
   const getRowBaseAmount = (r: ReturnReportRow): number => {
     return toBaseCurrency({

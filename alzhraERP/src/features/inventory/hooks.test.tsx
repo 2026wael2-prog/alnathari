@@ -62,7 +62,7 @@ describe('Inventory Hooks', () => {
 
       await waitFor(() => {
         expect(inventoryService.createProduct).toHaveBeenCalledWith(
-          newProductData,
+          expect.objectContaining(newProductData),
           'comp-1',
           'user-1'
         );

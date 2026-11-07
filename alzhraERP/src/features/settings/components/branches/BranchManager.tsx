@@ -149,6 +149,16 @@ const BranchManager: React.FC = () => {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-bold text-gray-800 dark:text-white">{branch.name}</p>
+                        {branch.code && (
+                          <span className="rounded bg-blue-100 px-2 py-0.5 font-mono text-xs font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                            {branch.code}
+                          </span>
+                        )}
+                        {branch.is_main && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                            المركز الرئيسي
+                          </span>
+                        )}
                         <span
                           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
                             branch.status === 'active'
@@ -166,6 +176,21 @@ const BranchManager: React.FC = () => {
                             </>
                           )}
                         </span>
+                        {branch.integration_mode && (
+                          <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                            {branch.integration_mode === 'independent'
+                              ? 'مستقل بالكامل'
+                              : branch.integration_mode === 'inventory_only'
+                                ? 'تكامل مخزني فقط'
+                                : 'تكامل شامل'}
+                          </span>
+                        )}
+                        {branch.warehouses && branch.warehouses.length > 0 && (
+                          <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                            المخازن ({branch.warehouses.length}):{' '}
+                            {branch.warehouses.map(w => w.name_ar || w.name).join('، ')}
+                          </span>
+                        )}
                       </div>
 
                       <div className="mt-1 flex flex-col gap-0.5">

@@ -41,13 +41,18 @@ export interface CreateTreasuryInput {
 export const treasuryApi = {
   // ── Cashboxes ──────────────────────────────────────────────────────────────
 
-  getCashboxes: async (companyId: string) => {
-    return await supabase
+  getCashboxes: async (companyId: string, branchId?: string | null) => {
+    let query = supabase
       .from('cashboxes')
       .select('*')
       .eq('company_id', companyId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: true });
+      .eq('is_active', true);
+
+    if (branchId) {
+      query = query.or(`branch_id.eq.${branchId},branch_id.is.null`);
+    }
+
+    return await query.order('created_at', { ascending: true });
   },
 
   createCashbox: async (companyId: string, input: CreateTreasuryInput) => {
@@ -81,13 +86,18 @@ export const treasuryApi = {
 
   // ── Exchange Companies ─────────────────────────────────────────────────────
 
-  getExchangeCompanies: async (companyId: string) => {
-    return await supabase
+  getExchangeCompanies: async (companyId: string, branchId?: string | null) => {
+    let query = supabase
       .from('exchange_companies')
       .select('*')
       .eq('company_id', companyId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: true });
+      .eq('is_active', true);
+
+    if (branchId) {
+      query = query.or(`branch_id.eq.${branchId},branch_id.is.null`);
+    }
+
+    return await query.order('created_at', { ascending: true });
   },
 
   createExchangeCompany: async (companyId: string, input: CreateTreasuryInput) => {

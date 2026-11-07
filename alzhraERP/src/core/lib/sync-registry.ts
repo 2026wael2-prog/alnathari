@@ -5,6 +5,8 @@ import { purchasesService, purchasesApi } from '../../features/purchases/service
 import { accountsService } from '../../features/accounting/services/accountsService';
 import { inventoryApi } from '../../features/inventory/api';
 import { partiesService } from '../../features/parties/service';
+import { bondsService } from '../../features/bonds/service';
+import { journalService } from '../../features/accounting/services/journalService';
 import type { PartyType } from '../../features/parties/types';
 
 /**
@@ -28,10 +30,10 @@ export const processSyncMutation = async (
   if (feature === 'products' && action === 'save') {
     const { id, company_id, user_id, ...data } = vars;
 
-    if (id) {
+    if (typeof id === 'string' && id !== '') {
       // Conflict Detection: Fetch current state
-      const { data: current } = await inventoryApi.getProductById(id as string);
-      if (current && meta.last_updated_at) {
+      const { data: current } = await inventoryApi.getProductById(id);
+      if (current !== null && current !== undefined && typeof meta.last_updated_at === 'string' && meta.last_updated_at !== '') {
         const serverTime = new Date(current.updated_at).getTime();
         const clientTime = new Date(meta.last_updated_at).getTime();
 
@@ -69,8 +71,8 @@ export const processSyncMutation = async (
     );
   }
 
-  if (feature === 'inventory' && action === 'save_audit_progress') {
-    const { items } = vars;
+  if (feature === 'inventory' && (action === 'save_audit_progress' || action === 'audit')) {
+    const items = Array.isArray(variables) ? variables : vars.items;
     return inventoryService.saveAuditProgress(
       cast<Parameters<typeof inventoryService.saveAuditProgress>[0]>(items)
     );
@@ -78,11 +80,13 @@ export const processSyncMutation = async (
 
   // Parties Sync
   if (feature === 'parties' && action === 'save') {
-    const { company_id, id, ...data } = vars;
+    const { company_id, id, branch_id, branchId, ...data } = vars;
+    const effectiveBranchId = (branch_id ?? branchId ?? null) as string | null;
     return partiesService.saveParty(
       company_id as string,
       cast<Parameters<typeof partiesService.saveParty>[1]>(data),
-      cast<Parameters<typeof partiesService.saveParty>[2]>(id)
+      cast<Parameters<typeof partiesService.saveParty>[2]>(id),
+      effectiveBranchId
     );
   }
 
@@ -140,6 +144,30 @@ export const processSyncMutation = async (
     return accountsService.createAccount(
       cast<Parameters<typeof accountsService.createAccount>[0]>(data),
       company_id as string
+    );
+  }
+
+  if (feature === 'accounting' && action === 'journal') {
+    const { companyId, company_id, userId, user_id, branchId, branch_id, data } = vars;
+    const effectiveBranchId = (branchId ?? branch_id ?? null) as string | null;
+    return journalService.createJournal(
+      cast<Parameters<typeof journalService.createJournal>[0]>(data ?? vars),
+      (companyId ?? company_id) as string,
+      (userId ?? user_id) as string,
+      effectiveBranchId
+    );
+  }
+
+  if (feature === 'bonds' && action === 'create') {
+    const { company_id, user_id, branch_id, branchId, ...data } = vars;
+    const effectiveBranchId = (branchId ?? branch_id) as string | undefined;
+    return bondsService.createBond(
+      company_id as string,
+      user_id as string,
+      cast<Parameters<typeof bondsService.createBond>[2]>({
+        ...data,
+        ...(typeof effectiveBranchId === 'string' && effectiveBranchId !== '' ? { branchId: effectiveBranchId } : {}),
+      })
     );
   }
 

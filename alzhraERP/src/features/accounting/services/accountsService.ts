@@ -34,7 +34,7 @@ const DEFAULT_CHART_OF_ACCOUNTS: Array<{
 export const accountsService = {
   getAccounts: async (
     companyId: string,
-    options?: { includeBalances?: boolean }
+    options?: { includeBalances?: boolean; branchId?: string | null }
   ): Promise<Account[]> => {
     // Fetch account metadata
     const { data, error } = await accountsApi.getAccounts(companyId);
@@ -54,6 +54,7 @@ export const accountsService = {
         {
           p_company_id: companyId,
           p_as_of_date: formatLocalDate(),
+          ...(options.branchId ? { p_branch_id: options.branchId } : {}),
         }
       );
       // Fail loudly rather than silently zeroing every account balance.

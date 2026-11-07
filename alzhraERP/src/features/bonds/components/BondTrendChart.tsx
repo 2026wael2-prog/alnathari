@@ -36,7 +36,7 @@ const BondTrendChart: React.FC<BondTrendChartProps> = ({ data, isDark }) => {
                             tickFormatter={(value) => new Date(value).toLocaleDateString('ar-SA-u-nu-latn', { day: 'numeric', month: 'short' })}
                         />
                         <YAxis
-                            tick={{ fontSize: 9, fill: '#94a3b8' }}
+                            tick={{ fontSize: 10, fill: '#94a3b8' }}
                             axisLine={false}
                             tickLine={false}
                             width={40}

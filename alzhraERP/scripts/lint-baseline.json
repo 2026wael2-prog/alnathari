@@ -530,7 +530,7 @@
   "src/features/parties/components/customers/CustomerTimeline.tsx": 9,
   "src/features/parties/components/customers/CustomerTimelineModal.tsx": 15,
   "src/features/parties/components/statement/StatementControls.tsx": 50,
-  "src/features/parties/components/statement/StatementPrintSheet.tsx": 3,
+  "src/features/parties/components/statement/StatementPrintSheet.tsx": 0,
   "src/features/parties/components/statement/StatementSummaryCards.tsx": 7,
   "src/features/parties/hooks.ts": 37,
   "src/features/parties/lib/party-cache.ts": 1,
@@ -815,7 +815,7 @@
   "src/features/supplier-portal/components/QuotationBuilderDrawer.tsx": 29,
   "src/features/supplier-portal/components/QuotationHistoryModal.tsx": 9,
   "src/features/supplier-portal/components/SupplierProductDataGrid.tsx": 18,
-  "src/features/supplier-portal/components/SupplierQuotationPrintModal.tsx": 32,
+  "src/features/supplier-portal/components/SupplierQuotationPrintModal.tsx": 23,
   "src/features/supplier-portal/components/VendorComparisonModal.tsx": 13,
   "src/features/supplier-portal/components/tabs/ProductsTab.tsx": 0,
   "src/features/supplier-portal/components/tabs/QuotationsTab.tsx": 10,
@@ -1004,7 +1004,7 @@
   "src/features/admin/services/adminService.ts": 9,
   "src/features/admin/types.ts": 0,
   "src/core/types/invoiceSearch.ts": 0,
-  "src/features/bonds/components/BondVoucherModal.tsx": 25,
+  "src/features/bonds/components/BondVoucherModal.tsx": 32,
   "src/ui/common/InvoiceSearchToolbar.tsx": 18,
   "src/ui/layout/tabs/MultiViewContainer.tsx": 0,
   "src/ui/layout/tabs/WorkspaceTabBar.tsx": 28,
@@ -1015,5 +1015,9 @@
   "src/features/expenses/components/ExpenseLedgerView.tsx": 1,
   "src/features/expenses/components/ledger/ExpenseLedgerSummaryCards.tsx": 1,
   "src/features/expenses/components/ledger/ExpenseLedgerToolbar.tsx": 0,
-  "src/features/expenses/components/ledger/expenseLedgerColumns.tsx": 2
+  "src/features/expenses/components/ledger/expenseLedgerColumns.tsx": 2,
+  "src/features/appearance/presets/classicMizanPro.test.ts": 0,
+  "src/features/sales/components/print/PrintDocumentHeader.tsx": 0,
+  "src/ui/common/UniversalDocumentHeader.tsx": 0,
+  "src/ui/layout/useLayoutVariant.test.ts": 0
 }

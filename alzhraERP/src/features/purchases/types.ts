@@ -46,6 +46,7 @@ export interface CreatePaymentDTO {
   method: 'cash' | 'bank';
   /** الحساب المالي (خزينة/بنك/صرافة) المختار صراحةً لسند الصرف — إن غاب يُستخدم أول صندوق نشط */
   treasuryAccountId?: string | undefined;
+  branchId?: string | null | undefined;
   reference?: string | undefined;
   notes?: string | undefined;
   currencyCode?: string | undefined;
@@ -59,6 +60,7 @@ export interface SupplierPaymentData {
   date: string;
   /** الحساب المالي المختار صراحةً — يحل محل البحث الثابت عن رمز الحساب '1010' */
   treasuryAccountId?: string | undefined;
+  branchId?: string | null | undefined;
   notes?: string | undefined;
   currencyCode?: string | undefined;
   exchangeRate?: number | undefined;

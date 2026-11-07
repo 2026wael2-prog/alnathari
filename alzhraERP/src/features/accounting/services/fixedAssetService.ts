@@ -34,18 +34,25 @@ export interface CreateFixedAssetInput {
   salvage_value?: number;
   useful_life_months: number;
   notes?: string;
+  branch_id?: string | null;
 }
 
 export const fixedAssetService = {
-  getAssets: async (companyId: string): Promise<FixedAsset[]> => {
-    const { data, error } = await (supabase.from as any)('fixed_assets')
+  getAssets: async (companyId: string, branchId?: string | null): Promise<FixedAsset[]> => {
+    let query = (supabase as unknown as { from: (table: string) => any })
+      .from('fixed_assets')
       .select('*')
       .eq('company_id', companyId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .is('deleted_at', null);
+
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) throw parseError(error);
-    return (data as FixedAsset[]) ?? [];
+    return (data as unknown as FixedAsset[]) ?? [];
   },
 
   createAsset: async (companyId: string, input: CreateFixedAssetInput): Promise<FixedAsset> => {
@@ -68,9 +75,11 @@ export const fixedAssetService = {
       );
     }
 
-    const { data, error } = await (supabase.from as any)('fixed_assets')
+    const { data, error } = await supabase
+      .from('fixed_assets' as 'accounts')
       .insert({
         company_id: companyId,
+        ...(input.branch_id ? { branch_id: input.branch_id } : {}),
         name: input.name,
         asset_code: input.asset_code,
         category: input.category || 'equipment',
@@ -83,29 +92,35 @@ export const fixedAssetService = {
         depreciation_expense_account_id: expAcc.id,
         notes: input.notes,
         status: 'active',
-      })
+      } as never)
       .select()
       .single();
 
     if (error) throw parseError(error);
-    return data as FixedAsset;
+    return data as unknown as FixedAsset;
   },
 
   postAssetDepreciation: async (assetId: string, periodDate?: string) => {
-    const { data, error } = await (supabase.rpc as any)('fn_post_asset_depreciation', {
-      p_asset_id: assetId,
-      p_period_date: periodDate || formatLocalDate(new Date()),
-    });
+    const { data, error } = await supabase.rpc(
+      'fn_post_asset_depreciation' as never,
+      {
+        p_asset_id: assetId,
+        p_period_date: periodDate || formatLocalDate(new Date()),
+      } as never
+    );
 
     if (error) throw parseError(error);
     return data;
   },
 
   runAllAssetsDepreciation: async (companyId: string, periodDate?: string) => {
-    const { data, error } = await (supabase.rpc as any)('fn_run_all_assets_depreciation', {
-      p_company_id: companyId,
-      p_period_date: periodDate || formatLocalDate(new Date()),
-    });
+    const { data, error } = await supabase.rpc(
+      'fn_run_all_assets_depreciation' as never,
+      {
+        p_company_id: companyId,
+        p_period_date: periodDate || formatLocalDate(new Date()),
+      } as never
+    );
 
     if (error) throw parseError(error);
     return data;

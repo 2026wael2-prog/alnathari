@@ -100,7 +100,10 @@ const InvoiceMeta: React.FC<Props> = ({ invoiceNumber }) => {
     // صندوق سعودي) مع عملة مثل USD/OMR/CNY فيُودَع البيع في الصندوق الخطأ بصمت.
     // الآن: مطابقة دقيقة بالعملة أولاً ثم بالاسم/الرمز، مع إفراغ الاختيار القديم
     // عند غياب حساب مطابق حتى لا يمرر المتصل حساباً بعملة مختلفة.
-    if (currencyChanged && paymentAccounts && paymentAccounts.length > 0) {
+    const isCashboxValid = Boolean(
+      cashboxId && paymentAccounts?.some(acc => acc.id === cashboxId)
+    );
+    if ((currencyChanged || !isCashboxValid) && paymentAccounts && paymentAccounts.length > 0) {
       const normalizedCurrency = (currency || 'SAR').toUpperCase();
       const searchTerms = [
         normalizedCurrency,
@@ -120,12 +123,15 @@ const InvoiceMeta: React.FC<Props> = ({ invoiceNumber }) => {
         return currencyMatches || keywordMatches;
       });
 
-      setMetadata('cashboxId', matchingAccount ? matchingAccount.id : '');
+      setMetadata('cashboxId', matchingAccount ? matchingAccount.id : paymentAccounts[0]?.id ?? '');
     }
 
-    // Default primary warehouse selection
-    if (warehouses && warehouses.length > 0 && (warehouseId === 'wh_main' || !warehouseId)) {
-      const castWarehouses = warehouses as Array<Record<string, unknown>>;
+    // Default primary warehouse selection (also re-selects when switching branches if stored warehouseId belongs to another branch)
+    const castWarehouses = (warehouses ?? []) as Array<Record<string, unknown>>;
+    const isWarehouseValid = Boolean(
+      warehouseId && warehouseId !== 'wh_main' && castWarehouses.some(w => w.id === warehouseId)
+    );
+    if (castWarehouses.length > 0 && !isWarehouseValid) {
       const primary = castWarehouses.find(w => w.is_primary);
       const target = primary || castWarehouses[0];
       if (target?.id) {
@@ -136,6 +142,7 @@ const InvoiceMeta: React.FC<Props> = ({ invoiceNumber }) => {
     prevCurrency.current = currency;
   }, [
     currency,
+    cashboxId,
     paymentAccounts,
     rates.data,
     warehouses,

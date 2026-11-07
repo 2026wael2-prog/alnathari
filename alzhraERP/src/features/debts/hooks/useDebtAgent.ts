@@ -8,41 +8,44 @@ import {
   type AgentQueueItem,
 } from '../services/debtAgentService';
 import type { DebtFollowupConfigUpdate } from '../types';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 
+// eslint-disable-next-line max-lines-per-function, @typescript-eslint/explicit-function-return-type
 export const useDebtAgent = () => {
   const companyId = useAuthStore(s => s.user?.company_id);
+  const { branchId } = useBranchFilter();
   const queryClient = useQueryClient();
   const { showToast } = useFeedbackStore();
 
   const telemetryQuery = useQuery<AgentTelemetry>({
-    queryKey: ['debts', 'agent', 'telemetry', companyId],
-    queryFn: () => debtAgentService.getTelemetry(companyId!),
+    queryKey: ['debts', 'agent', 'telemetry', companyId, branchId],
+    queryFn: () => debtAgentService.getTelemetry(companyId ?? '', branchId),
     enabled: Boolean(companyId),
     refetchInterval: 30_000,
   });
 
   const feedQuery = useQuery<AgentActivityItem[]>({
-    queryKey: ['debts', 'agent', 'feed', companyId],
-    queryFn: () => debtAgentService.getActivityFeed(companyId!),
+    queryKey: ['debts', 'agent', 'feed', companyId, branchId],
+    queryFn: () => debtAgentService.getActivityFeed(companyId ?? '', 30, branchId),
     enabled: Boolean(companyId),
     refetchInterval: 45_000,
   });
 
   const queueQuery = useQuery<AgentQueueItem[]>({
-    queryKey: ['debts', 'agent', 'queue', companyId],
-    queryFn: () => debtAgentService.getUpcomingQueue(companyId!),
+    queryKey: ['debts', 'agent', 'queue', companyId, branchId],
+    queryFn: () => debtAgentService.getUpcomingQueue(companyId ?? '', branchId),
     enabled: Boolean(companyId),
     refetchInterval: 45_000,
   });
 
   const toggleAutonomous = useMutation({
     mutationFn: async (enabled: boolean) => {
-      if (!companyId) throw new Error('لا توجد جلسة عمل');
+      if (companyId === undefined || companyId === '') throw new Error('لا توجد جلسة عمل');
       return debtAgentService.toggleAutonomousMode(companyId, enabled);
     },
     onSuccess: data => {
-      queryClient.invalidateQueries({ queryKey: ['debts', 'agent'] });
-      queryClient.invalidateQueries({ queryKey: ['debts', 'followup-config'] });
+      void queryClient.invalidateQueries({ queryKey: ['debts', 'agent'] });
+      void queryClient.invalidateQueries({ queryKey: ['debts', 'followup-config'] });
       showToast(
         data.auto_send_enabled
           ? 'تم تفعيل وضع المتابعة الآلية المستقلة للوكيل بنجاح 🟢'
@@ -57,12 +60,12 @@ export const useDebtAgent = () => {
 
   const updateGovernance = useMutation({
     mutationFn: async (updates: DebtFollowupConfigUpdate) => {
-      if (!companyId) throw new Error('لا توجد جلسة عمل');
+      if (companyId === undefined || companyId === '') throw new Error('لا توجد جلسة عمل');
       return debtAgentService.updateGovernance(companyId, updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['debts', 'agent'] });
-      queryClient.invalidateQueries({ queryKey: ['debts', 'followup-config'] });
+      void queryClient.invalidateQueries({ queryKey: ['debts', 'agent'] });
+      void queryClient.invalidateQueries({ queryKey: ['debts', 'followup-config'] });
       showToast('تم حفظ سياسات وقواعد الوكيل بنجاح ✅', 'success');
     },
     onError: (err: Error) => {
@@ -72,13 +75,13 @@ export const useDebtAgent = () => {
 
   const drainQueueNow = useMutation({
     mutationFn: async () => {
-      if (!companyId) throw new Error('لا توجد جلسة عمل');
+      if (companyId === undefined || companyId === '') throw new Error('لا توجد جلسة عمل');
       return debtAgentService.triggerDrainQueueNow(companyId);
     },
     onSuccess: res => {
-      queryClient.invalidateQueries({ queryKey: ['debts', 'agent'] });
+      void queryClient.invalidateQueries({ queryKey: ['debts', 'agent'] });
       showToast(
-        `تم تنفيذ جولة الإرسال فوراً (تمت معالجة ${res.dispatchedCount} عملية) 🚀`,
+        `تم تنفيذ جولة الإرسال فوراً (تمت معالجة ${String(res.dispatchedCount)} عملية) 🚀`,
         'success'
       );
     },
@@ -100,10 +103,10 @@ export const useDebtAgent = () => {
     isUpdatingGovernance: updateGovernance.isPending,
     drainQueueNow: drainQueueNow.mutate,
     isDraining: drainQueueNow.isPending,
-    refetchAll: () => {
-      telemetryQuery.refetch();
-      feedQuery.refetch();
-      queueQuery.refetch();
+    refetchAll: (): void => {
+      void telemetryQuery.refetch();
+      void feedQuery.refetch();
+      void queueQuery.refetch();
     },
   };
 };

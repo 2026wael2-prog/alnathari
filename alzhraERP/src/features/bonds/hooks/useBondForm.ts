@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { ArrowDown, ArrowRightLeft, ArrowUpCircle } from 'lucide-react';
 import type { BondFormData, BondType } from '../types';
-import { useAccounts } from '../../accounting/hooks/index';
+import { useAccounts, usePaymentAccounts } from '../../accounting/hooks/index';
 import { useParties } from '../../parties/hooks';
 import { useFeedbackStore } from '../../feedback/store';
 import { formatLocalDate } from '../../../core/utils';
@@ -53,6 +53,7 @@ export function useBondForm(
   prefill?: BondPrefill | null
 ) {
   const { data: allAccounts } = useAccounts();
+  const { data: paymentAccounts } = usePaymentAccounts();
   const { showToast } = useFeedbackStore();
   const [partyQuery, setPartyQuery] = useState('');
   const [showPartyDropdown, setShowPartyDropdown] = useState(false);
@@ -186,20 +187,29 @@ export function useBondForm(
   }, [isOpen, prefill, setValue, setAmountInputStr]);
 
   const { cashAccounts, otherAccounts } = useMemo(() => {
-    const cash = allAccounts?.filter(acc => acc.code.startsWith('10')) || [];
+    const paymentIds = new Set((paymentAccounts ?? []).map(p => p.id));
+    const cash =
+      paymentIds.size > 0 && allAccounts
+        ? allAccounts.filter(acc => paymentIds.has(acc.id))
+        : allAccounts?.filter(acc => acc.code.startsWith('10') && acc.allow_posting) || [];
     const others = allAccounts?.filter(acc => !acc.code.startsWith('10')) || [];
     return { cashAccounts: cash, otherAccounts: others };
-  }, [allAccounts]);
+  }, [allAccounts, paymentAccounts]);
 
-  // Auto-select primary cash account if none selected
+  // Auto-select branch cash account if none selected or if selected account does not belong to current branch's cashAccounts
   useEffect(() => {
-    if (cashAccounts.length > 0 && !watch('cash_account_id')) {
-      const primaryCash = cashAccounts.find(a => a.code === '1010') || cashAccounts[0];
+    const currentCashId = watch('cash_account_id');
+    const isValid = Boolean(currentCashId && cashAccounts.some(a => a.id === currentCashId));
+    if (cashAccounts.length > 0 && !isValid) {
+      const currencyMatch = cashAccounts.find(
+        a => (a.currency_code ?? 'SAR').toUpperCase() === (selectedCurrency || 'SAR').toUpperCase()
+      );
+      const primaryCash = currencyMatch || cashAccounts[0];
       if (primaryCash) {
         setValue('cash_account_id', primaryCash.id);
       }
     }
-  }, [cashAccounts, setValue, watch]);
+  }, [cashAccounts, selectedCurrency, setValue, watch]);
 
   const handlePartySelect = useCallback(
     (party: PartySelectOption) => {

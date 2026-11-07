@@ -47,7 +47,7 @@ export const useExpenseCategoryMutation = () => {
       return expensesService.createCategory(user.company_id, name);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expense_categories'] });
+      void queryClient.invalidateQueries({ queryKey: ['expense_categories'] });
       showToast('تمت إضافة التصنيف بنجاح', 'success');
     },
   });
@@ -61,8 +61,8 @@ export const useExpensesData = (searchTerm = '') => {
   const query = useQuery({
     queryKey: ['expenses', companyId, branchId],
     queryFn: () =>
-      companyId ? expensesService.getExpensesList(companyId, branchId) : Promise.resolve([]),
-    enabled: !!companyId,
+      Boolean(companyId) ? expensesService.getExpensesList(companyId ?? '', branchId) : Promise.resolve([]),
+    enabled: Boolean(companyId),
   });
 
   const filteredExpenses = useMemo(() => {
@@ -70,25 +70,22 @@ export const useExpensesData = (searchTerm = '') => {
     if (!searchTerm.trim()) return query.data;
     const term = searchTerm.toLowerCase().trim();
     return query.data.filter(e => {
-      const desc = (e.description || '').toLowerCase();
-      const voucher = (e.voucher_number || '').toLowerCase();
-      const cat = (e.category_name || '').toLowerCase();
-      const amt = String(e.amount || '');
-      const cur = (e.currency_code || '').toLowerCase();
-      const method = (e.payment_method || '').toLowerCase();
-      return (
-        desc.includes(term) ||
-        voucher.includes(term) ||
-        cat.includes(term) ||
-        amt.includes(term) ||
-        cur.includes(term) ||
-        method.includes(term)
-      );
+      const haystack = [
+        e.description ?? '',
+        e.voucher_number ?? '',
+        e.category_name ?? '',
+        String(e.amount),
+        e.currency_code,
+        e.payment_method,
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(term);
     });
   }, [query.data, searchTerm]);
 
   const stats = useMemo(() => {
-    return expensesService.calculateStats(query.data || []);
+    return expensesService.calculateStats(query.data ?? []);
   }, [query.data]);
 
   return { ...query, expenses: filteredExpenses, stats };
@@ -99,14 +96,15 @@ export const useExpenseActions = () => {
   const { user } = useAuthStore();
   const { showToast } = useFeedbackStore();
   const { isOnline } = useNetworkStatus();
-
   const { branchId } = useBranchFilter();
 
   const create = useMutation({
     mutationFn: async (data: ExpenseFormData) => {
-      if (!user?.company_id || !user?.id) throw new Error('جلسة العمل منتهية');
+      if (user?.company_id === undefined || user.company_id === '' || user.id === '') {
+        throw new Error('جلسة العمل منتهية');
+      }
       await assertPermission('expenses:create', 'تسجيل مصروفات');
-      const finalData = { ...data, branch_id: data.branch_id || branchId };
+      const finalData = { ...data, branch_id: data.branch_id ?? branchId };
       return expensesService.processNewExpense(finalData, user.company_id, user.id);
     },
     onSuccess: () => {
@@ -114,10 +112,15 @@ export const useExpenseActions = () => {
       showToast('تم تسجيل المصروف وترحيله بنجاح', 'success');
     },
     onError: (error: Error, variables) => {
-      if (!isOnline || error.message?.includes('Failed to fetch')) {
-        syncStore.enqueue({
+      if (!isOnline || error.message.includes('Failed to fetch')) {
+        void syncStore.enqueue({
           mutationKey: ['expenses', 'create'],
-          variables: { ...variables, company_id: user?.company_id, user_id: user?.id },
+          variables: {
+            ...variables,
+            branch_id: variables.branch_id ?? branchId,
+            company_id: user?.company_id,
+            user_id: user?.id,
+          },
         });
         showToast('تم حفظ المصروف محلياً (وضع عدم الاتصال). سيتم المزامنة تلقائياً.', 'info');
         return;

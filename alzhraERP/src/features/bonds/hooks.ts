@@ -8,6 +8,7 @@ import { useBranchFilter } from '../branches/hooks/useBranchFilter';
 import { invalidateFinancialQueries } from '../../core/utils/querySyncUtils';
 import { invalidateByPreset } from '../../lib/invalidation';
 import { parseError } from '../../core/utils/errorUtils';
+import { syncStore } from '../../core/lib/sync-store';
 
 export const useBonds = (type?: BondType) => {
   const { user } = useAuthStore();
@@ -50,17 +51,33 @@ export const useBondMutation = () => {
 
       return bondsService.createBond(user.company_id, user.id, {
         ...data,
-        ...(branchId ? { branchId } : {}),
+        ...(typeof branchId === 'string' && branchId.length > 0 ? { branchId } : {}),
       });
     },
     onSuccess: (_, variables) => {
-      invalidateFinancialQueries(queryClient, user?.company_id, { bonds: true });
+      void invalidateFinancialQueries(queryClient, user?.company_id, { bonds: true });
       invalidateByPreset(queryClient, 'bond');
       const typeName =
         variables.type === 'receipt' ? 'قبض' : variables.type === 'transfer' ? 'تحويل' : 'صرف';
       showToast(`تم إصدار سند ال${typeName} وترحيله آلياً`, 'success');
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown, variables) => {
+      const isOffline =
+        !navigator.onLine ||
+        (error instanceof Error && error.message.includes('Failed to fetch'));
+      if (isOffline && user?.company_id !== undefined && user.company_id !== '' && user.id !== '') {
+        void syncStore.enqueue({
+          mutationKey: ['bonds', 'create'],
+          variables: {
+            ...variables,
+            ...(typeof branchId === 'string' && branchId.length > 0 ? { branchId } : {}),
+            company_id: user.company_id,
+            user_id: user.id,
+          },
+        });
+        showToast('تم حفظ السند محلياً (وضع عدم الاتصال). ستتم المزامنة تلقائياً فور عودة الإنترنت.', 'info');
+        return;
+      }
       const appErr = parseError(error);
       showToast(appErr.message, 'error');
     },

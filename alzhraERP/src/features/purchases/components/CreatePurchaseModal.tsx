@@ -26,6 +26,7 @@ interface PurchaseValidationContext {
   supplier: { id: string; name: string } | null;
   issueDate: string;
   warehouseId: string;
+  availableWarehouseIds?: string[];
   invoiceType: string;
   cashboxId: string;
   validItems: ReturnType<typeof usePurchaseStore.getState>['items'];
@@ -34,6 +35,7 @@ const validatePurchase = ({
   supplier,
   issueDate,
   warehouseId,
+  availableWarehouseIds,
   invoiceType,
   cashboxId,
   validItems,
@@ -41,7 +43,13 @@ const validatePurchase = ({
   if (supplier === null) return 'يرجى اختيار مورد أولاً';
   if (validItems.length === 0) return 'يرجى إضافة صنف واحد على الأقل بكمية وسعر صحيحين';
   if (!hasText(issueDate)) return 'يرجى تحديد تاريخ الفاتورة';
-  if (!hasText(warehouseId)) return 'يرجى اختيار مستودع فعلي قبل اعتماد الفاتورة';
+  if (
+    !hasText(warehouseId) ||
+    (availableWarehouseIds &&
+      availableWarehouseIds.length > 0 &&
+      !availableWarehouseIds.includes(warehouseId))
+  )
+    return 'يرجى اختيار مستودع فعلي تابع للفرع قبل اعتماد الفاتورة';
   if (validItems.some(item => item.discount < 0 || item.discount > item.quantity * item.costPrice))
     return 'يوجد خصم غير صالح؛ يجب ألا يتجاوز الخصم إجمالي الصنف';
   if (invoiceType === 'cash' && !hasText(cashboxId))
@@ -254,10 +262,12 @@ const CreatePurchaseModal: React.FC<Props> = ({ onSuccess }) => {
     const validItems = items.filter(
       item => item.productId !== '' && item.quantity > 0 && item.costPrice > 0
     );
+    const availableWarehouseIds = (rawWarehouses ?? []).map(w => w.id);
     const validationError = validatePurchase({
       supplier,
       issueDate,
       warehouseId,
+      availableWarehouseIds,
       invoiceType,
       cashboxId,
       validItems,
@@ -288,6 +298,7 @@ const CreatePurchaseModal: React.FC<Props> = ({ onSuccess }) => {
     issueDate,
     items,
     paidAmount,
+    rawWarehouses,
     showToast,
     supplier,
     totals.grandTotal,
@@ -299,6 +310,12 @@ const CreatePurchaseModal: React.FC<Props> = ({ onSuccess }) => {
     const validItems = items.filter(
       item => item.productId !== '' && item.quantity > 0 && item.costPrice > 0
     );
+    const primaryWh =
+      (rawWarehouses ?? []).find(w => w.is_primary) ?? (rawWarehouses ?? [])[0];
+    const effectiveWarehouseId =
+      hasText(warehouseId) && (rawWarehouses ?? []).some(w => w.id === warehouseId)
+        ? warehouseId
+        : (primaryWh?.id ?? warehouseId);
 
     createPurchase(
       {
@@ -314,7 +331,7 @@ const CreatePurchaseModal: React.FC<Props> = ({ onSuccess }) => {
           quantity: item.quantity,
           costPrice: item.costPrice,
           discount: item.discount,
-          warehouseId,
+          warehouseId: effectiveWarehouseId,
           total: Math.max(0, item.quantity * item.costPrice - item.discount),
         })),
         status: 'posted',

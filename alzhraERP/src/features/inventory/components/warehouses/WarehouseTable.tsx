@@ -16,6 +16,10 @@ interface WarehouseRow {
     id: string;
     name_ar?: string;
     location?: string | null;
+    branch_id?: string | null;
+    branch_name?: string | null;
+    is_primary?: boolean;
+    code?: string | null;
     stockValue?: number;
     itemCount?: number;
     totalStock?: number;
@@ -30,24 +34,39 @@ const WarehouseTable: React.FC<Props> = ({ warehouses, onViewDetails, onEdit, on
                     <div className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-lg">
                         <Warehouse size={16} />
                     </div>
-                    <span className="font-bold text-gray-800 dark:text-slate-100 text-sm">{row.name_ar}</span>
+                    <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-gray-800 dark:text-slate-100 text-sm">{row.name_ar}</span>
+                        {row.is_primary === true && (
+                            <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                رئيسي
+                            </span>
+                        )}
+                    </div>
                 </div>
             )
         },
-        { header: 'الموقع', accessor: (row: WarehouseRow) => <span className="font-bold text-gray-500">{row.location || '---'}</span> },
+        {
+            header: 'الفرع',
+            accessor: (row: WarehouseRow) => (
+                <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                    {row.branch_name !== null && row.branch_name !== undefined && row.branch_name !== '' ? row.branch_name : 'عام للشركة'}
+                </span>
+            )
+        },
+        { header: 'الموقع', accessor: (row: WarehouseRow) => <span className="font-bold text-gray-500">{row.location !== null && row.location !== undefined && row.location !== '' ? row.location : '---'}</span> },
         {
             header: 'قيمة المخزون',
-            accessor: (row: WarehouseRow) => <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm">{formatCurrency(Number(row.stockValue || 0))}</span>,
+            accessor: (row: WarehouseRow) => <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm">{formatCurrency(row.stockValue ?? 0)}</span>,
             className: 'text-left'
         },
         {
             header: 'الأصناف',
-            accessor: (row: WarehouseRow) => <span className="font-mono font-bold text-gray-700 dark:text-slate-300">{formatNumberDisplay(Number(row.itemCount || 0))}</span>,
+            accessor: (row: WarehouseRow) => <span className="font-mono font-bold text-gray-700 dark:text-slate-300">{formatNumberDisplay(row.itemCount ?? 0)}</span>,
             className: 'text-center'
         },
         {
             header: 'إجمالي القطع',
-            accessor: (row: WarehouseRow) => <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{formatNumberDisplay(Number(row.totalStock || 0))}</span>,
+            accessor: (row: WarehouseRow) => <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{formatNumberDisplay(row.totalStock ?? 0)}</span>,
             className: 'text-center'
         },
         {

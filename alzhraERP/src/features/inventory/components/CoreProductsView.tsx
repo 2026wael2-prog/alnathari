@@ -16,6 +16,7 @@ import { useProductsPaginated } from '../hooks/useProductsPaginated';
 import { useProductMutations } from '../hooks/useProducts';
 import { productService } from '../services/productService';
 import { useAuthStore } from '../../auth/store';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 import type { Product } from '../types';
 import { cn, formatNumberDisplay } from '../../../core/utils';
 import type { Column } from '../../../ui/common/ExcelTable';
@@ -45,6 +46,7 @@ export const CoreProductsView: React.FC<CoreProductsViewProps> = ({
 }) => {
   const { user } = useAuthStore();
   const companyId = user?.company_id ?? '';
+  const { branchId } = useBranchFilter();
   const queryClient = useQueryClient();
 
   const [filterMode, setFilterMode] = useState<CoreFilterMode>('core_only');
@@ -77,8 +79,8 @@ export const CoreProductsView: React.FC<CoreProductsViewProps> = ({
     isFetching: isStatsFetching,
     refetch: refetchStats,
   } = useQuery({
-    queryKey: ['core_products_stats', companyId],
-    queryFn: () => productService.getCoreProductsStats(companyId),
+    queryKey: ['core_products_stats', companyId, branchId],
+    queryFn: () => productService.getCoreProductsStats(companyId, branchId),
     enabled: !!companyId,
     staleTime: 1000 * 30,
   });

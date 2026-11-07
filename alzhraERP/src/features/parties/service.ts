@@ -111,7 +111,13 @@ export const partiesService = {
   getStatement: async (
     partyId: string,
     _type: PartyType,
-    options?: { startDate?: string; endDate?: string; currencyCode?: string; companyId?: string },
+    options?: {
+      startDate?: string;
+      endDate?: string;
+      currencyCode?: string;
+      companyId?: string;
+      branchId?: string | null;
+    },
     explicitCompanyId?: string
   ): Promise<StatementMovement[]> => {
     let companyId = explicitCompanyId ?? options?.companyId;
@@ -197,7 +203,7 @@ export const partiesService = {
   ): Promise<StatementTransactionDetails | null> => {
     if (!companyId) return null;
 
-    const { data, error } = await (supabase.rpc as any)('get_statement_transaction_details', {
+    const { data, error } = await supabase.rpc('get_statement_transaction_details', {
       p_company_id: companyId,
       p_reference_type: referenceType,
       p_reference_id: referenceId,
@@ -206,7 +212,7 @@ export const partiesService = {
       logger.error('partiesService', 'Failed to fetch transaction details', error);
       return null;
     }
-    return data as unknown as StatementTransactionDetails;
+    return data as StatementTransactionDetails | null;
   },
 
   getCategoriesWithStats: async (companyId: string, type: PartyType): Promise<PartyCategory[]> => {
@@ -406,27 +412,21 @@ export const partiesService = {
 
       if (id) {
         const { error } = await partiesApi.updateParty(id, sanitizedData);
-        if (error) throw error;
+        if (error) throw parseError(error);
       } else {
-        const { error } = await partiesApi.createParty(sanitizedData, companyId, branchId);
-        if (error) throw error;
+        const effectiveBranchId =
+          branchId ?? (data as { branch_id?: string | null }).branch_id ?? null;
+        const { error } = await partiesApi.createParty(sanitizedData, companyId, effectiveBranchId);
+        if (error) throw parseError(error);
       }
     } catch (error: unknown) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        (error as { code: string }).code === '23505'
-      ) {
-        throw parseError(error);
-      }
-      throw error;
+      throw error instanceof Error ? error : parseError(error);
     }
   },
 
   deleteParty: async (id: string) => {
     const { error } = await partiesApi.deleteParty(id);
-    if (error) throw error;
+    if (error) throw parseError(error);
   },
 
   saveCategory: async (companyId: string, data: { name: string; type: PartyType }, id?: string) => {
@@ -438,7 +438,7 @@ export const partiesService = {
           .eq('id', id)
           .select()
           .single();
-        if (error) throw error;
+        if (error) throw parseError(error);
         return result;
       }
       const { data: result, error } = await supabase
@@ -446,7 +446,7 @@ export const partiesService = {
         .insert({ company_id: companyId, name: data.name, type: data.type })
         .select()
         .single();
-      if (error) throw error;
+      if (error) throw parseError(error);
       return result;
     } catch (error: unknown) {
       if (
@@ -457,19 +457,19 @@ export const partiesService = {
       ) {
         throw new Error('عذراً، هذا الاسم موجود مسبقاً في قائمة الفئات');
       }
-      throw error;
+      throw error instanceof Error ? error : parseError(error);
     }
   },
 
   deleteCategory: async (id: string) => {
     const { error } = await supabase.from('party_categories').delete().eq('id', id);
-    if (error) throw error;
+    if (error) throw parseError(error);
     return true;
   },
 
   search: async (companyId: string, type: PartyType, query: string) => {
     const { data, error } = await partiesApi.search(companyId, type, query);
-    if (error) throw error;
+    if (error) throw parseError(error);
     return (data || []) as unknown as Party[];
   },
 
@@ -479,7 +479,7 @@ export const partiesService = {
       .select('name_ar, address, phone, tax_number, logo_url')
       .eq('id', companyId)
       .single();
-    if (error) throw error;
+    if (error) throw parseError(error);
     return data;
   },
 
@@ -490,7 +490,7 @@ export const partiesService = {
       type,
       name
     );
-    if (searchError) throw searchError;
+    if (searchError) throw parseError(searchError);
 
     const existing = (searchResults || []).find((p: Record<string, unknown>) => p.name === name);
     if (existing) return existing as unknown as Party;
@@ -504,7 +504,7 @@ export const partiesService = {
       companyId
     );
 
-    if (createError) throw createError;
+    if (createError) throw parseError(createError);
     return created as unknown as Party;
   },
 };

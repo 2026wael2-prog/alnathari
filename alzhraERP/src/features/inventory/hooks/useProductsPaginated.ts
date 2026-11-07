@@ -77,7 +77,8 @@ async function fetchProductsFallback(
   search: string,
   sortKey: string,
   sortDir: string,
-  isCore?: boolean
+  isCore?: boolean,
+  branchId?: string | null
 ): Promise<ProductsPage> {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -110,7 +111,7 @@ async function fetchProductsFallback(
         stock:product_stock(
           quantity,
           warehouse_id,
-          warehouses(name_ar)
+          warehouses(name_ar, branch_id, branches(id, name))
         )
       `,
       { count: 'exact' }
@@ -149,7 +150,7 @@ async function fetchProductsFallback(
   const { data, count, error } = await query;
   if (error) throw error;
 
-  const products = productService.mapRawProducts(data ?? []);
+  const products = productService.mapRawProducts(data ?? [], undefined, branchId);
   const totalCount = count ?? 0;
   const totalPages = Math.ceil(totalCount / pageSize);
   return { data: products, totalCount, page, pageSize, totalPages };
@@ -232,11 +233,12 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
             debouncedSearch,
             sortKey,
             sortDir,
-            isCore
+            isCore,
+            branchId
           );
         }
 
-        const products = productService.mapRawProducts(data ?? []);
+        const products = productService.mapRawProducts(data ?? [], undefined, branchId);
         const totalCount = (data as any)?.[0]?.total_count ?? 0;
         const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -250,7 +252,8 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
             debouncedSearch,
             sortKey,
             sortDir,
-            isCore
+            isCore,
+            branchId
           );
           if (fallbackRes.totalCount > 0) {
             return fallbackRes;
@@ -267,7 +270,8 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
           debouncedSearch,
           sortKey,
           sortDir,
-          isCore
+          isCore,
+          branchId
         );
       }
     },
@@ -314,11 +318,12 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
               debouncedSearch,
               sortKey,
               sortDir,
-              isCore
+              isCore,
+              branchId
             );
           }
 
-          const products = productService.mapRawProducts(data ?? []);
+          const products = productService.mapRawProducts(data ?? [], undefined, branchId);
           const totalCount = (data as any)?.[0]?.total_count ?? 0;
 
           if (isCore === true && products.length === 0 && !debouncedSearch.trim()) {
@@ -329,7 +334,8 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
               debouncedSearch,
               sortKey,
               sortDir,
-              isCore
+              isCore,
+              branchId
             );
           }
 
@@ -348,7 +354,8 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
             debouncedSearch,
             sortKey,
             sortDir,
-            isCore
+            isCore,
+            branchId
           );
         }
       },

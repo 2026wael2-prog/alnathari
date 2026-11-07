@@ -10,6 +10,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { logger } from '../../../core/utils/logger';
 import { syncStore } from '../../../core/lib/sync-store';
 import { parseError } from '../../../core/utils/errorUtils';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 
 /** جلب قائمة جلسات الجرد */
 export interface AuditSessionListItem {
@@ -28,11 +29,12 @@ export interface AuditSessionListItem {
 
 export const useAuditSessions = () => {
   const { user } = useAuthStore();
+  const { branchId } = useBranchFilter();
   return useQuery<AuditSessionListItem[]>({
-    queryKey: ['audit_sessions', user?.company_id],
+    queryKey: ['audit_sessions', user?.company_id, branchId],
     queryFn: async () => {
       if (!user?.company_id) return [];
-      const rows = await inventoryService.getAuditSessions(user.company_id);
+      const rows = await inventoryService.getAuditSessions(user.company_id, branchId);
       return rows as unknown as AuditSessionListItem[];
     },
     enabled: !!user?.company_id,

@@ -21,6 +21,9 @@ const BranchFormModal: React.FC<BranchFormModalProps> = ({
 
   const [form, setForm] = useState<BranchFormData>({
     name: '',
+    code: '',
+    is_main: false,
+    integration_mode: 'full_integration',
     address: '',
     phone: '',
     email: '',
@@ -31,13 +34,25 @@ const BranchFormModal: React.FC<BranchFormModalProps> = ({
     if (branch) {
       setForm({
         name: branch.name,
+        code: branch.code ?? '',
+        is_main: Boolean(branch.is_main),
+        integration_mode: branch.integration_mode ?? 'full_integration',
         address: branch.address ?? '',
         phone: branch.phone ?? '',
         email: branch.email ?? '',
         status: branch.status,
       });
     } else {
-      setForm({ name: '', address: '', phone: '', email: '', status: 'active' });
+      setForm({
+        name: '',
+        code: '',
+        is_main: false,
+        integration_mode: 'full_integration',
+        address: '',
+        phone: '',
+        email: '',
+        status: 'active',
+      });
     }
   }, [branch, isOpen]);
 
@@ -80,21 +95,72 @@ const BranchFormModal: React.FC<BranchFormModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4 p-6 max-md:p-4">
-          {/* Branch Name */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-slate-300">
-              اسم الفرع <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={e => {
-                setForm({ ...form, name: e.target.value });
-              }}
-              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              required
-              autoFocus
-            />
+          {/* Branch Name & Code */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-slate-300">
+                اسم الفرع <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={e => {
+                  setForm({ ...form, name: e.target.value });
+                }}
+                className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                required
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-slate-300">
+                كود الفرع (للفواتير)
+              </label>
+              <input
+                type="text"
+                value={form.code ?? ''}
+                onChange={e => {
+                  setForm({ ...form, code: e.target.value.toUpperCase() });
+                }}
+                placeholder="مثال: WN أو B1"
+                maxLength={8}
+                dir="ltr"
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-center font-mono text-sm uppercase outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+          </div>
+
+          {/* Integration Mode & Main Branch */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-slate-300">
+                نمط تكامل الفرع
+              </label>
+              <select
+                value={form.integration_mode ?? 'full_integration'}
+                onChange={e => {
+                  setForm({ ...form, integration_mode: e.target.value });
+                }}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              >
+                <option value="full_integration">تكامل شامل (مخزون ومحاسبة)</option>
+                <option value="inventory_only">تكامل مخزني فقط</option>
+                <option value="independent">فرع مستقل بالكامل</option>
+              </select>
+            </div>
+            <div className="flex items-end pb-1">
+              <label className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-gray-200 bg-gray-50/70 px-3 py-2 text-sm font-medium text-gray-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.is_main)}
+                  onChange={e => {
+                    setForm({ ...form, is_main: e.target.checked });
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span>المركز / الفرع الرئيسي</span>
+              </label>
+            </div>
           </div>
 
           {/* Address */}

@@ -524,11 +524,17 @@ export const reportService = {
     }));
   },
 
-  getVatReturnReport: async (companyId: string, startDate: string, endDate: string) => {
+  getVatReturnReport: async (
+    companyId: string,
+    startDate: string,
+    endDate: string,
+    branchId?: string | null
+  ) => {
     const { data, error } = await supabase.rpc('fn_get_vat_return_report', {
       p_company_id: companyId,
       p_start_date: startDate,
       p_end_date: endDate,
+      ...(branchId ? { p_branch_id: branchId } : {}),
     });
     if (error) throw error;
     return data as {

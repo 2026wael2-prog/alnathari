@@ -9,6 +9,7 @@ import { ExpenseCategorySection } from './components/ExpenseCategorySection';
 
 import { ExpenseFinancialSection } from './components/ExpenseFinancialSection';
 import { useFeedbackStore } from '../../../feedback/store';
+import { createIdempotencyKey } from '../../../../core/utils/idempotency';
 
 interface Props {
   isOpen: boolean;
@@ -36,6 +37,13 @@ const CreateExpenseModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, isSubm
 
   const { showToast } = useFeedbackStore();
   const [localSubmitting, setLocalSubmitting] = React.useState(false);
+  const idempotencyKeyRef = React.useRef(createIdempotencyKey('expense'));
+
+  React.useEffect(() => {
+    if (isOpen) {
+      idempotencyKeyRef.current = createIdempotencyKey('expense');
+    }
+  }, [isOpen]);
 
   React.useEffect(() => {
     if (!isOpen || !isSubmitting) {
@@ -43,17 +51,17 @@ const CreateExpenseModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, isSubm
     }
   }, [isOpen, isSubmitting]);
 
-  const handleSafeSubmit = (data: ExpenseFormData) => {
+  const handleSafeSubmit = (data: ExpenseFormData): void => {
     if (isSubmitting || localSubmitting) return;
 
-    if (data.currency_code === 'SAR' && Number(data.amount) >= 500) {
+    if (data.currency_code === 'SAR' && data.amount >= 500) {
       const isDailyPetty =
         /(عشاء|غداء|غدا|قات|ماء|ثلج|حلاقة|رصيد|تكس|مدرسة|دفاتر|طماط|بصل|كريم|سيجارة|نثري)/i.test(
           data.description || ''
         );
-      if (isDailyPetty && !data.confirm_large_sar) {
+      if (isDailyPetty && data.confirm_large_sar !== true) {
         const confirmed = window.confirm(
-          `تنبيه تدقيق مالي:\nالمبلغ المدخل هو (${data.amount} ريال سعودي) لبيان نثري (${data.description}).\n\nهل أنت متأكد تماماً أن هذا المبلغ بالريال السعودي وليس بالريال اليمني؟`
+          `تنبيه تدقيق مالي:\nالمبلغ المدخل هو (${String(data.amount)} ريال سعودي) لبيان نثري (${data.description}).\n\nهل أنت متأكد تماماً أن هذا المبلغ بالريال السعودي وليس بالريال اليمني؟`
         );
         if (!confirmed) {
           return;
@@ -63,10 +71,10 @@ const CreateExpenseModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, isSubm
     }
 
     setLocalSubmitting(true);
-    onSubmit(data);
+    onSubmit({ ...data, idempotency_key: data.idempotency_key ?? idempotencyKeyRef.current });
   };
 
-  const onInvalidSubmit = (errors: Record<string, unknown>) => {
+  const onInvalidSubmit = (errors: Record<string, unknown>): void => {
     // Collect error messages
     const errorMessages = Object.keys(errors).map(key => {
       const fieldNames: Record<string, string> = {
@@ -76,7 +84,7 @@ const CreateExpenseModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, isSubm
         description: 'البيان',
         exchange_rate: 'سعر الصرف',
       };
-      return `حقل ${fieldNames[key] || key} مطلوب أو غير صالح`;
+      return `حقل ${fieldNames[key] ?? key} مطلوب أو غير صالح`;
     });
 
     if (errorMessages.length > 0) {
@@ -99,7 +107,7 @@ const CreateExpenseModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, isSubm
         إلغاء
       </button>
       <Button
-        onClick={handleSubmit(handleSafeSubmit, onInvalidSubmit)}
+        onClick={() => void handleSubmit(handleSafeSubmit, onInvalidSubmit)()}
         isLoading={isBusy}
         disabled={isBusy}
         className="flex-[2] rounded-none border-rose-700 bg-rose-600 text-[11px] font-bold uppercase tracking-widest shadow-xl"

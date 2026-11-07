@@ -50,16 +50,18 @@ export const warehouseApi = {
   initializeStock: async (
     companyId: string,
     userId: string,
-    stockData: { product_id: string; warehouse_id: string; quantity: number }
+    stockData: { product_id: string; warehouse_id: string; quantity: number; unit_cost?: number }
   ) => {
+    const unitCost = Number(stockData.unit_cost) || 0;
+    const totalCost = unitCost * (stockData.quantity || 0);
     return await supabase.from('inventory_transactions').insert({
       company_id: companyId,
       created_by: userId,
       product_id: stockData.product_id,
       warehouse_id: stockData.warehouse_id,
       quantity: stockData.quantity,
-      total_cost: 0,
-      unit_cost: 0,
+      total_cost: totalCost,
+      unit_cost: unitCost,
       transaction_type: 'initial',
       reference_type: 'opening_balance',
     });
@@ -131,15 +133,47 @@ export const warehouseApi = {
 
   saveWarehouse: async (
     companyId: string,
-    data: { id?: string; name_ar: string; location: string; branch_id?: string | null }
+    data: {
+      id?: string;
+      name_ar: string;
+      location: string;
+      branch_id?: string | null;
+      code?: string | null;
+      is_primary?: boolean;
+    }
   ) => {
-    const { id, ...formData } = data;
+    const { id, code: _code, ...formData } = data;
+    const cleanBranchId =
+      formData.branch_id && formData.branch_id.trim() !== ''
+        ? formData.branch_id
+        : null;
+    const sanitizedData = {
+      name_ar: formData.name_ar,
+      location: formData.location,
+      branch_id: cleanBranchId,
+      ...(formData.is_primary !== undefined ? { is_primary: formData.is_primary } : {}),
+    };
+
     if (id) {
-      return await supabase.from('warehouses').update(formData).eq('id', id);
+      return await supabase.from('warehouses').update(sanitizedData).eq('id', id);
     } else {
+      let isPrimary = Boolean(formData.is_primary);
+      if (cleanBranchId && formData.is_primary === undefined) {
+        const { data: existingBranchWh } = await supabase
+          .from('warehouses')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('branch_id', cleanBranchId)
+          .is('deleted_at', null)
+          .limit(1);
+        if (!existingBranchWh || existingBranchWh.length === 0) {
+          isPrimary = true;
+        }
+      }
       return await supabase.from('warehouses').insert({
-        ...formData,
+        ...sanitizedData,
         company_id: companyId,
+        is_primary: isPrimary,
         status: 'active',
       });
     }

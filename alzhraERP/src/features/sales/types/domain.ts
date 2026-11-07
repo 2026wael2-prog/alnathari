@@ -7,6 +7,7 @@
  */
 
 import type { Database } from '../../../core/database.types';
+import { formatLocalDate } from '../../../core/utils/dateUtils';
 
 // ============================================================================
 // Database Type Aliases
@@ -256,14 +257,14 @@ export const InvoiceMapper = {
       company_id: companyId,
       created_by: userId,
       party_id: dto.partyId,
-      issue_date: dto.issueDate.toISOString(),
+      issue_date: formatLocalDate(dto.issueDate),
       type: 'sale',
       status: 'draft',
       payment_method: dto.paymentMethod,
       currency_code: dto.currencyCode,
       exchange_rate: dto.exchangeRate,
     };
-    if (dto.dueDate !== undefined) insert.due_date = dto.dueDate?.toISOString() || null;
+    if (dto.dueDate !== undefined) insert.due_date = dto.dueDate ? formatLocalDate(dto.dueDate) : null;
     if (dto.notes !== undefined) insert.notes = dto.notes;
     return insert as InvoiceInsert;
   },

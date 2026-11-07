@@ -58,7 +58,7 @@ export const ExpenseLedgerView: React.FC<Props> = ({ initialAccountId, onBackToL
         accounts.find(a => a.code === '5600') ||
         accounts.find(a => a.code === '5300') ||
         accounts.find(a => a.code === '5400') ||
-        accounts.find(a => a.code.startsWith('5')) ||
+        accounts.find(a => a.code.startsWith('5') && !a.code.startsWith('51')) ||
         accounts[0];
       if (defaultExp) {
         setSelectedAccountId(defaultExp.id);
@@ -80,7 +80,9 @@ export const ExpenseLedgerView: React.FC<Props> = ({ initialAccountId, onBackToL
   // Filter accounts for the selector tabs
   const filteredAccounts = useMemo(() => {
     if (accountFilterType === 'expense') {
-      return accounts.filter(a => a.type === 'expense' || a.code.startsWith('5'));
+      return accounts.filter(
+        a => (a.type === 'expense' || a.code.startsWith('5')) && !a.code.startsWith('51')
+      );
     }
     if (accountFilterType === 'employee') {
       return accounts.filter(a => a.code.startsWith('140') || a.name.includes('راتب'));

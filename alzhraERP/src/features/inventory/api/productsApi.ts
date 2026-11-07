@@ -182,6 +182,13 @@ export const productsApi = {
     if (!hardDeleteErr) {
       return { data: null, error: null };
     }
+    if (
+      hardDeleteErr.code === '42501' ||
+      (typeof hardDeleteErr.message === 'string' &&
+        hardDeleteErr.message.includes('عذراً، لا تمتلك صلاحية'))
+    ) {
+      return { data: null, error: hardDeleteErr };
+    }
 
     // Fallback: soft-delete via status='archived' + deleted_at so
     // search_inventory_paginated excludes it. 'deleted' is NOT a permitted value
@@ -210,6 +217,13 @@ export const productsApi = {
     if (!hardDeleteErr) {
       return { data: null, error: null };
     }
+    if (
+      hardDeleteErr.code === '42501' ||
+      (typeof hardDeleteErr.message === 'string' &&
+        hardDeleteErr.message.includes('عذراً، لا تمتلك صلاحية'))
+    ) {
+      return { data: null, error: hardDeleteErr };
+    }
 
     // If hard delete fails due to constraints, soft-delete preserving data integrity.
     // status='archived' — القيمة 'deleted' مرفوضة من products_status_check.
@@ -219,7 +233,7 @@ export const productsApi = {
       .in('id', ids);
   },
 
-  searchProduct: async (companyId: string, term: string) => {
+  searchProduct: async (companyId: string, term: string, branchId?: string | null) => {
     const cleanTerm = normalizeArabic(term).trim();
     try {
       const { data, error } = await supabase.rpc('search_inventory_paginated', {
@@ -229,6 +243,7 @@ export const productsApi = {
         p_offset: 0,
         p_sort_key: 'name_ar',
         p_sort_dir: 'asc',
+        ...(branchId ? { p_branch_id: branchId } : {}),
       });
       if (!error && Array.isArray(data)) {
         return {
@@ -251,10 +266,10 @@ export const productsApi = {
     }
 
     const searchPattern = `%${cleanTerm}%`;
-    return await supabase
+    const res = await supabase
       .from('products')
       .select(
-        'id, name_ar, sku, sale_price, purchase_price, part_number, alternative_numbers, brand, quantity:product_stock(quantity)'
+        'id, name_ar, sku, sale_price, purchase_price, part_number, alternative_numbers, brand, quantity:product_stock(quantity, warehouses(branch_id))'
       )
       .eq('company_id', companyId)
       .eq('status', 'active')
@@ -263,6 +278,25 @@ export const productsApi = {
       )
       .order('name_ar')
       .limit(30);
+
+    if (branchId && Array.isArray(res.data)) {
+      return {
+        ...res,
+        data: res.data.map(item => ({
+          ...item,
+          quantity: Array.isArray(item.quantity)
+            ? item.quantity.filter(
+                (s: { warehouses?: { branch_id?: string | null } | Array<{ branch_id?: string | null }> | null }) => {
+                  const wh = Array.isArray(s.warehouses) ? s.warehouses[0] : s.warehouses;
+                  return wh?.branch_id === branchId;
+                }
+              )
+            : [],
+        })),
+      };
+    }
+
+    return res;
   },
 
   getSupplier: async (id: string) => {

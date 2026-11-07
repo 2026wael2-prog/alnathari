@@ -29,27 +29,79 @@ export const settingsApi = {
   },
 
   getBranches: async (companyId: string) => {
-    return await supabase
+    const res = await supabase
       .from('branches')
-      .select('*')
+      .select('*, warehouses(id, name_ar, location, is_primary, deleted_at)')
       .eq('company_id', companyId)
+      .order('is_main', { ascending: false })
       .order('name', { ascending: true });
+
+    if (res.data) {
+      res.data = res.data.map(b => ({
+        ...b,
+        warehouses: (b.warehouses || [])
+          .filter(w => !w.deleted_at)
+          .map(w => ({
+            ...w,
+            name: w.name_ar,
+          })),
+      }));
+    }
+    return res;
   },
 
   createBranch: async (companyId: string, data: BranchFormData) => {
-    return await supabase
-      .from('branches')
-      .insert({ ...data, company_id: companyId })
-      .select()
-      .single();
+    const { code, integration_mode, ...rest } = data;
+    const payload = {
+      ...rest,
+      code: code?.trim() ? code.trim().toUpperCase() : null,
+      ...(integration_mode ? { integration_mode } : {}),
+      company_id: companyId,
+    };
+    const res = await supabase.from('branches').insert(payload).select().single();
+
+    // التأكد من إنشاء مستودع رئيسي خاص بالفرع الجديد تلقائياً إذا لم ينشئه الـ Trigger بعد
+    if (res.data && !res.error) {
+      const { data: existingWh } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('branch_id', res.data.id)
+        .is('deleted_at', null)
+        .limit(1);
+
+      if (!existingWh || existingWh.length === 0) {
+        await supabase.from('warehouses').insert({
+          company_id: companyId,
+          branch_id: res.data.id,
+          name_ar: `مستودع ${res.data.name}`,
+          location: res.data.address || null,
+          is_primary: true,
+          status: 'active',
+        });
+      }
+    }
+
+    return res;
   },
 
   updateBranch: async (id: string, data: BranchFormData) => {
-    return await supabase.from('branches').update(data).eq('id', id).select().single();
+    const { code, integration_mode, ...rest } = data;
+    const payload = {
+      ...rest,
+      ...(code !== undefined ? { code: code?.trim() ? code.trim().toUpperCase() : null } : {}),
+      ...(integration_mode ? { integration_mode } : {}),
+    };
+    return await supabase.from('branches').update(payload).eq('id', id).select().single();
   },
 
   deleteBranch: async (id: string) => {
-    return await supabase.from('branches').delete().eq('id', id);
+    const res = await supabase.from('branches').delete().eq('id', id);
+    // إذا كان الفرع مرتبطاً بفواتير أو مستودعات أو حركات (23503)، نقوم بتعطيله بدلاً من الانهيار
+    if (res.error && res.error.code === '23503') {
+      return await supabase.from('branches').update({ status: 'inactive' }).eq('id', id);
+    }
+    return res;
   },
 
   // إدارة الفريق والدعوات (Team Management)
@@ -128,12 +180,23 @@ export const settingsApi = {
   },
 
   setPrimaryWarehouse: async (companyId: string, warehouseId: string) => {
-    // أولاً: إلغاء أساسي من جميع المستودعات
-    const { error: resetError } = await supabase
+    // جلب الفرع التابع له هذا المستودع لحصر إلغاء (is_primary) ضمن نفس الفرع فقط
+    const { data: targetWh } = await supabase
+      .from('warehouses')
+      .select('branch_id')
+      .eq('id', warehouseId)
+      .maybeSingle();
+
+    let resetQuery = supabase
       .from('warehouses')
       .update({ is_primary: false })
       .eq('company_id', companyId);
 
+    if (targetWh?.branch_id) {
+      resetQuery = resetQuery.eq('branch_id', targetWh.branch_id);
+    }
+
+    const { error: resetError } = await resetQuery;
     if (resetError) throw resetError;
 
     // ثانياً: تعيين المستودع المحدد كأساسي
@@ -144,7 +207,6 @@ export const settingsApi = {
       .select()
       .single();
 
-    // Rollback: إذا فشل التعيين، نعيد المستودع الأصلي
     if (result.error) {
       logger.error(
         'api',

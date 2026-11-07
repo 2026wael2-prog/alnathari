@@ -57,7 +57,7 @@ describe('purchasesApi.createSupplierPayment — treasury account resolution', (
 
     await purchasesApi.createSupplierPayment(basePayment(), 'comp-1', 'user-1');
 
-    expect(mockGetCashboxes).toHaveBeenCalledWith('comp-1');
+    expect(mockGetCashboxes).toHaveBeenCalledWith('comp-1', undefined);
     const [, params] = mockRpc.mock.calls[0] as unknown as [string, Record<string, unknown>];
     expect(params.p_cash_account_id).toBe('acc-cashbox-1');
   });

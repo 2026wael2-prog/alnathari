@@ -6,15 +6,19 @@ import { inventoryService } from '../service';
 import { useAuthStore } from '../../auth/store';
 import { useFeedbackStore } from '../../feedback/store';
 import { inventoryApi } from '../api';
+import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 
-/** جلب قائمة المستودعات */
+/** جلب قائمة المستودعات (مفلترة تلقائياً حسب الفرع النشط ما لم يُمرر فرع محدد أو null) */
 export const useWarehouses = (branchId?: string | null) => {
   const { user } = useAuthStore();
+  const { branchId: activeBranchId } = useBranchFilter();
+  const effectiveBranchId = branchId !== undefined ? branchId : activeBranchId;
+
   return useQuery({
-    queryKey: ['warehouses', user?.company_id, branchId],
+    queryKey: ['warehouses', user?.company_id, effectiveBranchId],
     queryFn: () =>
       user?.company_id
-        ? inventoryService.getWarehouses(user.company_id, branchId)
+        ? inventoryService.getWarehouses(user.company_id, effectiveBranchId)
         : Promise.resolve([] as any[]),
     enabled: !!user?.company_id,
     staleTime: 5 * 60 * 1000,
@@ -40,6 +44,7 @@ export const useWarehouseMutations = () => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { showToast } = useFeedbackStore();
+  const { branchId: activeBranchId } = useBranchFilter();
 
   const save = useMutation({
     mutationFn: async (data: {
@@ -47,13 +52,26 @@ export const useWarehouseMutations = () => {
       name_ar: string;
       location: string;
       branch_id?: string | null;
+      code?: string | null;
     }) => {
-      if (!user?.company_id) throw new Error('Auth error');
-      return await inventoryApi.saveWarehouse(user.company_id, data);
+      if (user?.company_id === undefined || user.company_id === '') throw new Error('Auth error');
+      const res = await inventoryApi.saveWarehouse(user.company_id, {
+        ...data,
+        branch_id:
+          data.branch_id !== undefined && data.branch_id !== null && String(data.branch_id).trim() !== ''
+            ? data.branch_id
+            : activeBranchId ?? null,
+      });
+      if (res.error) throw res.error;
+      return res;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+      void queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+      void queryClient.invalidateQueries({ queryKey: ['branches'] });
       showToast('تم حفظ بيانات المستودع بنجاح', 'success');
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'فشل حفظ المستودع', 'error');
     },
   });
 
@@ -62,7 +80,7 @@ export const useWarehouseMutations = () => {
       return await inventoryApi.deleteWarehouse(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+      void queryClient.invalidateQueries({ queryKey: ['warehouses'] });
       showToast('تم حذف المستودع', 'info');
     },
     onError: (err: Error) => {

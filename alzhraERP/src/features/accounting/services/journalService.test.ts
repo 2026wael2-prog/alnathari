@@ -39,7 +39,7 @@ describe('journalService', () => {
 
             const result = await journalService.createJournal(mockFormData, mockCompanyId, mockUserId);
 
-            expect(PostTransactionUsecase.execute).toHaveBeenCalledWith(mockFormData, mockCompanyId, mockUserId);
+            expect(PostTransactionUsecase.execute).toHaveBeenCalledWith(mockFormData, mockCompanyId, mockUserId, undefined);
             expect(result).toBe(expectedJournalId);
         });
     });

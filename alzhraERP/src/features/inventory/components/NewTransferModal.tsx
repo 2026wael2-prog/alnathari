@@ -15,7 +15,7 @@ interface NewTransferModalProps {
 }
 
 const NewTransferModal: React.FC<NewTransferModalProps> = ({ isOpen, onClose }) => {
-  const { data: warehouses } = useWarehouses();
+  const { data: warehouses } = useWarehouses(null);
   const {
     fromWh,
     setFromWh,
