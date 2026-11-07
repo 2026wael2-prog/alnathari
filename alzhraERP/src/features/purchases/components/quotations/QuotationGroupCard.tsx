@@ -1,5 +1,6 @@
+/* eslint-disable max-lines-per-function */
 import React from 'react';
-import { ChevronDown, ChevronUp, Scale } from 'lucide-react';
+import { ChevronDown, ChevronUp, Scale, Truck } from 'lucide-react';
 import { formatCurrency } from '../../../../core/utils';
 import QuotationActionIcons from '../../../sales/components/quotations/QuotationActionIcons';
 import type { QuotationRowAction } from '../../../sales/components/quotations/QuotationActionIcons';
@@ -11,12 +12,14 @@ interface QuotationRowHeaderProps {
   quotation: QuotationListRow;
   isExpanded: boolean;
   onQuotationAction?: ((quotationId: string, action: QuotationRowAction) => void) | undefined;
+  onOpenShipment?: ((quotationId: string, quotationNumber: string, supplierName: string) => void) | undefined;
 }
 
 const QuotationRowHeader: React.FC<QuotationRowHeaderProps> = ({
   quotation,
   isExpanded,
   onQuotationAction,
+  onOpenShipment,
 }) => {
   const status = STATUS_CONFIG[quotation.status];
   return (
@@ -46,6 +49,19 @@ const QuotationRowHeader: React.FC<QuotationRowHeaderProps> = ({
           {formatCurrency(quotation.total_amount, quotation.currency_code)}
         </span>
         <span className="text-xs font-medium text-gray-400">{quotation.item_count} بنود</span>
+        {onOpenShipment !== undefined && (
+          <button
+            type="button"
+            title="تتبع الشحنة البرية (صنعاء ➔ المهرة)"
+            onClick={e => {
+              e.stopPropagation();
+              onOpenShipment(quotation.id, quotation.quotation_number, quotation.supplier_name);
+            }}
+            className="rounded p-1 text-blue-600 transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30"
+          >
+            <Truck size={15} />
+          </button>
+        )}
         {onQuotationAction !== undefined && (
           <QuotationActionIcons
             onAction={action => {
@@ -63,6 +79,7 @@ interface QuotationRowProps {
   isExpanded: boolean;
   onToggleExpand: () => void;
   onQuotationAction?: ((quotationId: string, action: QuotationRowAction) => void) | undefined;
+  onOpenShipment?: ((quotationId: string, quotationNumber: string, supplierName: string) => void) | undefined;
 }
 
 export const QuotationRow: React.FC<QuotationRowProps> = ({
@@ -70,6 +87,7 @@ export const QuotationRow: React.FC<QuotationRowProps> = ({
   isExpanded,
   onToggleExpand,
   onQuotationAction,
+  onOpenShipment,
 }) => (
   <div className="transition-colors hover:bg-gray-50/50 dark:hover:bg-slate-800/30">
     <div
@@ -88,6 +106,7 @@ export const QuotationRow: React.FC<QuotationRowProps> = ({
         quotation={quotation}
         isExpanded={isExpanded}
         onQuotationAction={onQuotationAction}
+        onOpenShipment={onOpenShipment}
       />
     </div>
 
@@ -148,6 +167,8 @@ interface QuotationGroupCardProps {
   onCompare: (groupId: string) => void;
   /** إجراء صف العرض (إرسال واتساب/طباعة/إكسل) — تنفّذه الصفحة عبر نافذة التفاصيل. */
   onQuotationAction?: ((quotationId: string, action: QuotationRowAction) => void) | undefined;
+  /** تتبع الشحنة البرية عبر مكاتب شركات الشحن (صنعاء ➔ المهرة) */
+  onOpenShipment?: ((quotationId: string, quotationNumber: string, supplierName: string) => void) | undefined;
 }
 
 export const QuotationGroupCard: React.FC<QuotationGroupCardProps> = ({
@@ -157,6 +178,7 @@ export const QuotationGroupCard: React.FC<QuotationGroupCardProps> = ({
   onToggleQuotation,
   onCompare,
   onQuotationAction,
+  onOpenShipment,
 }) => (
   <div className="overflow-hidden rounded-2xl border border-gray-100 bg-[var(--app-surface)] shadow-sm dark:border-slate-800">
     <QuotationGroupHeader group={group} compareGroupId={compareGroupId} onCompare={onCompare} />
@@ -170,6 +192,7 @@ export const QuotationGroupCard: React.FC<QuotationGroupCardProps> = ({
             onToggleQuotation(quotation.id);
           }}
           onQuotationAction={onQuotationAction}
+          onOpenShipment={onOpenShipment}
         />
       ))}
     </div>

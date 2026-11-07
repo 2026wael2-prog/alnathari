@@ -1,5 +1,6 @@
 /* eslint-disable max-lines-per-function */
 import React, { useMemo } from 'react';
+import { Truck } from 'lucide-react';
 import { formatCurrency } from '../../../../core/utils';
 import { formatLocalDate } from '../../../../core/utils/dateUtils';
 import { STATUS_CONFIG } from './statusConfig';
@@ -31,6 +32,7 @@ interface DetailedQuotationsTableRowProps {
   /** أول بند في العرض: تُعرض أيقونات الإجراءات هنا فقط بدل تكرارها في كل سطر. */
   isFirstItem: boolean;
   onQuotationAction?: ((quotationId: string, action: QuotationRowAction) => void) | undefined;
+  onOpenShipment?: ((quotationId: string, quotationNumber: string, supplierName: string) => void) | undefined;
 }
 
 const DetailedQuotationsTableRow: React.FC<DetailedQuotationsTableRowProps> = ({
@@ -38,6 +40,7 @@ const DetailedQuotationsTableRow: React.FC<DetailedQuotationsTableRowProps> = ({
   index,
   isFirstItem,
   onQuotationAction,
+  onOpenShipment,
 }) => {
   const status = STATUS_CONFIG[item.status];
   return (
@@ -103,12 +106,28 @@ const DetailedQuotationsTableRow: React.FC<DetailedQuotationsTableRowProps> = ({
         {item.createdAt !== '' ? formatLocalDate(item.createdAt) : '—'}
       </td>
       <td className="px-3 py-3">
-        {isFirstItem && onQuotationAction !== undefined && (
-          <QuotationActionIcons
-            onAction={action => {
-              onQuotationAction(item.quotationId, action);
-            }}
-          />
+        {isFirstItem && (
+          <div className="flex items-center gap-1.5 justify-center">
+            {onOpenShipment !== undefined && (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenShipment(item.quotationId, item.quotationNumber, item.supplierName);
+                }}
+                title="تتبع الشحنة البرية (صنعاء ➔ المهرة)"
+                className="p-1 rounded text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors"
+              >
+                <Truck size={14} />
+              </button>
+            )}
+            {onQuotationAction !== undefined && (
+              <QuotationActionIcons
+                onAction={action => {
+                  onQuotationAction(item.quotationId, action);
+                }}
+              />
+            )}
+          </div>
         )}
       </td>
     </tr>
@@ -141,11 +160,14 @@ interface DetailedQuotationsTableProps {
   quotations: QuotationListRow[];
   /** إجراء صف العرض (إرسال واتساب/طباعة/إكسل) — تنفّذه الصفحة عبر نافذة التفاصيل. */
   onQuotationAction?: ((quotationId: string, action: QuotationRowAction) => void) | undefined;
+  /** فتح نافذة تتبع الشحنة البرية (صنعاء ➔ المهرة) */
+  onOpenShipment?: ((quotationId: string, quotationNumber: string, supplierName: string) => void) | undefined;
 }
 
 export const DetailedQuotationsTable: React.FC<DetailedQuotationsTableProps> = ({
   quotations,
   onQuotationAction,
+  onOpenShipment,
 }) => {
   const flatItems = useMemo(
     () =>
@@ -202,6 +224,7 @@ export const DetailedQuotationsTable: React.FC<DetailedQuotationsTableProps> = (
                 index={index}
                 isFirstItem={index === 0 || flatItems[index - 1]?.quotationId !== item.quotationId}
                 onQuotationAction={onQuotationAction}
+                onOpenShipment={onOpenShipment}
               />
             ))}
           </tbody>
