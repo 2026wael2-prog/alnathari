@@ -1,10 +1,11 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-type-conversion, @typescript-eslint/no-unnecessary-type-assertion, max-params */
+/* eslint-disable @typescript-eslint/no-unnecessary-type-conversion, max-params */
 import { supabase } from '../../../lib/supabaseClient';
 import { formatLocalDate } from '../../../core/utils/dateUtils';
 import { logger } from '../../../core/utils/logger';
 import type { Database, Json } from '../../../core/database.types';
 import type {
   CarrierOption,
+  CreateCarrierDTO,
   PurchaseQuotationShipment,
   ShipmentTimelineEvent,
   ShipmentTrackingStage,
@@ -108,23 +109,104 @@ const mapRowToShipment = (row: RawShipmentRow): PurchaseQuotationShipment => {
 export const shipmentsApi = {
   /**
    * جلب مكاتب وشركات النقل والشحن الحقيقية من قاعدة بيانات سوبابيز
+   * (دمج مكاتب الشحن المسجلة مع جهات النقل من سجل الأطراف)
    */
   getCarriers: async (companyId: string): Promise<CarrierOption[]> => {
     try {
-      const { data, error } = await supabase
-        .from('parties')
-        .select('id, name, phone, address')
-        .eq('company_id', companyId)
-        .is('deleted_at', null)
-        .or('name.ilike.%نقل%,name.ilike.%شحن%,name.ilike.%مكتب%')
-        .order('name');
+      const [shippingRes, partiesRes] = await Promise.all([
+        supabase
+          .from('shipping_companies')
+          .select('id, name, phone, address, origin_city, origin_hub, destination_city, destination_hub')
+          .eq('company_id', companyId)
+          .eq('is_active', true)
+          .order('name'),
+        supabase
+          .from('parties')
+          .select('id, name, phone, address')
+          .eq('company_id', companyId)
+          .is('deleted_at', null)
+          .or('name.ilike.%نقل%,name.ilike.%شحن%,name.ilike.%مكتب%')
+          .order('name'),
+      ]);
 
-      if (error !== null || data === null) return [];
-      return data as CarrierOption[];
+      const shippingList: CarrierOption[] = (shippingRes.data ?? []).map(sc => ({
+        id: sc.id,
+        name: sc.name,
+        phone: sc.phone,
+        address: sc.address,
+        origin_city: sc.origin_city,
+        origin_hub: sc.origin_hub,
+        destination_city: sc.destination_city,
+        destination_hub: sc.destination_hub,
+        source: 'shipping_companies',
+      }));
+
+      const existingNames = new Set(shippingList.map(s => s.name.trim().toLowerCase()));
+
+      const partiesList: CarrierOption[] = (partiesRes.data ?? [])
+        .filter(p => !existingNames.has(p.name.trim().toLowerCase()))
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          phone: p.phone,
+          address: p.address,
+          origin_city: 'صنعاء',
+          origin_hub: null,
+          destination_city: 'المهرة (الغيضة)',
+          destination_hub: null,
+          source: 'parties',
+        }));
+
+      return [...shippingList, ...partiesList].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
     } catch (err) {
-      logger.error('shipmentsApi', 'Error loading real carriers from parties:', err);
+      logger.error('shipmentsApi', 'Error loading real carriers from database:', err);
       return [];
     }
+  },
+
+  /**
+   * تسجيل وحفظ مكتب أو شركة شحن جديدة في سوبابيز
+   */
+  createCarrier: async (
+    companyId: string,
+    dto: CreateCarrierDTO
+  ): Promise<CarrierOption> => {
+    const payload: Database['public']['Tables']['shipping_companies']['Insert'] = {
+      id: crypto.randomUUID(),
+      company_id: companyId,
+      name: dto.name.trim(),
+      phone: dto.phone?.trim() ?? null,
+      address: dto.address?.trim() ?? null,
+      origin_city: dto.origin_city?.trim() ?? 'صنعاء',
+      origin_hub: dto.origin_hub?.trim() ?? null,
+      destination_city: dto.destination_city?.trim() ?? 'المهرة (الغيضة)',
+      destination_hub: dto.destination_hub?.trim() ?? null,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('shipping_companies')
+      .insert(payload)
+      .select('id, name, phone, address, origin_city, origin_hub, destination_city, destination_hub')
+      .single();
+
+    if (error !== null) {
+      logger.error('shipmentsApi', 'Error creating shipping company:', error);
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      phone: data.phone,
+      address: data.address,
+      origin_city: data.origin_city,
+      origin_hub: data.origin_hub,
+      destination_city: data.destination_city,
+      destination_hub: data.destination_hub,
+      source: 'shipping_companies',
+    };
   },
 
   /**

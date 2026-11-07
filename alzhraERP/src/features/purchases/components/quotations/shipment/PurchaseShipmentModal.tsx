@@ -7,6 +7,7 @@ import {
   Loader2,
   MapPin,
   Package,
+  Plus,
   Save,
   Share2,
   Truck,
@@ -30,6 +31,7 @@ import {
   type UpsertShipmentDTO,
 } from '../../../types/shipment';
 import { ShipmentTrackingStepper } from './ShipmentTrackingStepper';
+import { AddCarrierModal } from './AddCarrierModal';
 import {
   generateShipmentWhatsAppMessage,
   openWhatsAppShipmentShare,
@@ -64,6 +66,7 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
   // مكاتب وشركات النقل الحقيقية من قاعدة بيانات سوبابيز
   const [carriers, setCarriers] = useState<CarrierOption[]>([]);
   const [selectedCarrierId, setSelectedCarrierId] = useState<string>('other');
+  const [showAddCarrierModal, setShowAddCarrierModal] = useState(false);
 
   // Shipment State
   const [shipmentId, setShipmentId] = useState<string | undefined>(undefined);
@@ -180,8 +183,30 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
         setShippingCompany(carrier.name);
         setOfficePhone(carrier.phone || '');
         setOfficeAddress(carrier.address || '');
+        if (carrier.origin_city) setOriginCity(carrier.origin_city);
+        if (carrier.origin_hub) setOriginHub(carrier.origin_hub);
+        if (carrier.destination_city) setDestinationCity(carrier.destination_city);
+        if (carrier.destination_hub) setDestinationHub(carrier.destination_hub);
       }
     }
+  };
+
+  const handleCarrierAdded = (newCarrier: CarrierOption) => {
+    setCarriers(prev => {
+      const exists = prev.some(c => c.id === newCarrier.id || c.name === newCarrier.name);
+      if (exists) return prev;
+      return [newCarrier, ...prev];
+    });
+    setSelectedCarrierId(newCarrier.id);
+    setShippingCompany(newCarrier.name);
+    setOfficePhone(newCarrier.phone || '');
+    setOfficeAddress(newCarrier.address || '');
+    if (newCarrier.origin_city) setOriginCity(newCarrier.origin_city);
+    if (newCarrier.origin_hub) setOriginHub(newCarrier.origin_hub);
+    if (newCarrier.destination_city) setDestinationCity(newCarrier.destination_city);
+    if (newCarrier.destination_hub) setDestinationHub(newCarrier.destination_hub);
+    setShowAddCarrierModal(false);
+    showToast(`تمت إضافة مكتب الشحن "${newCarrier.name}" بنجاح وحفظه في سوبابيز`, 'success');
   };
 
   // Save / Update Shipment
@@ -442,21 +467,42 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
-                      مكتب / شركة الشحن (من قاعدة البيانات) *
-                    </label>
-                    <select
-                      value={selectedCarrierId}
-                      onChange={e => handleCarrierChange(e.target.value)}
-                      className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
-                    >
-                      <option value="other">-- كتابة اسم مكتب / شركة شحن أخرى --</option>
-                      {carriers.map(carrier => (
-                        <option key={carrier.id} value={carrier.id}>
-                          {carrier.name} {carrier.phone ? `(${carrier.phone})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300">
+                        مكتب / شركة الشحن (من قاعدة البيانات) *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddCarrierModal(true)}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors cursor-pointer"
+                        title="إضافة مكتب شحن جديد وحفظه في سوبابيز"
+                      >
+                        <Plus size={12} className="stroke-[2.5]" />
+                        <span>مكتب جديد</span>
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={selectedCarrierId}
+                        onChange={e => handleCarrierChange(e.target.value)}
+                        className="flex-1 min-w-0 text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+                      >
+                        <option value="other">-- كتابة اسم مكتب / شركة شحن أخرى --</option>
+                        {carriers.map(carrier => (
+                          <option key={carrier.id} value={carrier.id}>
+                            {carrier.name} {carrier.phone ? `(${carrier.phone})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddCarrierModal(true)}
+                        title="إضافة مكتب أو شركة شحن جديدة وحفظها في قاعدة البيانات"
+                        className="shrink-0 p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+                      >
+                        <Plus size={14} className="stroke-[2.5]" />
+                      </button>
+                    </div>
                   </div>
 
                   {selectedCarrierId === 'other' ? (
@@ -960,6 +1006,15 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
           </div>
         </div>
       </div>
+
+      {showAddCarrierModal && user?.company_id && (
+        <AddCarrierModal
+          isOpen={showAddCarrierModal}
+          onClose={() => setShowAddCarrierModal(false)}
+          onCarrierAdded={handleCarrierAdded}
+          companyId={user.company_id}
+        />
+      )}
     </div>
   );
 };

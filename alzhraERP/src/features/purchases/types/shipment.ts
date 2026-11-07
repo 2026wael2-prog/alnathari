@@ -128,6 +128,22 @@ export interface CarrierOption {
   name: string;
   phone: string | null;
   address: string | null;
+  origin_city?: string | null | undefined;
+  origin_hub?: string | null | undefined;
+  destination_city?: string | null | undefined;
+  destination_hub?: string | null | undefined;
+  source?: 'shipping_companies' | 'parties' | undefined;
+}
+
+/** نموذج إنشاء مكتب أو شركة شحن جديدة في سوبابيز */
+export interface CreateCarrierDTO {
+  name: string;
+  phone?: string | null | undefined;
+  address?: string | null | undefined;
+  origin_city?: string | null | undefined;
+  origin_hub?: string | null | undefined;
+  destination_city?: string | null | undefined;
+  destination_hub?: string | null | undefined;
 }
 
 /** المحطات الجغرافية الرئيسية لخط السير بين صنعاء والمهرة */

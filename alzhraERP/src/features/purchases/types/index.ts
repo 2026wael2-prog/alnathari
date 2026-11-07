@@ -4,6 +4,8 @@
  */
 
 export * from './domain';
+export * from './quotation';
+export * from './shipment';
 
 // Re-export commonly used types
 export type {
