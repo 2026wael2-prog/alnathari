@@ -1,11 +1,14 @@
-/* eslint-disable @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/strict-boolean-expressions, complexity, jsx-a11y/label-has-associated-control, max-lines-per-function, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unnecessary-type-conversion, react-hooks/exhaustive-deps, @typescript-eslint/no-deprecated */
+/* eslint-disable @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/strict-boolean-expressions, complexity, jsx-a11y/label-has-associated-control, max-lines-per-function, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unnecessary-type-conversion, react-hooks/exhaustive-deps, @typescript-eslint/no-deprecated, security/detect-object-injection */
 import React, { useEffect, useState } from 'react';
 import {
   Building2,
   CheckCircle2,
+  Compass,
   DollarSign,
+  GitBranch,
   Loader2,
   MapPin,
+  Navigation,
   Package,
   Plus,
   Save,
@@ -20,14 +23,18 @@ import { purchaseQuotationsApi } from '../../../api/quotationsApi';
 import { useAuthStore } from '../../../../auth/store';
 import { useFeedbackStore } from '../../../../feedback/store';
 import { useWarehouses } from '../../../../inventory/hooks/useWarehouses';
+import { useBranches } from '../../../../settings/hooks';
 import { formatLocalDate } from '../../../../../core/utils/dateUtils';
 import {
-  SANA_MAHRAH_TRANSIT_STATIONS,
+  SHIPPING_CORRIDORS,
   type CarrierOption,
+  type DriverOption,
   type PurchaseQuotationShipment,
   type ShipmentTimelineEvent,
   type ShipmentTrackingStage,
+  type ShippingCorridorCode,
   type ShippingPaymentMethod,
+  type TransitStation,
   type UpsertShipmentDTO,
 } from '../../../types/shipment';
 import { ShipmentTrackingStepper } from './ShipmentTrackingStepper';
@@ -58,15 +65,30 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
   const { showToast } = useFeedbackStore();
   const { data: rawWarehouses } = useWarehouses();
   const warehouses = Array.isArray(rawWarehouses) ? rawWarehouses : [];
+  const { data: rawBranches } = useBranches();
+  const rawBranchesList = Array.isArray(rawBranches) ? rawBranches : [];
+  const branches = rawBranchesList.filter(b => b.status === 'active');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'timeline' | 'share'>('details');
 
+  // مسار وممر الشحن البري المعتمد
+  const [routeCode, setRouteCode] = useState<ShippingCorridorCode>('sanaa_mahrah');
+  const [transitStations, setTransitStations] = useState<TransitStation[]>(SHIPPING_CORRIDORS.sanaa_mahrah.defaultTransitStations);
+
+  // تحديد الفروع المعنية (صاحب الطلب وفرع الوصول بالمهرة)
+  const [requestingBranchId, setRequestingBranchId] = useState<string>('');
+  const [destinationBranchId, setDestinationBranchId] = useState<string>('');
+
   // مكاتب وشركات النقل الحقيقية من قاعدة بيانات سوبابيز
   const [carriers, setCarriers] = useState<CarrierOption[]>([]);
   const [selectedCarrierId, setSelectedCarrierId] = useState<string>('other');
   const [showAddCarrierModal, setShowAddCarrierModal] = useState(false);
+
+  // السائقون الحقيقيون من قاعدة بيانات سوبابيز
+  const [drivers, setDrivers] = useState<DriverOption[]>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>('other');
 
   // Shipment State
   const [shipmentId, setShipmentId] = useState<string | undefined>(undefined);
@@ -103,23 +125,25 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
   const [timeline, setTimeline] = useState<PurchaseQuotationShipment['timeline']>([]);
 
   // New Checkpoint Station Input
-  const [selectedStation, setSelectedStation] = useState(SANA_MAHRAH_TRANSIT_STATIONS[0].name);
+  const [selectedStation, setSelectedStation] = useState(SHIPPING_CORRIDORS.sanaa_mahrah.defaultTransitStations[0].name);
   const [stationNote, setStationNote] = useState('');
 
-  // Load existing shipment and real carriers from Supabase
+  // Load existing shipment and real carriers and drivers from Supabase
   useEffect(() => {
     let isMounted = true;
     const fetchShipmentAndCarriers = async () => {
       if (!user?.company_id) return;
       setLoading(true);
       try {
-        const [existing, realCarriers] = await Promise.all([
+        const [existing, realCarriers, realDrivers] = await Promise.all([
           shipmentsApi.getShipmentByQuotationId(quotationId, user.company_id),
           shipmentsApi.getCarriers(user.company_id),
+          shipmentsApi.getDrivers(user.company_id),
         ]);
 
         if (isMounted) {
           setCarriers(realCarriers);
+          setDrivers(realDrivers);
 
           if (existing) {
             setShipmentId(existing.id);
@@ -134,13 +158,33 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
             setOfficePhone(existing.shipping_office_phone);
             setOfficeAddress(existing.shipping_office_address);
             setWaybillNumber(existing.waybill_number);
+
+            const corridor: ShippingCorridorCode = existing.route_code ?? 'sanaa_mahrah';
+            setRouteCode(corridor);
+            const activeCorridor = SHIPPING_CORRIDORS[corridor] || SHIPPING_CORRIDORS.sanaa_mahrah;
+            setTransitStations(activeCorridor.defaultTransitStations);
+            setSelectedStation(activeCorridor.defaultTransitStations[0]?.name || 'صنعاء');
+
             setOriginCity(existing.origin_city);
             setOriginHub(existing.origin_hub || '');
             setDestinationCity(existing.destination_city);
             setDestinationHub(existing.destination_hub || '');
+
+            setRequestingBranchId(existing.requesting_branch_id || user.branch_id || '');
+            setDestinationBranchId(existing.destination_branch_id || '');
             setDestinationWarehouseId(existing.destination_warehouse_id || '');
+
             setDriverName(existing.driver_name);
             setDriverPhone(existing.driver_phone);
+            const matchedDriver = realDrivers.find(
+              d => d.name === existing.driver_name || (d.phone && d.phone === existing.driver_phone)
+            );
+            if (matchedDriver) {
+              setSelectedDriverId(matchedDriver.id);
+            } else {
+              setSelectedDriverId('other');
+            }
+
             setVehiclePlateNumber(existing.vehicle_plate_number);
             setVehicleType(existing.vehicle_type);
             setParcelCount(existing.parcel_count);
@@ -154,8 +198,17 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
             setTrackingStatus(existing.tracking_status);
             setNotes(existing.notes || '');
             setTimeline(existing.timeline || []);
-          } else if (warehouses.length > 0 && !destinationWarehouseId) {
-            setDestinationWarehouseId(warehouses[0].id);
+          } else {
+            if (user.branch_id) {
+              setRequestingBranchId(user.branch_id);
+            }
+            if (warehouses.length > 0 && !destinationWarehouseId) {
+              const primaryWh = warehouses.find(w => Boolean(w.is_primary));
+              setDestinationWarehouseId(primaryWh ? primaryWh.id : warehouses[0].id);
+              if (primaryWh?.branch_id) {
+                setDestinationBranchId(primaryWh.branch_id);
+              }
+            }
           }
         }
       } catch {
@@ -169,6 +222,35 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
       isMounted = false;
     };
   }, [quotationId, user?.company_id]);
+
+  // Handle Corridor Change
+  const handleCorridorChange = (newCode: ShippingCorridorCode) => {
+    setRouteCode(newCode);
+    const corridor = SHIPPING_CORRIDORS[newCode];
+    if (corridor) {
+      if (newCode !== 'custom') {
+        setOriginCity(corridor.originCity);
+        setOriginHub(corridor.defaultOriginHub);
+        setDestinationCity(corridor.destinationCity);
+      }
+      setTransitStations(corridor.defaultTransitStations);
+      if (corridor.defaultTransitStations.length > 0) {
+        setSelectedStation(corridor.defaultTransitStations[0].name);
+      }
+    }
+  };
+
+  // Handle Driver Select
+  const handleDriverChange = (driverId: string) => {
+    setSelectedDriverId(driverId);
+    if (driverId !== 'other') {
+      const driver = drivers.find(d => d.id === driverId);
+      if (driver) {
+        setDriverName(driver.name);
+        setDriverPhone(driver.phone || '');
+      }
+    }
+  };
 
   // Handle Real Carrier Change
   const handleCarrierChange = (carrierId: string) => {
@@ -229,6 +311,9 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
       const dto: UpsertShipmentDTO = {
         id: shipmentId,
         quotation_id: quotationId,
+        route_code: routeCode,
+        requesting_branch_id: requestingBranchId || null,
+        destination_branch_id: destinationBranchId || null,
         shipping_company_name: finalCompanyName,
         shipping_office_phone: officePhone,
         shipping_office_address: officeAddress,
@@ -343,6 +428,11 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
     quotation_id: quotationId,
     quotation_number: quotationNumber,
     supplier_name: supplierName,
+    route_code: routeCode,
+    requesting_branch_id: requestingBranchId || undefined,
+    requesting_branch: branches.find(b => b.id === requestingBranchId),
+    destination_branch_id: destinationBranchId || undefined,
+    destination_branch: branches.find(b => b.id === destinationBranchId),
     shipping_company_name: shippingCompany === 'other' ? customCompanyName : shippingCompany,
     shipping_office_phone: officePhone,
     shipping_office_address: officeAddress,
@@ -409,6 +499,7 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
           <ShipmentTrackingStepper
             currentStage={trackingStatus}
             interactive={true}
+            originCity={originCity}
             onSelectStage={handleStageChange}
           />
         </div>
@@ -459,6 +550,97 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
             </div>
           ) : activeTab === 'details' ? (
             <form onSubmit={handleSave} className="space-y-5">
+              {/* القسم 0: مسار الشحن البري والفروع المعنية */}
+              <div className="rounded-xl border border-indigo-100 bg-gradient-to-l from-indigo-50/40 via-white to-purple-50/30 p-4 dark:border-indigo-950/40 dark:bg-slate-900/50 space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-indigo-900 dark:text-indigo-300">
+                    <Compass size={16} className="text-indigo-600 dark:text-indigo-400" />
+                    <span>مسار الشحن البري وتحديد الفروع</span>
+                  </div>
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold">
+                    المقصد النهائي: المهرة (الغيضة / شحن)
+                  </span>
+                </div>
+
+                {/* اختيار ممر ومسار الشحن */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1.5">
+                    اختر خط السير والممر البري *
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                    {(Object.keys(SHIPPING_CORRIDORS) as ShippingCorridorCode[]).map(code => {
+                      const c = SHIPPING_CORRIDORS[code];
+                      const isSelected = routeCode === code;
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => handleCorridorChange(code)}
+                          className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                            isSelected
+                              ? 'border-indigo-600 bg-indigo-600 text-white font-bold shadow-sm shadow-indigo-600/30'
+                              : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          }`}
+                        >
+                          <Navigation size={13} className={isSelected ? 'text-white mb-0.5' : 'text-indigo-500 mb-0.5'} />
+                          <span className="text-[10.5px] leading-tight font-bold">{c.originCity || 'مخصص'}</span>
+                          <span className="text-[9.5px] opacity-80 mt-0.5">⟵ المهرة</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* تحديد الفروع: الفرع صاحب الطلب وفرع الوصول بالمهرة */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
+                      الفرع صاحب الطلب / المستفيد *
+                    </label>
+                    <div className="relative">
+                      <GitBranch size={15} className="absolute right-3 top-2.5 text-gray-400 pointer-events-none" />
+                      <select
+                        value={requestingBranchId}
+                        onChange={e => setRequestingBranchId(e.target.value)}
+                        className="w-full text-xs rounded-lg border border-indigo-200 bg-white pr-9 pl-3 py-2 text-indigo-950 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold"
+                      >
+                        <option value="">-- اختر الفرع صاحب الطلب --</option>
+                        {branches.map(b => (
+                          <option key={b.id} value={b.id}>
+                            {b.name} {b.is_main ? '(الفرع الرئيسي)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
+                      فرع الاستلام والتوريد بالمهرة
+                    </label>
+                    <div className="relative">
+                      <Building2 size={15} className="absolute right-3 top-2.5 text-gray-400 pointer-events-none" />
+                      <select
+                        value={destinationBranchId}
+                        onChange={e => {
+                          setDestinationBranchId(e.target.value);
+                          const branchWh = warehouses.find(w => w.branch_id === e.target.value);
+                          if (branchWh) setDestinationWarehouseId(branchWh.id);
+                        }}
+                        className="w-full text-xs rounded-lg border border-gray-200 bg-white pr-9 pl-3 py-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+                      >
+                        <option value="">-- جميع فروع المهرة --</option>
+                        {branches.map(b => (
+                          <option key={b.id} value={b.id}>
+                            {b.name} {b.is_main ? '(الرئيسي)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* القسم 1: شركة الشحن ورقم البوليصة */}
               <div className="rounded-xl border border-blue-100 bg-blue-50/30 p-4 dark:border-blue-900/30 dark:bg-blue-950/10 space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-blue-800 dark:text-blue-300">
@@ -524,13 +706,13 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
                   ) : (
                     <div>
                       <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
-                        فرع صنعاء / نقطة الانطلاق
+                        فرع {originCity || 'الانطلاق'} / نقطة الإرسال
                       </label>
                       <input
                         type="text"
                         value={originHub}
                         onChange={e => setOriginHub(e.target.value)}
-                        placeholder="مثال: فرع الحصبة / مذبح / شارع تعز"
+                        placeholder={`مثال: فرع ${originCity} / المركز الرئيسي`}
                         className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                       />
                     </div>
@@ -581,23 +763,53 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
 
               {/* القسم 2: السائق ووسيلة النقل */}
               <div className="rounded-xl border border-gray-200/80 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/40 space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-800 dark:text-slate-200">
-                  <User size={16} className="text-indigo-600 dark:text-indigo-400" />
-                  <span>بيانات السائق والشاحنة الناقلة</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-800 dark:text-slate-200">
+                    <User size={16} className="text-indigo-600 dark:text-indigo-400" />
+                    <span>بيانات السائق والشاحنة الناقلة (قاعدة البيانات)</span>
+                  </div>
+                  {drivers.length > 0 && (
+                    <span className="text-[10px] text-gray-500 dark:text-slate-400 font-medium">
+                      متوفر {drivers.length} سائق معتمد
+                    </span>
+                  )}
                 </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
-                      اسم السائق
+                      اختيار سائق مسجل
+                    </label>
+                    <select
+                      value={selectedDriverId}
+                      onChange={e => handleDriverChange(e.target.value)}
+                      className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+                    >
+                      <option value="other">-- سائق آخر (إدخال يدوي) --</option>
+                      {drivers.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} {d.phone ? `(${d.phone})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
+                      اسم السائق *
                     </label>
                     <input
                       type="text"
                       value={driverName}
-                      onChange={e => setDriverName(e.target.value)}
+                      onChange={e => {
+                        setDriverName(e.target.value);
+                        setSelectedDriverId('other');
+                      }}
                       placeholder="اسم سائق الرحلة"
                       className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                     />
                   </div>
+
                   <div>
                     <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
                       رقم هاتف السائق
@@ -607,9 +819,11 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
                       value={driverPhone}
                       onChange={e => setDriverPhone(e.target.value)}
                       placeholder="770000000"
-                      className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-right"
+                      dir="ltr"
                     />
                   </div>
+
                   <div>
                     <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
                       رقم اللوحة
@@ -622,6 +836,9 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
                       className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-1">
                   <div>
                     <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
                       نوع المركبة
@@ -631,11 +848,12 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
                       onChange={e => setVehicleType(e.target.value)}
                       className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                     >
-                      <option value="دينا نقل">دينا نقل</option>
+                      <option value="شاحنة نقل (دينا)">شاحنة نقل (دينا)</option>
+                      <option value="هيلكس نقل">هيلكس نقل</option>
                       <option value="قاطرة / تريلا">قاطرة / تريلا</option>
                       <option value="شاحنة متوسطة">شاحنة متوسطة</option>
                       <option value="ونيت / شاص">ونيت / شاص</option>
-                      <option value="باص نقل ركاب وبضائع">باص نقل ركاب وبضائع</option>
+                      <option value="باص نقل بضائع">باص نقل بضائع</option>
                     </select>
                   </div>
                 </div>
@@ -687,11 +905,18 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
                       className="w-full text-xs rounded-lg border border-emerald-300 bg-white p-2 text-emerald-800 dark:border-emerald-800 dark:bg-slate-800 dark:text-emerald-300 font-semibold"
                     >
                       <option value="">-- اختر مستودع الاستلام بالمهرة --</option>
-                      {warehouses.map((wh: { id: string; name_ar?: string; name?: string; is_primary?: boolean }) => (
-                        <option key={wh.id} value={wh.id}>
-                          {wh.name_ar || wh.name} {wh.is_primary ? '(الرئيسي)' : ''}
-                        </option>
-                      ))}
+                      {(destinationBranchId
+                        ? warehouses.filter(w => !w.branch_id || w.branch_id === destinationBranchId)
+                        : warehouses
+                      ).map(wh => {
+                        const whBranch = branches.find(b => b.id === wh.branch_id);
+                        const branchLabel = whBranch?.name ? ` — ${whBranch.name}` : '';
+                        return (
+                          <option key={wh.id} value={wh.id}>
+                            {wh.name_ar || wh.name || ''} {wh.is_primary ? '(الرئيسي)' : ''}{branchLabel}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -807,7 +1032,7 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
               <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-900/40 dark:bg-blue-950/20 space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-blue-900 dark:text-blue-300">
                   <MapPin size={16} />
-                  <span>تسجيل مرور بمحطة أو نقطة تفتيش على طريق صنعاء - المهرة</span>
+                  <span>تسجيل مرور بمحطة أو نقطة على طريق {originCity} ⟵ المهرة</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
@@ -819,7 +1044,7 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
                       onChange={e => setSelectedStation(e.target.value)}
                       className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
                     >
-                      {SANA_MAHRAH_TRANSIT_STATIONS.map((st: { id: string; name: string; province: string }) => (
+                      {transitStations.map((st: { id: string; name: string; province: string }) => (
                         <option key={st.id} value={st.name}>
                           {st.name} ({st.province})
                         </option>

@@ -181,7 +181,7 @@ export const AddCarrierModal: React.FC<AddCarrierModalProps> = ({
             {/* Route & Hub Defaults */}
             <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-3.5 dark:border-slate-800 dark:bg-slate-800/40 space-y-3">
               <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 block">
-                مراكز خط السير المعتادة (صنعاء ⟵ المهرة)
+                مراكز ومسارات الشحن المعتادة (صنعاء، عدن، تعز، المكلا، سيئون ⟵ المهرة)
               </span>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -192,22 +192,29 @@ export const AddCarrierModal: React.FC<AddCarrierModalProps> = ({
                   >
                     مدينة الانطلاق
                   </label>
-                  <input
+                  <select
                     id="carrier-origin-city-input"
-                    type="text"
                     value={originCity}
                     onChange={e => {
                       setOriginCity(e.target.value);
                     }}
-                    className="w-full text-xs rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  />
+                    className="w-full text-xs rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+                  >
+                    <option value="صنعاء">صنعاء</option>
+                    <option value="عدن">عدن</option>
+                    <option value="تعز">تعز</option>
+                    <option value="المكلا">المكلا</option>
+                    <option value="سيئون">سيئون</option>
+                    <option value="مأرب">مأرب</option>
+                    <option value="عتق">عتق (شبوة)</option>
+                  </select>
                 </div>
                 <div>
                   <label
                     htmlFor="carrier-origin-hub-input"
                     className="block text-[11px] font-medium text-gray-600 dark:text-slate-400 mb-1"
                   >
-                    نقطة / فرع استلام صنعاء
+                    نقطة / فرع الاستلام بمدينة الانطلاق
                   </label>
                   <input
                     id="carrier-origin-hub-input"
@@ -216,7 +223,7 @@ export const AddCarrierModal: React.FC<AddCarrierModalProps> = ({
                     onChange={e => {
                       setOriginHub(e.target.value);
                     }}
-                    placeholder="مثال: فرع الحصبة / مذبح"
+                    placeholder="مثال: الفرع الرئيسي / المستودع"
                     className="w-full text-xs rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   />
                 </div>

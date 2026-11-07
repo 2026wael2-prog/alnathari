@@ -6,9 +6,11 @@ import type { Database, Json } from '../../../core/database.types';
 import type {
   CarrierOption,
   CreateCarrierDTO,
+  DriverOption,
   PurchaseQuotationShipment,
   ShipmentTimelineEvent,
   ShipmentTrackingStage,
+  ShippingCorridorCode,
   UpsertShipmentDTO,
 } from '../types/shipment';
 
@@ -16,6 +18,8 @@ interface RawShipmentRow {
   id: string;
   company_id: string;
   quotation_id: string;
+  route_code: string | null;
+  requesting_branch_id: string | null;
   shipping_company_name: string;
   shipping_office_phone: string | null;
   shipping_office_address: string | null;
@@ -49,6 +53,7 @@ interface RawShipmentRow {
   created_by: string | null;
   quotation?: {
     quotation_number: string;
+    branch_id?: string | null;
     party?: { name: string } | null;
   } | null;
 }
@@ -72,6 +77,8 @@ const mapRowToShipment = (row: RawShipmentRow): PurchaseQuotationShipment => {
     quotation_id: row.quotation_id,
     quotation_number: row.quotation?.quotation_number,
     supplier_name: row.quotation?.party?.name,
+    route_code: (row.route_code as ShippingCorridorCode) || 'sanaa_mahrah',
+    requesting_branch_id: row.requesting_branch_id ?? row.quotation?.branch_id ?? undefined,
     shipping_company_name: row.shipping_company_name,
     shipping_office_phone: row.shipping_office_phone ?? '',
     shipping_office_address: row.shipping_office_address ?? '',
@@ -210,6 +217,31 @@ export const shipmentsApi = {
   },
 
   /**
+   * جلب السائقين ومسؤولي النقل الحقيقيين المسجلين في قاعدة بيانات سوبابيز
+   */
+  getDrivers: async (companyId: string): Promise<DriverOption[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('parties')
+        .select('id, name, phone')
+        .eq('company_id', companyId)
+        .is('deleted_at', null)
+        .or('name.ilike.%نقل%,name.ilike.%سائق%,name.ilike.%هيلكس%,name.ilike.%دينا%,name.ilike.%شاحنة%,name.ilike.%سيارة%')
+        .order('name');
+
+      if (error !== null || data === null) return [];
+      return data.map(d => ({
+        id: d.id,
+        name: d.name,
+        phone: d.phone,
+      }));
+    } catch (err) {
+      logger.error('shipmentsApi', 'Error loading real drivers from parties:', err);
+      return [];
+    }
+  },
+
+  /**
    * جلب تفاصيل شحنة عرض سعر معين مباشرة من سوبابيز
    */
   getShipmentByQuotationId: async (
@@ -219,7 +251,7 @@ export const shipmentsApi = {
     try {
       const { data, error } = await supabase
         .from('purchase_quotation_shipments')
-        .select('*, quotation:quotations(quotation_number, party:parties(name))')
+        .select('*, quotation:quotations(quotation_number, branch_id, party:parties(name))')
         .eq('quotation_id', quotationId)
         .eq('company_id', companyId)
         .maybeSingle();
@@ -245,7 +277,7 @@ export const shipmentsApi = {
     try {
       let query = supabase
         .from('purchase_quotation_shipments')
-        .select('*, quotation:quotations(quotation_number, party:parties(name))')
+        .select('*, quotation:quotations(quotation_number, branch_id, party:parties(name))')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false });
 
@@ -312,9 +344,11 @@ export const shipmentsApi = {
       });
     }
 
-    const payload = {
+    const payload: Database['public']['Tables']['purchase_quotation_shipments']['Insert'] = {
       company_id: companyId,
       quotation_id: dto.quotation_id,
+      route_code: dto.route_code || 'sanaa_mahrah',
+      requesting_branch_id: dto.requesting_branch_id || null,
       shipping_company_name: dto.shipping_company_name,
       shipping_office_phone: dto.shipping_office_phone || null,
       shipping_office_address: dto.shipping_office_address || null,
@@ -355,7 +389,7 @@ export const shipmentsApi = {
         .update(payload)
         .eq('id', currentId)
         .eq('company_id', companyId)
-        .select('*, quotation:quotations(quotation_number, party:parties(name))')
+        .select('*, quotation:quotations(quotation_number, branch_id, party:parties(name))')
         .single();
 
       if (error !== null) throw error;
@@ -364,7 +398,7 @@ export const shipmentsApi = {
       const { data, error } = await supabase
         .from('purchase_quotation_shipments')
         .insert({ ...payload, id: crypto.randomUUID() })
-        .select('*, quotation:quotations(quotation_number, party:parties(name))')
+        .select('*, quotation:quotations(quotation_number, branch_id, party:parties(name))')
         .single();
 
       if (error !== null) throw error;
@@ -420,7 +454,7 @@ export const shipmentsApi = {
         .update(updates)
         .eq('id', shipmentId)
         .eq('company_id', companyId)
-        .select('*, quotation:quotations(quotation_number, party:parties(name))')
+        .select('*, quotation:quotations(quotation_number, branch_id, party:parties(name))')
         .maybeSingle();
 
       if (error !== null) throw error;

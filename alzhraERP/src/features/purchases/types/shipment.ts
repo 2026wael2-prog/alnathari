@@ -1,20 +1,49 @@
 /**
  * purchase_quotation_shipments types
- * تتبع شحنات عروض الشراء عبر مكاتب شركات الشحن (خط صنعاء - المهرة)
+ * تتبع وإدارة شحنات عروض الشراء البرية عبر مكاتب وشركات الشحن
+ * مسارات الشحن المعتمدة إلى محافظة المهرة:
+ * - صنعاء ⟵ المهرة
+ * - عدن ⟵ المهرة
+ * - تعز ⟵ المهرة
+ * - المكلا ⟵ المهرة
+ * - سيئون ⟵ المهرة
  */
 
 export type ShipmentTrackingStage =
-  | 'pending_dispatch'       // قيد التجهيز والتغليف لدى مورد صنعاء
-  | 'handed_to_office'       // سُلمت لمكتب الشحن في صنعاء مع سند الشحن
-  | 'in_transit'             // على الطريق بين المحافظات (صنعاء ➔ المهرة)
+  | 'pending_dispatch'       // قيد التجهيز والتغليف لدى المورد
+  | 'handed_to_office'       // سُلمت لمكتب الشحن مع سند الإرسالية
+  | 'in_transit'             // على الطريق بين المحافظات
   | 'arrived_at_office'      // وصلت فرع مكتب الشحن بالمهرة (الغيضة / شحن)
   | 'received_at_warehouse'  // استُلمت وفُحصت في مستودع المنشأة بالمهرة
   | 'cancelled';             // ملغية / مرتجعة
 
 export type ShippingPaymentMethod =
   | 'collect_on_delivery' // دفع عند الاستلام في المهرة (COD)
-  | 'prepaid_by_supplier' // مدفوع مقدماً من المورد في صنعاء
+  | 'prepaid_by_supplier' // مدفوع مقدماً من المورد
   | 'on_company_account'; // مسجل على حساب المنشأة لدى مكتب الشحن
+
+export type ShippingCorridorCode =
+  | 'sanaa_mahrah'
+  | 'aden_mahrah'
+  | 'taiz_mahrah'
+  | 'mukalla_mahrah'
+  | 'seiyun_mahrah'
+  | 'custom';
+
+export interface TransitStation {
+  id: string;
+  name: string;
+  province: string;
+}
+
+export interface ShippingCorridor {
+  code: ShippingCorridorCode;
+  label: string;
+  originCity: string;
+  destinationCity: string;
+  defaultOriginHub: string;
+  defaultTransitStations: TransitStation[];
+}
 
 export interface ShipmentTimelineEvent {
   id: string;
@@ -32,25 +61,33 @@ export interface PurchaseQuotationShipment {
   quotation_number?: string | undefined;
   supplier_name?: string | undefined;
 
+  // مسار الشحن والكود
+  route_code?: ShippingCorridorCode | undefined;
+
+  // ربط الفروع (الفرع صاحب الطلب وفرع الوصول بالمهرة)
+  requesting_branch_id?: string | null | undefined;
+  requesting_branch?: { id: string; name: string; code?: string | null | undefined } | null | undefined;
+  destination_branch_id?: string | null | undefined;
+  destination_branch?: { id: string; name: string; code?: string | null | undefined } | null | undefined;
+  destination_warehouse_id?: string | null | undefined;
+
   // بيانات مكتب / شركة الشحن
   shipping_company_name: string;
   shipping_office_phone: string;
   shipping_office_address: string;
   waybill_number: string; // رقم البوليصة / سند الإرسالية
 
-  // المسار الجغرافي (صنعاء ➔ المهرة)
-  origin_city: string; // افتراضي: صنعاء
-  origin_hub?: string | undefined; // مثل: فرع الحصبة / مذبح / شارع خولان
-  destination_city: string; // افتراضي: المهرة (الغيضة)
-  destination_hub?: string | undefined; // مثل: فرع الغيضة - شارع المطار / فرع شحن
-  destination_branch_id?: string | null | undefined;
-  destination_warehouse_id?: string | null | undefined;
+  // المسار الجغرافي
+  origin_city: string;
+  origin_hub?: string | undefined;
+  destination_city: string;
+  destination_hub?: string | undefined;
 
   // بيانات الناقل والسائق
   driver_name: string;
   driver_phone: string;
   vehicle_plate_number: string;
-  vehicle_type: string; // دينا، قاطرة، شاحنة متوسطة، ونيت
+  vehicle_type: string; // دينا، قاطرة، شاحنة متوسطة، ونيت، هيلكس
 
   // تفاصيل الحمولة والطرود
   parcel_count: number;
@@ -82,6 +119,11 @@ export interface PurchaseQuotationShipment {
 export interface UpsertShipmentDTO {
   id?: string | undefined;
   quotation_id: string;
+  route_code?: ShippingCorridorCode | undefined;
+  requesting_branch_id?: string | null | undefined;
+  destination_branch_id?: string | null | undefined;
+  destination_warehouse_id?: string | null | undefined;
+
   shipping_company_name: string;
   shipping_office_phone?: string | undefined;
   shipping_office_address?: string | undefined;
@@ -91,8 +133,6 @@ export interface UpsertShipmentDTO {
   origin_hub?: string | undefined;
   destination_city?: string | undefined;
   destination_hub?: string | undefined;
-  destination_branch_id?: string | null | undefined;
-  destination_warehouse_id?: string | null | undefined;
 
   driver_name?: string | undefined;
   driver_phone?: string | undefined;
@@ -135,6 +175,13 @@ export interface CarrierOption {
   source?: 'shipping_companies' | 'parties' | undefined;
 }
 
+/** بيانات السائقين المسجلين في النظام */
+export interface DriverOption {
+  id: string;
+  name: string;
+  phone: string | null;
+}
+
 /** نموذج إنشاء مكتب أو شركة شحن جديدة في سوبابيز */
 export interface CreateCarrierDTO {
   name: string;
@@ -146,16 +193,109 @@ export interface CreateCarrierDTO {
   destination_hub?: string | null | undefined;
 }
 
-/** المحطات الجغرافية الرئيسية لخط السير بين صنعاء والمهرة */
-export const SANA_MAHRAH_TRANSIT_STATIONS = [
-  { id: 'sanaa', name: 'صنعاء (نقطة الانطلاق)', province: 'أمانة العاصمة' },
-  { id: 'marib', name: 'مأرب', province: 'مأرب' },
-  { id: 'aber', name: 'العبر', province: 'حضرموت' },
-  { id: 'seiyun', name: 'سيئون / تريم', province: 'وادي حضرموت' },
-  { id: 'mukalla', name: 'المكلا / الشحر', province: 'ساحل حضرموت' },
-  { id: 'sayhut', name: 'سيحوت / قشن', province: 'المهرة' },
-  { id: 'alghaydah', name: 'الغيضة (عاصمة المهرة)', province: 'المهرة' },
-  { id: 'shahan', name: 'منفذ شحن الحدودي', province: 'المهرة' },
-  { id: 'hawf', name: 'محمية حوف', province: 'المهرة' },
-];
+/** مسارات وممرات الشحن المعتمدة في اليمن المتجهة إلى المهرة */
+export const SHIPPING_CORRIDORS: Record<ShippingCorridorCode, ShippingCorridor> = {
+  sanaa_mahrah: {
+    code: 'sanaa_mahrah',
+    label: 'صنعاء ⟵ المهرة (الغيضة / شحن)',
+    originCity: 'صنعاء',
+    destinationCity: 'المهرة (الغيضة)',
+    defaultOriginHub: 'فرع مذبح / الحصبة / شارع خولان',
+    defaultTransitStations: [
+      { id: 'sanaa', name: 'صنعاء (نقطة الانطلاق)', province: 'أمانة العاصمة' },
+      { id: 'marib', name: 'مأرب', province: 'مأرب' },
+      { id: 'aber', name: 'العبر', province: 'حضرموت' },
+      { id: 'seiyun', name: 'سيئون / تريم', province: 'وادي حضرموت' },
+      { id: 'mukalla', name: 'المكلا / الشحر', province: 'ساحل حضرموت' },
+      { id: 'sayhut', name: 'سيحوت / قشن', province: 'المهرة' },
+      { id: 'alghaydah', name: 'الغيضة (عاصمة المهرة)', province: 'المهرة' },
+      { id: 'shahan', name: 'منفذ شحن الحدودي', province: 'المهرة' },
+      { id: 'hawf', name: 'محمية حوف', province: 'المهرة' },
+    ],
+  },
+  aden_mahrah: {
+    code: 'aden_mahrah',
+    label: 'عدن ⟵ المهرة (الغيضة / شحن)',
+    originCity: 'عدن',
+    destinationCity: 'المهرة (الغيضة)',
+    defaultOriginHub: 'فرع الشيخ عثمان / دار سعد / البريقة',
+    defaultTransitStations: [
+      { id: 'aden', name: 'عدن (نقطة الانطلاق)', province: 'عدن' },
+      { id: 'abyan_shaqra', name: 'أبين / شقرة', province: 'أبين' },
+      { id: 'ahwar', name: 'أحور', province: 'أبين' },
+      { id: 'shabwa_ataq', name: 'شبوة (عتق / بلحاف)', province: 'شبوة' },
+      { id: 'mukalla', name: 'المكلا / بروم', province: 'حضرموت' },
+      { id: 'shihr', name: 'الشحر / الحامي', province: 'حضرموت' },
+      { id: 'sayhut', name: 'سيحوت / قشن', province: 'المهرة' },
+      { id: 'alghaydah', name: 'الغيضة (عاصمة المهرة)', province: 'المهرة' },
+      { id: 'shahan', name: 'منفذ شحن الحدودي', province: 'المهرة' },
+    ],
+  },
+  taiz_mahrah: {
+    code: 'taiz_mahrah',
+    label: 'تعز ⟵ المهرة (الغيضة / شحن)',
+    originCity: 'تعز',
+    destinationCity: 'المهرة (الغيضة)',
+    defaultOriginHub: 'فرع الحوبان / مفرق ماوية / بير باشا',
+    defaultTransitStations: [
+      { id: 'taiz', name: 'تعز (الحوبان / المدينة)', province: 'تعز' },
+      { id: 'lahj', name: 'لحج (العند / الحوطة)', province: 'لحج' },
+      { id: 'aden', name: 'عدن (محطة عبور)', province: 'عدن' },
+      { id: 'abyan', name: 'أبين / زنجبار', province: 'أبين' },
+      { id: 'shabwah', name: 'شبوة (النقبة / عتق)', province: 'شبوة' },
+      { id: 'mukalla', name: 'المكلا / ساحل حضرموت', province: 'حضرموت' },
+      { id: 'sayhut', name: 'سيحوت / قشن', province: 'المهرة' },
+      { id: 'alghaydah', name: 'الغيضة (عاصمة المهرة)', province: 'المهرة' },
+      { id: 'shahan', name: 'منفذ شحن الحدودي', province: 'المهرة' },
+    ],
+  },
+  mukalla_mahrah: {
+    code: 'mukalla_mahrah',
+    label: 'المكلا ⟵ المهرة (الغيضة / شحن)',
+    originCity: 'المكلا',
+    destinationCity: 'المهرة (الغيضة)',
+    defaultOriginHub: 'فرع جول مسحة / الديس / الشرج',
+    defaultTransitStations: [
+      { id: 'mukalla', name: 'المكلا (نقطة الانطلاق)', province: 'حضرموت' },
+      { id: 'shihr', name: 'الشحر', province: 'حضرموت' },
+      { id: 'hami', name: 'الحامي', province: 'حضرموت' },
+      { id: 'dis_sharqia', name: 'الديس الشرقية', province: 'حضرموت' },
+      { id: 'raida_qusaiar', name: 'الريدة وقصيعر / مصينعة', province: 'حضرموت' },
+      { id: 'sayhut', name: 'سيحوت', province: 'المهرة' },
+      { id: 'qishn', name: 'قشن', province: 'المهرة' },
+      { id: 'alghaydah', name: 'الغيضة (عاصمة المهرة)', province: 'المهرة' },
+      { id: 'shahan', name: 'منفذ شحن الحدودي', province: 'المهرة' },
+    ],
+  },
+  seiyun_mahrah: {
+    code: 'seiyun_mahrah',
+    label: 'سيئون ⟵ المهرة (الغيضة / شحن)',
+    originCity: 'سيئون',
+    destinationCity: 'المهرة (الغيضة)',
+    defaultOriginHub: 'فرع وادي حضرموت / مريمة / تريم',
+    defaultTransitStations: [
+      { id: 'seiyun', name: 'سيئون (وادي حضرموت)', province: 'حضرموت' },
+      { id: 'tarim', name: 'تريم', province: 'حضرموت' },
+      { id: 'thamud', name: 'ثمود الصحراوي', province: 'حضرموت' },
+      { id: 'ramah', name: 'رماه', province: 'حضرموت' },
+      { id: 'shahan', name: 'منفذ شحن الحدودي', province: 'المهرة' },
+      { id: 'alghaydah', name: 'الغيضة (عاصمة المهرة)', province: 'المهرة' },
+      { id: 'hawf', name: 'محمية حوف', province: 'المهرة' },
+    ],
+  },
+  custom: {
+    code: 'custom',
+    label: 'مسار مخصص آخر',
+    originCity: '',
+    destinationCity: 'المهرة (الغيضة)',
+    defaultOriginHub: '',
+    defaultTransitStations: [
+      { id: 'start', name: 'نقطة الانطلاق', province: 'اليمن' },
+      { id: 'transit', name: 'محطة عبور وسيطة', province: 'اليمن' },
+      { id: 'dest', name: 'المهرة (الغيضة)', province: 'المهرة' },
+    ],
+  },
+};
 
+/** محطات خط صنعاء - المهرة للتوافقية العكسية */
+export const SANA_MAHRAH_TRANSIT_STATIONS = SHIPPING_CORRIDORS.sanaa_mahrah.defaultTransitStations;

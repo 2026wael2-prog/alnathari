@@ -17,39 +17,6 @@ interface StepDefinition {
   icon: React.ComponentType<{ className?: string; size?: number }>;
 }
 
-const STEPS: StepDefinition[] = [
-  {
-    stage: 'pending_dispatch',
-    label: 'تجهيز المورد',
-    description: 'صنعاء — فرز وتعبئة الطرود',
-    icon: Package,
-  },
-  {
-    stage: 'handed_to_office',
-    label: 'مكتب شحن صنعاء',
-    description: 'إصدار البوليصة وسند التسليم',
-    icon: Clock,
-  },
-  {
-    stage: 'in_transit',
-    label: 'النقل البري',
-    description: 'خط صنعاء - مأرب - المهرة',
-    icon: Truck,
-  },
-  {
-    stage: 'arrived_at_office',
-    label: 'وصول مكتب المهرة',
-    description: 'الغيضة / شحن (جاهزة للاستلام)',
-    icon: MapPin,
-  },
-  {
-    stage: 'received_at_warehouse',
-    label: 'مستودع المنشأة',
-    description: 'استلام وفحص وتوريد المخزن',
-    icon: Warehouse,
-  },
-];
-
 const STAGE_ORDER: Record<ShipmentTrackingStage, number> = {
   pending_dispatch: 0,
   handed_to_office: 1,
@@ -64,6 +31,7 @@ interface ShipmentTrackingStepperProps {
   timeline?: ShipmentTimelineEvent[] | undefined;
   onSelectStage?: ((stage: ShipmentTrackingStage) => void) | undefined;
   interactive?: boolean | undefined;
+  originCity?: string | undefined;
 }
 
 export const ShipmentTrackingStepper: React.FC<ShipmentTrackingStepperProps> = ({
@@ -71,8 +39,42 @@ export const ShipmentTrackingStepper: React.FC<ShipmentTrackingStepperProps> = (
   timeline = [],
   onSelectStage,
   interactive = false,
+  originCity = 'صنعاء',
 }) => {
   const currentIndex = STAGE_ORDER[currentStage] ?? 0;
+
+  const dynamicSteps: StepDefinition[] = [
+    {
+      stage: 'pending_dispatch',
+      label: 'تجهيز المورد',
+      description: `${originCity} — فرز وتعبئة الطرود`,
+      icon: Package,
+    },
+    {
+      stage: 'handed_to_office',
+      label: `مكتب ${originCity}`,
+      description: 'إصدار البوليصة وسند التسليم',
+      icon: Clock,
+    },
+    {
+      stage: 'in_transit',
+      label: 'النقل البري',
+      description: `خط ${originCity} ⟵ المهرة`,
+      icon: Truck,
+    },
+    {
+      stage: 'arrived_at_office',
+      label: 'وصول مكتب المهرة',
+      description: 'الغيضة / شحن (جاهزة للاستلام)',
+      icon: MapPin,
+    },
+    {
+      stage: 'received_at_warehouse',
+      label: 'مستودع المنشأة',
+      description: 'استلام وفحص وتوريد المخزن',
+      icon: Warehouse,
+    },
+  ];
 
   return (
     <div className="w-full">
@@ -83,11 +85,11 @@ export const ShipmentTrackingStepper: React.FC<ShipmentTrackingStepperProps> = (
         <div
           className="absolute left-6 top-1/2 -translate-y-1/2 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 -z-0 transition-all duration-500"
           style={{
-            width: `${Math.max(0, Math.min(100, (currentIndex / (STEPS.length - 1)) * 100))}%`,
+            width: `${Math.max(0, Math.min(100, (currentIndex / (dynamicSteps.length - 1)) * 100))}%`,
           }}
         />
 
-        {STEPS.map((step, idx) => {
+        {dynamicSteps.map((step, idx) => {
           const isDone = currentIndex > idx;
           const isCurrent = currentIndex === idx;
           const IconComponent = step.icon;

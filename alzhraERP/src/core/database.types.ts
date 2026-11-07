@@ -9901,6 +9901,8 @@ export type Database = {
           quotation_id: string
           received_by: string | null
           received_date: string | null
+          requesting_branch_id: string | null
+          route_code: string | null
           shipping_company_name: string
           shipping_cost: number
           shipping_currency: string
@@ -9937,6 +9939,8 @@ export type Database = {
           quotation_id: string
           received_by?: string | null
           received_date?: string | null
+          requesting_branch_id?: string | null
+          route_code?: string | null
           shipping_company_name: string
           shipping_cost?: number
           shipping_currency?: string
@@ -9973,6 +9977,8 @@ export type Database = {
           quotation_id?: string
           received_by?: string | null
           received_date?: string | null
+          requesting_branch_id?: string | null
+          route_code?: string | null
           shipping_company_name?: string
           shipping_cost?: number
           shipping_currency?: string
@@ -9998,6 +10004,13 @@ export type Database = {
           {
             foreignKeyName: "purchase_quotation_shipments_destination_branch_id_fkey"
             columns: ["destination_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_quotation_shipments_requesting_branch_id_fkey"
+            columns: ["requesting_branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
             referencedColumns: ["id"]
