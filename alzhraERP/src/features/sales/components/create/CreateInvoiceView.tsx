@@ -330,7 +330,7 @@ const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({ onSuccess }) => {
 
   return (
     <>
-      <div className="animate-in fade-in mx-auto max-w-none space-y-2 px-1 pb-24 pt-1 duration-500 sm:space-y-3 sm:px-2 sm:pb-28 sm:pt-2">
+      <div className="animate-in fade-in mx-auto max-w-none space-y-2 px-1 pb-28 pt-1 duration-500 sm:space-y-3 sm:px-2 sm:pb-32 sm:pt-2">
         {/* شريط تبويبات الفواتير المفتوحة المتعددة بالتوازي */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <OpenInvoicesTabs disabled={Boolean(navigation.currentViewingInvoice)} />
@@ -380,11 +380,18 @@ const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({ onSuccess }) => {
           </>
         )}
 
-        {/* شريط الميزان للتنقل بين الفواتير السابقة والجديدة */}
+        {/* شريط الميزان الثابت للتنقل وإجراءات الفاتورة مع الأيقونات المطورة */}
         <InvoiceNavigatorBar
           navigation={navigation}
           defaultNextNumber={nextInvoiceNumber ?? undefined}
           onNewInvoiceClick={navigation.exitViewingMode}
+          onSave={handleSave}
+          onPrint={() => {
+            handlePrint();
+          }}
+          isSaving={isPending}
+          totalAmount={summary.totalAmount}
+          currencyCode={currency}
         />
       </div>
 
