@@ -125,6 +125,7 @@ export const inventoryService = {
     return auditService.startAudit(data, companyId, userId);
   },
 
+  /* eslint-disable-next-line max-params -- legacy facade signature */
   addAuditItem: async (
     sessionId: string,
     productId: string,
@@ -155,9 +156,9 @@ export const inventoryService = {
   saveAuditProgress: async (
     payload:
       | {
-          sessionId?: string;
-          items: Array<{ id?: string; product_id: string; counted_quantity: number | null }>;
-        }
+        sessionId?: string;
+        items: Array<{ id?: string; product_id: string; counted_quantity: number | null }>;
+      }
       | Array<{ id?: string; product_id: string; counted_quantity: number | null }>,
     sessionId?: string
   ) => {
@@ -219,6 +220,14 @@ export const inventoryService = {
 
     if (error) throw parseError(error);
     return data;
+  },
+
+  getSupplierProductIds: async (companyId: string, supplierId: string): Promise<string[]> => {
+    return productService.getSupplierProductIds(companyId, supplierId);
+  },
+
+  getProductSupplierMap: async (companyId: string): Promise<Record<string, string>> => {
+    return productService.getProductSupplierMap(companyId);
   },
 };
 

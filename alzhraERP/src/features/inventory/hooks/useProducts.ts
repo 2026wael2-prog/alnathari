@@ -162,7 +162,6 @@ export const useProducts = (
 export const useMinimalProducts = (): UseQueryResult<Product[]> => {
   const { user } = useAuthStore();
   const companyId = user?.company_id;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MinimalProduct subset is assignable at runtime; full Product type expected by consumers
   return useQuery({
     queryKey: ['products_minimal', companyId],
     queryFn: () =>
@@ -230,7 +229,6 @@ export const useProductMutations = (): ProductMutations => {
       if (id !== undefined && previousProducts !== undefined) {
         queryClient.setQueryData<Product[]>(
           ['products', user?.company_id],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- spread of ProductFormData is a valid partial Product at runtime
           (old = []) => old.map(p => (p.id === id ? ({ ...p, ...data } as unknown as Product) : p))
         );
       }
@@ -358,7 +356,6 @@ export const useSearchProducts = (searchTerm: string): UseQueryResult<Product[]>
   const normalizedTerm = searchTerm.trim();
   const isSearchable = companyId !== undefined && companyId !== '' && normalizedTerm.length > 1;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SearchResultProduct is a runtime subset of Product; full Product type expected by consumers
   return useQuery({
     queryKey: ['products_search', companyId, normalizedTerm, branchId],
     queryFn: () =>
@@ -390,5 +387,48 @@ export const useStockedProducts = (): UseQueryResult<Product[]> => {
         : Promise.resolve([]),
     enabled: companyId !== undefined && companyId !== '',
     staleTime: 60 * 1000,
+  });
+};
+
+/**
+ * Hook to fetch product IDs associated with a specific supplier
+ */
+export const useSupplierProductIds = (
+  companyId?: string | null,
+  supplierId?: string | null
+): UseQueryResult<string[]> => {
+  const hasParams =
+    companyId !== null &&
+    companyId !== undefined &&
+    companyId.trim() !== '' &&
+    supplierId !== null &&
+    supplierId !== undefined &&
+    supplierId.trim() !== '';
+
+  return useQuery({
+    queryKey: ['supplier_product_ids', companyId, supplierId],
+    queryFn: () =>
+      hasParams
+        ? inventoryService.getSupplierProductIds(companyId, supplierId)
+        : Promise.resolve([]),
+    enabled: hasParams,
+    staleTime: 1000 * 60 * 3,
+  });
+};
+
+/**
+ * Hook to fetch map of productId -> supplierName for products in the company
+ */
+export const useProductSupplierMap = (
+  companyId?: string | null
+): UseQueryResult<Record<string, string>> => {
+  const hasCompany = companyId !== null && companyId !== undefined && companyId.trim() !== '';
+
+  return useQuery({
+    queryKey: ['product_supplier_map', companyId],
+    queryFn: () =>
+      hasCompany ? inventoryService.getProductSupplierMap(companyId) : Promise.resolve({}),
+    enabled: hasCompany,
+    staleTime: 1000 * 60 * 5,
   });
 };

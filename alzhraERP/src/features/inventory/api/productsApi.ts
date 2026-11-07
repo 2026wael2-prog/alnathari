@@ -286,11 +286,11 @@ export const productsApi = {
           ...item,
           quantity: Array.isArray(item.quantity)
             ? item.quantity.filter(
-                (s: { warehouses?: { branch_id?: string | null } | Array<{ branch_id?: string | null }> | null }) => {
-                  const wh = Array.isArray(s.warehouses) ? s.warehouses[0] : s.warehouses;
-                  return wh?.branch_id === branchId;
-                }
-              )
+              (s: { warehouses?: { branch_id?: string | null } | Array<{ branch_id?: string | null }> | null }) => {
+                const wh = Array.isArray(s.warehouses) ? s.warehouses[0] : s.warehouses;
+                return wh?.branch_id === branchId;
+              }
+            )
             : [],
         })),
       };
@@ -403,5 +403,80 @@ export const productsApi = {
 
   bulkSetCoreProducts: async (ids: string[], isCore: boolean) => {
     return await supabase.from('products').update({ is_core: isCore }).in('id', ids);
+  },
+
+  /**
+   * Get product IDs associated with a specific supplier (via supplier prices or purchase invoices)
+   */
+  getSupplierProductIds: async (companyId: string, supplierId: string): Promise<string[]> => {
+    if (!companyId || !supplierId) return [];
+
+    const [pspRes, invItemsRes] = await Promise.all([
+      supabase
+        .from('product_supplier_prices')
+        .select('product_id')
+        .eq('company_id', companyId)
+        .eq('supplier_id', supplierId),
+      supabase
+        .from('invoice_items')
+        .select('product_id, invoice:invoices!inner(company_id, party_id, type)')
+        .eq('invoice.company_id', companyId)
+        .eq('invoice.party_id', supplierId)
+        .eq('invoice.type', 'purchase'),
+    ]);
+
+    const ids = new Set<string>();
+    (pspRes.data || []).forEach(r => {
+      if (r.product_id) ids.add(r.product_id);
+    });
+    (invItemsRes.data || []).forEach((r: { product_id?: string | null }) => {
+      if (r.product_id) ids.add(r.product_id);
+    });
+
+    return Array.from(ids);
+  },
+
+  /**
+   * Get map of product IDs to their known supplier name
+   */
+  getProductSupplierMap: async (companyId: string): Promise<Record<string, string>> => {
+    if (!companyId) return {};
+
+    const map: Record<string, string> = {};
+
+    const [pspRes, invRes] = await Promise.all([
+      supabase
+        .from('product_supplier_prices')
+        .select('product_id, supplier:parties!supplier_id(name)')
+        .eq('company_id', companyId),
+      supabase
+        .from('invoice_items')
+        .select('product_id, invoice:invoices!inner(party:parties!party_id(name), type, company_id)')
+        .eq('invoice.company_id', companyId)
+        .eq('invoice.type', 'purchase')
+        .order('created_at', { ascending: false })
+        .limit(1000),
+    ]);
+
+    (pspRes.data || []).forEach(
+      (r: { product_id?: string | null; supplier?: { name?: string | null } | null }) => {
+        if (r.product_id && r.supplier?.name && !map[r.product_id]) {
+          map[r.product_id] = r.supplier.name;
+        }
+      }
+    );
+
+    (invRes.data || []).forEach(
+      (r: {
+        product_id?: string | null;
+        invoice?: { party?: { name?: string | null } | null } | null;
+      }) => {
+        if (r.product_id && r.invoice?.party?.name && !map[r.product_id]) {
+          map[r.product_id] = r.invoice.party.name;
+        }
+      }
+    );
+
+    return map;
   },
 };

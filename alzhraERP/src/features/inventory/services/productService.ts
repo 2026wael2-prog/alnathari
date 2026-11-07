@@ -1,6 +1,6 @@
 import { mapRawProducts } from './productMappers';
 import type { Product, ProductFormData } from '../types';
-import { inventoryApi } from '../api';
+import { inventoryApi, productsApi } from '../api';
 import { supabase } from '../../../lib/supabaseClient';
 import type { InsertDto } from '../../../core/database.helpers';
 import type { TableUpdate } from '@/core/types/supabase-helpers';
@@ -714,6 +714,20 @@ export const productService = {
       logger.error('productService.getCoreProductsStats', 'Failed to fetch stats', err);
       return { total: 0, critical: 0, outOfStock: 0, safe: 0 };
     }
+  },
+
+  /**
+   * Get product IDs associated with a specific supplier
+   */
+  getSupplierProductIds: async (companyId: string, supplierId: string): Promise<string[]> => {
+    return productsApi.getSupplierProductIds(companyId, supplierId);
+  },
+
+  /**
+   * Get map of product IDs to their known supplier name
+   */
+  getProductSupplierMap: async (companyId: string): Promise<Record<string, string>> => {
+    return productsApi.getProductSupplierMap(companyId);
   },
 };
 
