@@ -59,7 +59,7 @@ export const generateShipmentWhatsAppMessage = (
     `⏳ *تاريخ الوصول المتوقع:* ${shipment.expected_arrival_date}`,
     `🚦 *الحالة الحالية:* ${stageLabels[shipment.tracking_status] || shipment.tracking_status}`,
     line,
-    'محلات الجعفري لقطع الغيار والمعدات — المهرة',
+    'محلات النظاري لقطع غيار السيارات — المهرة',
   ];
 
   return parts.filter(Boolean).join('\n');

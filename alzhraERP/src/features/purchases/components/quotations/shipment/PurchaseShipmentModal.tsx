@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/strict-boolean-expressions, complexity, jsx-a11y/label-has-associated-control, max-lines-per-function, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unnecessary-type-conversion, react-hooks/exhaustive-deps, @typescript-eslint/no-deprecated */
+/* eslint-disable @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/strict-boolean-expressions, complexity, jsx-a11y/label-has-associated-control, max-lines-per-function, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unnecessary-type-conversion, react-hooks/exhaustive-deps, @typescript-eslint/no-deprecated */
 import React, { useEffect, useState } from 'react';
 import {
   Building2,
@@ -22,11 +22,10 @@ import { useWarehouses } from '../../../../inventory/hooks/useWarehouses';
 import { formatLocalDate } from '../../../../../core/utils/dateUtils';
 import {
   SANA_MAHRAH_TRANSIT_STATIONS,
-  YEMEN_SHIPPING_COMPANIES,
+  type CarrierOption,
   type PurchaseQuotationShipment,
   type ShipmentTimelineEvent,
   type ShipmentTrackingStage,
-  type ShippingCompanyPreset,
   type ShippingPaymentMethod,
   type UpsertShipmentDTO,
 } from '../../../types/shipment';
@@ -62,18 +61,22 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'timeline' | 'share'>('details');
 
+  // مكاتب وشركات النقل الحقيقية من قاعدة بيانات سوبابيز
+  const [carriers, setCarriers] = useState<CarrierOption[]>([]);
+  const [selectedCarrierId, setSelectedCarrierId] = useState<string>('other');
+
   // Shipment State
   const [shipmentId, setShipmentId] = useState<string | undefined>(undefined);
-  const [shippingCompany, setShippingCompany] = useState(YEMEN_SHIPPING_COMPANIES[0].name);
+  const [shippingCompany, setShippingCompany] = useState('');
   const [customCompanyName, setCustomCompanyName] = useState('');
-  const [officePhone, setOfficePhone] = useState(YEMEN_SHIPPING_COMPANIES[0].defaultPhone);
-  const [officeAddress, setOfficeAddress] = useState(YEMEN_SHIPPING_COMPANIES[0].sanaaHub);
+  const [officePhone, setOfficePhone] = useState('');
+  const [officeAddress, setOfficeAddress] = useState('');
   const [waybillNumber, setWaybillNumber] = useState('');
 
   const [originCity, setOriginCity] = useState('صنعاء');
-  const [originHub, setOriginHub] = useState(YEMEN_SHIPPING_COMPANIES[0].sanaaHub);
+  const [originHub, setOriginHub] = useState('');
   const [destinationCity, setDestinationCity] = useState('المهرة (الغيضة)');
-  const [destinationHub, setDestinationHub] = useState(YEMEN_SHIPPING_COMPANIES[0].mahrahHub);
+  const [destinationHub, setDestinationHub] = useState('');
   const [destinationWarehouseId, setDestinationWarehouseId] = useState<string>('');
 
   const [driverName, setDriverName] = useState('');
@@ -100,48 +103,57 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
   const [selectedStation, setSelectedStation] = useState(SANA_MAHRAH_TRANSIT_STATIONS[0].name);
   const [stationNote, setStationNote] = useState('');
 
-  // Load existing shipment if present
+  // Load existing shipment and real carriers from Supabase
   useEffect(() => {
     let isMounted = true;
-    const fetchShipment = async () => {
+    const fetchShipmentAndCarriers = async () => {
       if (!user?.company_id) return;
       setLoading(true);
       try {
-        const existing = await shipmentsApi.getShipmentByQuotationId(quotationId, user.company_id);
-        if (isMounted && existing) {
-          setShipmentId(existing.id);
-          const foundPreset = YEMEN_SHIPPING_COMPANIES.find((c: ShippingCompanyPreset) => c.name === existing.shipping_company_name);
-          if (foundPreset) {
+        const [existing, realCarriers] = await Promise.all([
+          shipmentsApi.getShipmentByQuotationId(quotationId, user.company_id),
+          shipmentsApi.getCarriers(user.company_id),
+        ]);
+
+        if (isMounted) {
+          setCarriers(realCarriers);
+
+          if (existing) {
+            setShipmentId(existing.id);
             setShippingCompany(existing.shipping_company_name);
-          } else {
-            setShippingCompany('other');
-            setCustomCompanyName(existing.shipping_company_name);
+            const matchedCarrier = realCarriers.find(c => c.name === existing.shipping_company_name);
+            if (matchedCarrier) {
+              setSelectedCarrierId(matchedCarrier.id);
+            } else {
+              setSelectedCarrierId('other');
+              setCustomCompanyName(existing.shipping_company_name);
+            }
+            setOfficePhone(existing.shipping_office_phone);
+            setOfficeAddress(existing.shipping_office_address);
+            setWaybillNumber(existing.waybill_number);
+            setOriginCity(existing.origin_city);
+            setOriginHub(existing.origin_hub || '');
+            setDestinationCity(existing.destination_city);
+            setDestinationHub(existing.destination_hub || '');
+            setDestinationWarehouseId(existing.destination_warehouse_id || '');
+            setDriverName(existing.driver_name);
+            setDriverPhone(existing.driver_phone);
+            setVehiclePlateNumber(existing.vehicle_plate_number);
+            setVehicleType(existing.vehicle_type);
+            setParcelCount(existing.parcel_count);
+            setWeightKg(existing.weight_kg);
+            setCargoDescription(existing.cargo_description);
+            setShippingCost(existing.shipping_cost);
+            setShippingCurrency(existing.shipping_currency);
+            setPaymentMethod(existing.payment_method);
+            setShippingDate(existing.shipping_date);
+            setExpectedArrivalDate(existing.expected_arrival_date);
+            setTrackingStatus(existing.tracking_status);
+            setNotes(existing.notes || '');
+            setTimeline(existing.timeline || []);
+          } else if (warehouses.length > 0 && !destinationWarehouseId) {
+            setDestinationWarehouseId(warehouses[0].id);
           }
-          setOfficePhone(existing.shipping_office_phone);
-          setOfficeAddress(existing.shipping_office_address);
-          setWaybillNumber(existing.waybill_number);
-          setOriginCity(existing.origin_city);
-          setOriginHub(existing.origin_hub || '');
-          setDestinationCity(existing.destination_city);
-          setDestinationHub(existing.destination_hub || '');
-          setDestinationWarehouseId(existing.destination_warehouse_id || '');
-          setDriverName(existing.driver_name);
-          setDriverPhone(existing.driver_phone);
-          setVehiclePlateNumber(existing.vehicle_plate_number);
-          setVehicleType(existing.vehicle_type);
-          setParcelCount(existing.parcel_count);
-          setWeightKg(existing.weight_kg);
-          setCargoDescription(existing.cargo_description);
-          setShippingCost(existing.shipping_cost);
-          setShippingCurrency(existing.shipping_currency);
-          setPaymentMethod(existing.payment_method);
-          setShippingDate(existing.shipping_date);
-          setExpectedArrivalDate(existing.expected_arrival_date);
-          setTrackingStatus(existing.tracking_status);
-          setNotes(existing.notes || '');
-          setTimeline(existing.timeline || []);
-        } else if (isMounted && warehouses.length > 0 && !destinationWarehouseId) {
-          setDestinationWarehouseId(warehouses[0].id);
         }
       } catch {
         // Fallback or empty
@@ -149,21 +161,26 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
         if (isMounted) setLoading(false);
       }
     };
-    void fetchShipment();
+    void fetchShipmentAndCarriers();
     return () => {
       isMounted = false;
     };
   }, [quotationId, user?.company_id]);
 
-  // Handle Preset Change
-  const handlePresetSelect = (name: string) => {
-    setShippingCompany(name);
-    const preset = YEMEN_SHIPPING_COMPANIES.find((c: ShippingCompanyPreset) => c.name === name);
-    if (preset) {
-      setOfficePhone(preset.defaultPhone);
-      setOfficeAddress(preset.sanaaHub);
-      setOriginHub(preset.sanaaHub);
-      setDestinationHub(preset.mahrahHub);
+  // Handle Real Carrier Change
+  const handleCarrierChange = (carrierId: string) => {
+    setSelectedCarrierId(carrierId);
+    if (carrierId === 'other') {
+      setShippingCompany(customCompanyName);
+      setOfficePhone('');
+      setOfficeAddress('');
+    } else {
+      const carrier = carriers.find(c => c.id === carrierId);
+      if (carrier) {
+        setShippingCompany(carrier.name);
+        setOfficePhone(carrier.phone || '');
+        setOfficeAddress(carrier.address || '');
+      }
     }
   };
 
@@ -426,44 +443,48 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
-                      مكتب / شركة الشحن *
+                      مكتب / شركة الشحن (من قاعدة البيانات) *
                     </label>
                     <select
-                      value={shippingCompany}
-                      onChange={e => handlePresetSelect(e.target.value)}
+                      value={selectedCarrierId}
+                      onChange={e => handleCarrierChange(e.target.value)}
                       className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
                     >
-                      {YEMEN_SHIPPING_COMPANIES.map((company: ShippingCompanyPreset) => (
-                        <option key={company.name} value={company.name}>
-                          {company.name}
+                      <option value="other">-- كتابة اسم مكتب / شركة شحن أخرى --</option>
+                      {carriers.map(carrier => (
+                        <option key={carrier.id} value={carrier.id}>
+                          {carrier.name} {carrier.phone ? `(${carrier.phone})` : ''}
                         </option>
                       ))}
-                      <option value="other">-- مكتب نقل آخر (كتابة يدوية) --</option>
                     </select>
                   </div>
 
-                  {shippingCompany === 'other' ? (
+                  {selectedCarrierId === 'other' ? (
                     <div>
                       <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
-                        اسم مكتب النقل المخصص *
+                        اسم مكتب النقل *
                       </label>
                       <input
                         type="text"
-                        value={customCompanyName}
-                        onChange={e => setCustomCompanyName(e.target.value)}
-                        placeholder="اكتب اسم المكتب..."
+                        value={shippingCompany}
+                        onChange={e => {
+                          setShippingCompany(e.target.value);
+                          setCustomCompanyName(e.target.value);
+                        }}
+                        placeholder="اكتب اسم المكتب / السائق..."
                         className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                       />
                     </div>
                   ) : (
                     <div>
                       <label className="block text-[11px] font-bold text-gray-700 dark:text-slate-300 mb-1">
-                        فرع صنعاء (الانطلاق)
+                        فرع صنعاء / نقطة الانطلاق
                       </label>
                       <input
                         type="text"
                         value={originHub}
                         onChange={e => setOriginHub(e.target.value)}
+                        placeholder="مثال: فرع الحصبة / مذبح / شارع تعز"
                         className="w-full text-xs rounded-lg border border-gray-200 bg-white p-2 text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                       />
                     </div>
@@ -620,9 +641,9 @@ export const PurchaseShipmentModal: React.FC<PurchaseShipmentModalProps> = ({
                       className="w-full text-xs rounded-lg border border-emerald-300 bg-white p-2 text-emerald-800 dark:border-emerald-800 dark:bg-slate-800 dark:text-emerald-300 font-semibold"
                     >
                       <option value="">-- اختر مستودع الاستلام بالمهرة --</option>
-                      {warehouses.map(wh => (
+                      {warehouses.map((wh: { id: string; name_ar?: string; name?: string; is_primary?: boolean }) => (
                         <option key={wh.id} value={wh.id}>
-                          {wh.name} {wh.is_primary ? '(الرئيسي)' : ''}
+                          {wh.name_ar || wh.name} {wh.is_primary ? '(الرئيسي)' : ''}
                         </option>
                       ))}
                     </select>

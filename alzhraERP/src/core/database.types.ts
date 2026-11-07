@@ -9878,6 +9878,200 @@ export type Database = {
           },
         ]
       }
+      purchase_quotation_shipments: {
+        Row: {
+          actual_arrival_date: string | null
+          cargo_description: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          destination_branch_id: string | null
+          destination_city: string
+          destination_hub: string | null
+          destination_warehouse_id: string | null
+          driver_name: string | null
+          driver_phone: string | null
+          expected_arrival_date: string | null
+          id: string
+          notes: string | null
+          origin_city: string
+          origin_hub: string | null
+          parcel_count: number
+          payment_method: string
+          quotation_id: string
+          received_by: string | null
+          received_date: string | null
+          shipping_company_name: string
+          shipping_cost: number
+          shipping_currency: string
+          shipping_date: string | null
+          shipping_office_address: string | null
+          shipping_office_phone: string | null
+          timeline: Json
+          tracking_status: string
+          updated_at: string
+          vehicle_plate_number: string | null
+          vehicle_type: string | null
+          waybill_number: string
+          weight_kg: number | null
+        }
+        Insert: {
+          actual_arrival_date?: string | null
+          cargo_description?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          destination_branch_id?: string | null
+          destination_city?: string
+          destination_hub?: string | null
+          destination_warehouse_id?: string | null
+          driver_name?: string | null
+          driver_phone?: string | null
+          expected_arrival_date?: string | null
+          id?: string
+          notes?: string | null
+          origin_city?: string
+          origin_hub?: string | null
+          parcel_count?: number
+          payment_method?: string
+          quotation_id: string
+          received_by?: string | null
+          received_date?: string | null
+          shipping_company_name: string
+          shipping_cost?: number
+          shipping_currency?: string
+          shipping_date?: string | null
+          shipping_office_address?: string | null
+          shipping_office_phone?: string | null
+          timeline?: Json
+          tracking_status?: string
+          updated_at?: string
+          vehicle_plate_number?: string | null
+          vehicle_type?: string | null
+          waybill_number: string
+          weight_kg?: number | null
+        }
+        Update: {
+          actual_arrival_date?: string | null
+          cargo_description?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          destination_branch_id?: string | null
+          destination_city?: string
+          destination_hub?: string | null
+          destination_warehouse_id?: string | null
+          driver_name?: string | null
+          driver_phone?: string | null
+          expected_arrival_date?: string | null
+          id?: string
+          notes?: string | null
+          origin_city?: string
+          origin_hub?: string | null
+          parcel_count?: number
+          payment_method?: string
+          quotation_id?: string
+          received_by?: string | null
+          received_date?: string | null
+          shipping_company_name?: string
+          shipping_cost?: number
+          shipping_currency?: string
+          shipping_date?: string | null
+          shipping_office_address?: string | null
+          shipping_office_phone?: string | null
+          timeline?: Json
+          tracking_status?: string
+          updated_at?: string
+          vehicle_plate_number?: string | null
+          vehicle_type?: string | null
+          waybill_number?: string
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_quotation_shipments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_quotation_shipments_destination_branch_id_fkey"
+            columns: ["destination_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_quotation_shipments_destination_warehouse_id_fkey"
+            columns: ["destination_warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_quotation_shipments_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipping_companies: {
+        Row: {
+          address: string | null
+          company_id: string
+          created_at: string | null
+          destination_city: string | null
+          destination_hub: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          origin_city: string | null
+          origin_hub: string | null
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          company_id: string
+          created_at?: string | null
+          destination_city?: string | null
+          destination_hub?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          origin_city?: string | null
+          origin_hub?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          company_id?: string
+          created_at?: string | null
+          destination_city?: string | null
+          destination_hub?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          origin_city?: string | null
+          origin_hub?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_companies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
       role_permissions: {
         Row: {
           created_at: string | null

@@ -1,33 +1,15 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-type-conversion, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/only-throw-error, max-params */
+/* eslint-disable @typescript-eslint/no-unnecessary-type-conversion, @typescript-eslint/no-unnecessary-type-assertion, max-params */
 import { supabase } from '../../../lib/supabaseClient';
 import { formatLocalDate } from '../../../core/utils/dateUtils';
 import { logger } from '../../../core/utils/logger';
+import type { Database, Json } from '../../../core/database.types';
 import type {
+  CarrierOption,
   PurchaseQuotationShipment,
   ShipmentTimelineEvent,
   ShipmentTrackingStage,
   UpsertShipmentDTO,
 } from '../types/shipment';
-
-interface DynamicQueryBuilder {
-  select: (columns?: string) => DynamicQueryBuilder;
-  insert: (values: unknown) => DynamicQueryBuilder;
-  update: (values: unknown) => DynamicQueryBuilder;
-  delete: () => DynamicQueryBuilder;
-  eq: (column: string, value: unknown) => DynamicQueryBuilder;
-  order: (column: string, options?: { ascending?: boolean }) => DynamicQueryBuilder;
-  single: () => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>;
-  maybeSingle: () => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>;
-  then: <TResult1 = { data: unknown; error: { code?: string; message?: string } | null }>(
-    onfulfilled?: (value: { data: unknown; error: { code?: string; message?: string } | null }) => TResult1 | PromiseLike<TResult1>
-  ) => Promise<TResult1>;
-}
-
-interface DynamicSupabaseClient {
-  from: (table: string) => DynamicQueryBuilder;
-}
-
-const db = supabase as unknown as DynamicSupabaseClient;
 
 interface RawShipmentRow {
   id: string;
@@ -123,63 +105,51 @@ const mapRowToShipment = (row: RawShipmentRow): PurchaseQuotationShipment => {
   };
 };
 
-/** محاولة استخراج الشحنة من حقل delivery_terms أو notes لعرض السعر في حال عدم وجود الجدول */
-const fallbackFromQuotation = async (
-  quotationId: string,
-  companyId: string
-): Promise<PurchaseQuotationShipment | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('quotations')
-      .select('id, company_id, quotation_number, delivery_terms, notes, party:parties(name), created_at')
-      .eq('id', quotationId)
-      .eq('company_id', companyId)
-      .maybeSingle();
-
-    if (error !== null || data === null) return null;
-
-    if (data.delivery_terms && data.delivery_terms.includes('__shipment_meta__:')) {
-      const jsonStr = data.delivery_terms.split('__shipment_meta__:')[1];
-      const parsed = JSON.parse(jsonStr) as PurchaseQuotationShipment;
-      parsed.quotation_number = data.quotation_number;
-      parsed.supplier_name = (data.party as { name?: string } | null)?.name;
-      return parsed;
-    }
-  } catch (err) {
-    logger.warn('shipmentsApi', 'fallbackFromQuotation parsing failed', err);
-  }
-  return null;
-};
-
 export const shipmentsApi = {
   /**
-   * جلب تفاصيل شحنة عرض سعر معين
+   * جلب مكاتب وشركات النقل والشحن الحقيقية من قاعدة بيانات سوبابيز
+   */
+  getCarriers: async (companyId: string): Promise<CarrierOption[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('parties')
+        .select('id, name, phone, address')
+        .eq('company_id', companyId)
+        .is('deleted_at', null)
+        .or('name.ilike.%نقل%,name.ilike.%شحن%,name.ilike.%مكتب%')
+        .order('name');
+
+      if (error !== null || data === null) return [];
+      return data as CarrierOption[];
+    } catch (err) {
+      logger.error('shipmentsApi', 'Error loading real carriers from parties:', err);
+      return [];
+    }
+  },
+
+  /**
+   * جلب تفاصيل شحنة عرض سعر معين مباشرة من سوبابيز
    */
   getShipmentByQuotationId: async (
     quotationId: string,
     companyId: string
   ): Promise<PurchaseQuotationShipment | null> => {
     try {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from('purchase_quotation_shipments')
         .select('*, quotation:quotations(quotation_number, party:parties(name))')
         .eq('quotation_id', quotationId)
         .eq('company_id', companyId)
         .maybeSingle();
 
-      if (error !== null) {
-        // إذا كان الخطأ أن الجدول غير موجود بعد (42P01)
-        if (error.code === '42P01') {
-          return await fallbackFromQuotation(quotationId, companyId);
-        }
-        logger.error('shipmentsApi', 'Error fetching quotation shipment:', error);
+      if (error !== null || data === null) {
         return null;
       }
 
-      if (data === null) return null;
       return mapRowToShipment(data as unknown as RawShipmentRow);
-    } catch {
-      return await fallbackFromQuotation(quotationId, companyId);
+    } catch (err) {
+      logger.error('shipmentsApi', 'Error fetching quotation shipment:', err);
+      return null;
     }
   },
 
@@ -191,7 +161,7 @@ export const shipmentsApi = {
     filterStage?: ShipmentTrackingStage
   ): Promise<PurchaseQuotationShipment[]> => {
     try {
-      let query = db
+      let query = supabase
         .from('purchase_quotation_shipments')
         .select('*, quotation:quotations(quotation_number, party:parties(name))')
         .eq('company_id', companyId)
@@ -202,10 +172,7 @@ export const shipmentsApi = {
       }
 
       const { data, error } = await query;
-      if (error !== null) {
-        if (error.code === '42P01') {
-          return [];
-        }
+      if (error !== null || data === null) {
         logger.error('shipmentsApi', 'Error fetching company shipments:', error);
         return [];
       }
@@ -292,79 +259,37 @@ export const shipmentsApi = {
       received_date: dto.received_date || null,
       received_by: dto.received_by || null,
       tracking_status: currentStage,
-      timeline: updatedTimeline,
+      timeline: updatedTimeline as unknown as Json,
       notes: dto.notes || null,
       updated_at: nowIso,
       created_by: userId,
     };
 
-    try {
-      let resultRow: RawShipmentRow | null = null;
+    let resultRow: RawShipmentRow | null = null;
 
-      if (currentId) {
-        const { data, error } = await db
-          .from('purchase_quotation_shipments')
-          .update(payload)
-          .eq('id', currentId)
-          .eq('company_id', companyId)
-          .select('*, quotation:quotations(quotation_number, party:parties(name))')
-          .single();
+    if (currentId) {
+      const { data, error } = await supabase
+        .from('purchase_quotation_shipments')
+        .update(payload)
+        .eq('id', currentId)
+        .eq('company_id', companyId)
+        .select('*, quotation:quotations(quotation_number, party:parties(name))')
+        .single();
 
-        if (error !== null) throw error;
-        resultRow = data as unknown as RawShipmentRow;
-      } else {
-        const { data, error } = await db
-          .from('purchase_quotation_shipments')
-          .insert({ ...payload, id: crypto.randomUUID() })
-          .select('*, quotation:quotations(quotation_number, party:parties(name))')
-          .single();
+      if (error !== null) throw error;
+      resultRow = data as unknown as RawShipmentRow;
+    } else {
+      const { data, error } = await supabase
+        .from('purchase_quotation_shipments')
+        .insert({ ...payload, id: crypto.randomUUID() })
+        .select('*, quotation:quotations(quotation_number, party:parties(name))')
+        .single();
 
-        if (error !== null) throw error;
-        resultRow = data as unknown as RawShipmentRow;
-      }
-
-      return mapRowToShipment(resultRow);
-    } catch (dbErr: unknown) {
-      logger.warn('shipmentsApi', 'Direct DB insert/update failed, utilizing fallback mode', dbErr);
-      
-      // حفظ احتياطي في delivery_terms لعرض السعر حتى لا يتعطل العمل
-      const fallbackShipment: PurchaseQuotationShipment = {
-        id: currentId || crypto.randomUUID(),
-        ...payload,
-        origin_hub: payload.origin_hub ?? undefined,
-        destination_hub: payload.destination_hub ?? undefined,
-        notes: payload.notes ?? undefined,
-        created_by: payload.created_by ?? undefined,
-        received_by: payload.received_by ?? undefined,
-        parcel_count: payload.parcel_count,
-        weight_kg: payload.weight_kg,
-        cargo_description: payload.cargo_description || '',
-        shipping_cost: payload.shipping_cost,
-        shipping_currency: payload.shipping_currency,
-        payment_method: payload.payment_method as PurchaseQuotationShipment['payment_method'],
-        shipping_office_phone: payload.shipping_office_phone || '',
-        shipping_office_address: payload.shipping_office_address || '',
-        driver_name: payload.driver_name || '',
-        driver_phone: payload.driver_phone || '',
-        vehicle_plate_number: payload.vehicle_plate_number || '',
-        vehicle_type: payload.vehicle_type,
-        created_at: nowIso,
-        updated_at: nowIso,
-      };
-
-      try {
-        const fallbackTerm = `شحن عبر ${dto.shipping_company_name} بوليصة: ${dto.waybill_number} __shipment_meta__:${JSON.stringify(fallbackShipment)}`;
-        await supabase
-          .from('quotations')
-          .update({ delivery_terms: fallbackTerm })
-          .eq('id', dto.quotation_id)
-          .eq('company_id', companyId);
-      } catch (termErr) {
-        logger.error('shipmentsApi', 'Failed saving fallback terms:', termErr);
-      }
-
-      return fallbackShipment;
+      if (error !== null) throw error;
+      resultRow = data as unknown as RawShipmentRow;
     }
+
+    return mapRowToShipment(resultRow);
   },
 
   /**
@@ -394,9 +319,9 @@ export const shipmentsApi = {
     const current = await shipmentsApi.getShipmentByQuotationId(quotationId, companyId);
     const timeline = current !== null ? [...current.timeline, newEvent] : [newEvent];
 
-    const updates: Record<string, unknown> = {
+    const updates: Database['public']['Tables']['purchase_quotation_shipments']['Update'] = {
       tracking_status: stage,
-      timeline,
+      timeline: timeline as unknown as Json,
       updated_at: nowIso,
     };
 
@@ -408,7 +333,7 @@ export const shipmentsApi = {
     }
 
     try {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from('purchase_quotation_shipments')
         .update(updates)
         .eq('id', shipmentId)
@@ -419,7 +344,7 @@ export const shipmentsApi = {
       if (error !== null) throw error;
       if (data !== null) return mapRowToShipment(data as unknown as RawShipmentRow);
     } catch (err) {
-      logger.warn('shipmentsApi', 'Update stage DB fallback:', err);
+      logger.error('shipmentsApi', 'Update stage DB error:', err);
     }
 
     if (current !== null) {
@@ -440,7 +365,7 @@ export const shipmentsApi = {
    */
   deleteShipment: async (companyId: string, shipmentId: string): Promise<void> => {
     try {
-      await db
+      await supabase
         .from('purchase_quotation_shipments')
         .delete()
         .eq('id', shipmentId)

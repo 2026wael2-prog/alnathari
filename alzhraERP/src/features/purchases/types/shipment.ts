@@ -122,66 +122,15 @@ export interface UpsertShipmentDTO {
   } | undefined;
 }
 
-/** مكاتب وشركات الشحن المعتمدة على خط صنعاء - المهرة */
-export interface ShippingCompanyPreset {
+/** بيانات مكتب أو ناقل الشحن المسجل في قاعدة البيانات */
+export interface CarrierOption {
+  id: string;
   name: string;
-  sanaaHub: string;
-  mahrahHub: string;
-  defaultPhone: string;
+  phone: string | null;
+  address: string | null;
 }
 
-export const YEMEN_SHIPPING_COMPANIES: ShippingCompanyPreset[] = [
-  {
-    name: 'شركة الرويشان للنقليات والشحن البري',
-    sanaaHub: 'صنعاء — فرع مذبح / الحصبة',
-    mahrahHub: 'المهرة — الغيضة (شارع المطار)',
-    defaultPhone: '01-234567',
-  },
-  {
-    name: 'مكتب البراق للنقليات السريعة',
-    sanaaHub: 'صنعاء — جولة عمران / شارع خولان',
-    mahrahHub: 'المهرة — الغيضة (المدخل الجنوبي)',
-    defaultPhone: '01-345678',
-  },
-  {
-    name: 'نقليات النمر للشحن البري والبضائع',
-    sanaaHub: 'صنعاء — شارع تعز / الحثيلي',
-    mahrahHub: 'المهرة — شحن (المنفذ الجمركي)',
-    defaultPhone: '01-456789',
-  },
-  {
-    name: 'مكتب الشامل للشحن والتخليص الجمركي',
-    sanaaHub: 'صنعاء — حي الجراف / المطار',
-    mahrahHub: 'المهرة — الغيضة وشحن',
-    defaultPhone: '01-567890',
-  },
-  {
-    name: 'نقليات الجزيرة للشحن والتوصيل',
-    sanaaHub: 'صنعاء — شارع خولان',
-    mahrahHub: 'المهرة — الغيضة',
-    defaultPhone: '01-678901',
-  },
-  {
-    name: 'نقليات اليمامة والراية السريعة',
-    sanaaHub: 'صنعاء — جولة الحصبة',
-    mahrahHub: 'المهرة — الغيضة وحوف',
-    defaultPhone: '01-789012',
-  },
-  {
-    name: 'مكتب أبو سرهد للنقل والشحن البري',
-    sanaaHub: 'صنعاء — الستين الجنوبي',
-    mahrahHub: 'المهرة — الغيضة',
-    defaultPhone: '01-890123',
-  },
-  {
-    name: 'نقليات راحة للنقل والشحن الداخلي',
-    sanaaHub: 'صنعاء — الزبيري / عصر',
-    mahrahHub: 'المهرة — الغيضة',
-    defaultPhone: '01-901234',
-  },
-];
-
-/** المحطات الرئيسية لخط السير صنعاء - المهرة */
+/** المحطات الجغرافية الرئيسية لخط السير بين صنعاء والمهرة */
 export const SANA_MAHRAH_TRANSIT_STATIONS = [
   { id: 'sanaa', name: 'صنعاء (نقطة الانطلاق)', province: 'أمانة العاصمة' },
   { id: 'marib', name: 'مأرب', province: 'مأرب' },
