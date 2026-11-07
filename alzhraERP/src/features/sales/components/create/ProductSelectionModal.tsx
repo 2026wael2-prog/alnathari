@@ -23,6 +23,7 @@ interface Props {
   onSelect: (product: Product) => void;
   initialQuery?: string;
   mode?: 'sale' | 'purchase' | 'quotation';
+  warehouseId?: string | null;
 }
 
 const FONT_SIZE_CLASSES = { small: 'text-[10px]', medium: 'text-[11px]', large: 'text-[13px]' };
@@ -38,6 +39,7 @@ const ProductSelectionModal: React.FC<Props> = ({
   onSelect,
   initialQuery = '',
   mode = 'sale',
+  warehouseId,
 }) => {
   const [localBranchId, setLocalBranchId] = useState<string | null>(null);
   const [showBranchMenu, setShowBranchMenu] = useState(false);
@@ -75,7 +77,14 @@ const ProductSelectionModal: React.FC<Props> = ({
     handleKeyDown,
     handleTableKeyDown,
     handleRowClick,
-  } = useProductSelectionTable({ isOpen, initialQuery, effectiveBranchId, mode, onSelect });
+  } = useProductSelectionTable({
+    isOpen,
+    initialQuery,
+    effectiveBranchId,
+    warehouseId,
+    mode,
+    onSelect,
+  });
 
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [showAddProduct, setShowAddProduct] = useState(false);

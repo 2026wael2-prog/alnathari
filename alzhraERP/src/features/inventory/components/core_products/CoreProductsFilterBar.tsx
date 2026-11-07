@@ -10,6 +10,7 @@ import {
   Factory,
   RotateCcw,
   SlidersHorizontal,
+  Warehouse,
 } from 'lucide-react';
 import { cn } from '../../../../core/utils';
 
@@ -30,6 +31,9 @@ export interface CoreProductsFilterBarProps {
   suppliers: Array<{ id: string; name: string }>;
   selectedSupplierId: string;
   onSupplierChange: (supplierId: string) => void;
+  warehouses?: Array<{ id: string; name_ar: string }>;
+  selectedWarehouseId?: string;
+  onWarehouseChange?: (warehouseId: string) => void;
   displayedCount: number;
   totalAvailableCount: number;
   onRefresh: () => void;
@@ -46,16 +50,23 @@ export const CoreProductsFilterBar: React.FC<CoreProductsFilterBarProps> = ({
   suppliers,
   selectedSupplierId,
   onSupplierChange,
+  warehouses,
+  selectedWarehouseId,
+  onWarehouseChange,
   displayedCount,
   totalAvailableCount,
   onRefresh,
   isRefreshing,
 }) => {
-  const hasActiveFilters = Boolean(selectedBrand.trim()) || Boolean(selectedSupplierId.trim());
+  const hasActiveFilters =
+    Boolean(selectedBrand.trim()) ||
+    Boolean(selectedSupplierId.trim()) ||
+    Boolean(selectedWarehouseId?.trim());
 
   const handleClearFilters = (): void => {
     onBrandChange('');
     onSupplierChange('');
+    onWarehouseChange?.('');
   };
 
   return (
@@ -242,6 +253,29 @@ export const CoreProductsFilterBar: React.FC<CoreProductsFilterBarProps> = ({
               ))}
             </select>
           </div>
+
+          {/* فلتر المستودع (Warehouse) */}
+          {warehouses && warehouses.length > 0 && onWarehouseChange && (
+            <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-1 text-xs transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/80">
+              <Warehouse size={13} className="text-purple-500" />
+              <span className="font-bold text-slate-500 dark:text-slate-400">المستودع:</span>
+              <select
+                value={selectedWarehouseId ?? ''}
+                onChange={e => {
+                  onWarehouseChange(e.target.value);
+                }}
+                className="max-w-[180px] truncate bg-transparent font-bold text-slate-800 outline-none dark:text-slate-200"
+                title="تصفية حسب المستودع"
+              >
+                <option value="">جميع المستودعات</option>
+                {warehouses.map(w => (
+                  <option key={w.id} value={w.id} className="dark:bg-slate-900">
+                    {w.name_ar}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* زر إعادة ضبط التصفية عند وجود فلاتر نشطة */}
           {hasActiveFilters && (

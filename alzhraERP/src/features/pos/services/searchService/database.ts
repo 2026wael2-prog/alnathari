@@ -117,14 +117,17 @@ export async function searchDatabase(
     // This avoids executing a heavy nested join query on invoice_items.
     const salesCounts = new Map<string, { count: number; last_date: string }>();
 
+    const targetWarehouseId = filters?.warehouse_id;
     const results = ((data || []) as unknown as RpcSearchRow[]).map(row => {
       const stockList = Array.isArray(row.stock) ? row.stock : [];
-      const scopedStock = branchId
-        ? stockList.filter(s => {
-            const bId = s.branch_id ?? s.warehouses?.branch_id;
-            return !bId || bId === branchId;
-          })
-        : stockList;
+      const scopedStock = targetWarehouseId
+        ? stockList.filter(s => s.warehouse_id === targetWarehouseId)
+        : branchId
+          ? stockList.filter(s => {
+              const bId = s.branch_id ?? s.warehouses?.branch_id;
+              return !bId || bId === branchId;
+            })
+          : stockList;
       const totalStock = scopedStock.reduce(
         (sum: number, s: SearchStockRow) => sum + (Number(s.quantity) || 0),
         0
@@ -222,11 +225,14 @@ export async function searchDatabaseFallback(
 
   if (error) return [];
 
+  const targetWarehouseId = _filters?.warehouse_id;
   return ((data || []) as unknown as FallbackSearchRow[]).map(row => {
     const stockList = Array.isArray(row.product_stock) ? row.product_stock : [];
-    const scopedStock = branchId
-      ? stockList.filter(s => !s.warehouses?.branch_id || s.warehouses.branch_id === branchId)
-      : stockList;
+    const scopedStock = targetWarehouseId
+      ? stockList.filter(s => s.warehouse_id === targetWarehouseId)
+      : branchId
+        ? stockList.filter(s => !s.warehouses?.branch_id || s.warehouses.branch_id === branchId)
+        : stockList;
     const totalStock = scopedStock.reduce(
       (sum: number, s: SearchStockRow) => sum + (Number(s.quantity) || 0),
       0
@@ -273,7 +279,8 @@ export async function searchDatabaseFallback(
 export async function searchByBarcode(
   companyId: string,
   barcode: string,
-  branchId?: string | null
+  branchId?: string | null,
+  warehouseId?: string | null
 ): Promise<POSSearchResult | null> {
   const { data, error } = await supabase
     .from('products')
@@ -296,11 +303,13 @@ export async function searchByBarcode(
 
   const row = data as unknown as BarcodeSearchRow;
   const stockList = Array.isArray(row.product_stock) ? row.product_stock : [];
-  const scopedStock = branchId
-    ? stockList.filter(
-        (s: SearchStockRow) => !s.warehouses?.branch_id || s.warehouses.branch_id === branchId
-      )
-    : stockList;
+  const scopedStock = warehouseId
+    ? stockList.filter(s => s.warehouse_id === warehouseId)
+    : branchId
+      ? stockList.filter(
+          (s: SearchStockRow) => !s.warehouses?.branch_id || s.warehouses.branch_id === branchId
+        )
+      : stockList;
   const totalStock = scopedStock.reduce((sum: number, s) => sum + (Number(s.quantity) || 0), 0);
 
   return {

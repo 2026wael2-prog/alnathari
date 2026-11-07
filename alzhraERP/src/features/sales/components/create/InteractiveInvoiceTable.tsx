@@ -10,8 +10,16 @@ import ProductSelectionModal from './ProductSelectionModal';
 import InvoiceRow from './InvoiceRow';
 
 const InteractiveInvoiceTable: React.FC = () => {
-  const { items, setProductForRow, addItem, updateItem, removeItem, showDiscount, toggleColumn } =
-    useSalesStore();
+  const {
+    items,
+    warehouseId,
+    setProductForRow,
+    addItem,
+    updateItem,
+    removeItem,
+    showDiscount,
+    toggleColumn,
+  } = useSalesStore();
 
   const tableRef = useRef<HTMLTableElement>(null);
   const [modalState, setModalState] = useState<{
@@ -376,6 +384,7 @@ const InteractiveInvoiceTable: React.FC = () => {
         }}
         onSelect={handleProductSelect}
         initialQuery={modalState.query}
+        warehouseId={warehouseId}
       />
     </div>
   );

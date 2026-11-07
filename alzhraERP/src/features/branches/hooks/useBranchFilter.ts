@@ -21,8 +21,12 @@ export const useBranchFilter = () => {
   const { user } = useAuthStore();
   const activeBranchId = useBranchFilterStore(s => s.activeBranchId);
   const activeBranchName = useBranchFilterStore(s => s.activeBranchName);
+  const activeWarehouseId = useBranchFilterStore(s => s.activeWarehouseId);
+  const activeWarehouseName = useBranchFilterStore(s => s.activeWarehouseName);
   const activeCompanyId = useBranchFilterStore(s => s.activeCompanyId);
   const ensureCompany = useBranchFilterStore(s => s.ensureCompany);
+  const setActiveWarehouse = useBranchFilterStore(s => s.setActiveWarehouse);
+  const resetWarehouse = useBranchFilterStore(s => s.resetWarehouse);
 
   const isManager = user?.role === 'owner' || user?.role === 'admin';
   const userBranchId = user?.branch_id ?? null;
@@ -32,24 +36,35 @@ export const useBranchFilter = () => {
   const isStaleStore = activeCompanyId !== null && activeCompanyId !== userCompanyId;
   const managerBranchId = isStaleStore ? null : activeBranchId;
   const managerBranchName = isStaleStore ? null : activeBranchName;
+  const managerWarehouseId = isStaleStore ? null : activeWarehouseId;
+  const managerWarehouseName = isStaleStore ? null : activeWarehouseName;
 
   // تهيئة الشركة الحالية / إعادة الضبط عند تبديل الشركة أو تسجيل الخروج
   useEffect(() => {
     ensureCompany(userCompanyId);
   }, [ensureCompany, userCompanyId]);
 
-  // المدير العام: يستخدم الفرع المختار في BranchSwitcher أو null (الكل)
+  // المدير العام: يستخدم الفرع والمستودع المختارين أو null (الكل)
   // الموظف: مقيد دائماً بفرعه
   const effectiveBranchId = isManager ? managerBranchId : userBranchId;
   const effectiveBranchName = isManager ? managerBranchName : (user?.branch_name ?? null);
+  const effectiveWarehouseId = managerWarehouseId;
+  const effectiveWarehouseName = managerWarehouseName;
 
   return {
     /** branch_id المُستخدم للفلترة — null يعني "جميع الفروع" */
     branchId: effectiveBranchId,
     branchName: effectiveBranchName,
-    /** هل المستخدم مدير يمكنه تبديل الفرع؟ */
+    /** warehouse_id المُستخدم للفلترة — null يعني "جميع مستودعات الفرع" */
+    warehouseId: effectiveWarehouseId,
+    warehouseName: effectiveWarehouseName,
+    setActiveWarehouse,
+    resetWarehouse,
+    /** هل المستخدم مدير يمكنه تبديل الفرع والمستودع؟ */
     isManager,
     /** هل يُعرض الكل (لا فلترة بفرع) */
     showingAll: effectiveBranchId === null,
+    /** هل يُعرض كل المستودعات (لا فلترة بمستودع محدد) */
+    showingAllWarehouses: effectiveWarehouseId === null,
   };
 };

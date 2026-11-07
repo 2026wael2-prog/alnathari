@@ -9,6 +9,7 @@ import { useTranslation } from '../../../../lib/hooks/useTranslation';
 import { useProductSearch, type ProductSearchResult } from '../../../sales/hooks/useProductSearch';
 import { useAuthStore } from '../../../auth/store';
 import type { CartItem } from '../../../sales/types';
+import { useSalesStore } from '../../store';
 import ProductSelectionModal from './ProductSelectionModal';
 import type { Product } from '../../../inventory/types';
 
@@ -20,6 +21,7 @@ interface ProductSearchProps {
 const ProductSearch: React.FC<ProductSearchProps> = ({ onSelectProduct }) => {
   const {} = useTranslation();
   const { user } = useAuthStore();
+  const warehouseId = useSalesStore(s => s.warehouseId);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -148,6 +150,7 @@ const ProductSearch: React.FC<ProductSearchProps> = ({ onSelectProduct }) => {
         }}
         onSelect={handleAdvancedSelect}
         initialQuery={searchTerm}
+        warehouseId={warehouseId}
       />
     </div>
   );

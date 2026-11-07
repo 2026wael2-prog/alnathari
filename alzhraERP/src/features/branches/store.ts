@@ -16,9 +16,13 @@ import { persist } from 'zustand/middleware';
 interface BranchFilterState {
   activeBranchId: string | null;
   activeBranchName: string | null;
+  activeWarehouseId: string | null;
+  activeWarehouseName: string | null;
   /** الشركة التي اختير لها الفرع النشط (عزل الفلتر بين الشركات) */
   activeCompanyId: string | null;
   setActiveBranch: (id: string | null, name: string | null, companyId?: string | null) => void;
+  setActiveWarehouse: (id: string | null, name: string | null) => void;
+  resetWarehouse: () => void;
   resetToAll: () => void;
   /**
    * يضمن أن الفرع النشط يعود للشركة الحالية؛ يُلغيه إن كان قديماً.
@@ -32,18 +36,45 @@ export const useBranchFilterStore = create<BranchFilterState>()(
     (set, get) => ({
       activeBranchId: null,
       activeBranchName: null,
+      activeWarehouseId: null,
+      activeWarehouseName: null,
       activeCompanyId: null,
       setActiveBranch: (id, name, companyId) =>
         set(state => ({
           activeBranchId: id,
           activeBranchName: id ? name : null,
+          // تفريغ المستودع النشط عند تغيير الفرع لتفادي تداخل المستودعات بين الفروع
+          activeWarehouseId: state.activeBranchId === id ? state.activeWarehouseId : null,
+          activeWarehouseName: state.activeBranchId === id ? state.activeWarehouseName : null,
           activeCompanyId: companyId ?? state.activeCompanyId,
         })),
-      resetToAll: () => set({ activeBranchId: null, activeBranchName: null }),
+      setActiveWarehouse: (id, name) =>
+        set({
+          activeWarehouseId: id,
+          activeWarehouseName: id ? name : null,
+        }),
+      resetWarehouse: () =>
+        set({
+          activeWarehouseId: null,
+          activeWarehouseName: null,
+        }),
+      resetToAll: () =>
+        set({
+          activeBranchId: null,
+          activeBranchName: null,
+          activeWarehouseId: null,
+          activeWarehouseName: null,
+        }),
       ensureCompany: companyId => {
         const { activeCompanyId, activeBranchId } = get();
         if (activeCompanyId === companyId) return activeBranchId !== null;
-        set({ activeBranchId: null, activeBranchName: null, activeCompanyId: companyId });
+        set({
+          activeBranchId: null,
+          activeBranchName: null,
+          activeWarehouseId: null,
+          activeWarehouseName: null,
+          activeCompanyId: companyId,
+        });
         return false;
       },
     }),
@@ -52,6 +83,8 @@ export const useBranchFilterStore = create<BranchFilterState>()(
       partialize: state => ({
         activeBranchId: state.activeBranchId,
         activeBranchName: state.activeBranchName,
+        activeWarehouseId: state.activeWarehouseId,
+        activeWarehouseName: state.activeWarehouseName,
         activeCompanyId: state.activeCompanyId,
       }),
     }

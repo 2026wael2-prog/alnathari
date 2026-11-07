@@ -51,8 +51,9 @@ export const ProductSelectionTableRow: React.FC<ProductSelectionTableRowProps> =
         );
       case 'branch': {
         const branchStock =
-          product.warehouse_distribution?.find(w => w.warehouse_id === effectiveBranchId) ||
-          product.warehouse_distribution?.[0];
+          product.warehouse_distribution?.find(
+            w => (w as { branch_id?: string | null }).branch_id === effectiveBranchId
+          ) || product.warehouse_distribution?.[0];
         return (
           <span className="block truncate text-xs opacity-80">
             {branchStock?.warehouse_name || 'المستودع الرئيسي'}

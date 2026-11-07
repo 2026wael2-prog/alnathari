@@ -18,6 +18,7 @@ interface UseProductSelectionTableOptions {
   isOpen: boolean;
   initialQuery: string;
   effectiveBranchId: string | null;
+  warehouseId?: string | null | undefined;
   mode?: 'sale' | 'purchase' | 'quotation';
   onSelect: (product: Product) => void;
 }
@@ -26,6 +27,7 @@ export function useProductSelectionTable({
   isOpen,
   initialQuery,
   effectiveBranchId,
+  warehouseId,
   mode = 'sale',
   onSelect,
 }: UseProductSelectionTableOptions) {
@@ -99,7 +101,7 @@ export function useProductSelectionTable({
             companyId,
             1,
             250,
-            undefined,
+            warehouseId,
             undefined,
             effectiveBranchId
           );
@@ -115,7 +117,7 @@ export function useProductSelectionTable({
           );
         }
 
-        return productService.mapRawProducts(data ?? [], undefined, effectiveBranchId);
+        return productService.mapRawProducts(data ?? [], warehouseId, effectiveBranchId);
       } catch (err) {
         logger.error('useProductSelectionTable', 'Failed to fetch products:', err);
         return [];

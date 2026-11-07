@@ -15,6 +15,7 @@ import { useAuthStore } from '../../auth/store';
 import { useBranchFilter } from '../../branches/hooks/useBranchFilter';
 import { useSuppliers } from '../../parties/hooks';
 import { useBrandSuggestions } from '../hooks/useBrandSuggestions';
+import { useWarehouses } from '../hooks/useWarehouses';
 import type { Product } from '../types';
 import { formatNumberDisplay } from '../../../core/utils';
 import type { Column } from '../../../ui/common/ExcelTable';
@@ -47,12 +48,15 @@ export const CoreProductsView: React.FC<CoreProductsViewProps> = ({
 }) => {
   const { user } = useAuthStore();
   const companyId = user?.company_id ?? '';
-  const { branchId } = useBranchFilter();
+  const { branchId, warehouseId: contextWarehouseId } = useBranchFilter();
   const queryClient = useQueryClient();
 
   const [filterMode, setFilterMode] = useState<CoreFilterMode>('core_only');
   const [selectedBrand, setSelectedBrand] = useState<string>('');
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(
+    contextWarehouseId ?? ''
+  );
   const [localSearchTerm, setLocalSearchTerm] = useState<string>(propSearchTerm ?? '');
   const activeSearch = propSearchTerm ?? localSearchTerm;
   const [pageSize, setPageSize] = useState(100);
@@ -74,7 +78,19 @@ export const CoreProductsView: React.FC<CoreProductsViewProps> = ({
     pageSize,
     initialSearch: activeSearch,
     isCore: queryIsCore,
+    warehouseId: selectedWarehouseId.trim() !== '' ? selectedWarehouseId : undefined,
   });
+
+  // Fetch all warehouses for the active branch
+  const { data: rawWarehouses } = useWarehouses(branchId);
+  const warehouses = useMemo(
+    () =>
+      (rawWarehouses ?? []).map((w: { id: string; name_ar: string }) => ({
+        id: w.id,
+        name_ar: w.name_ar,
+      })),
+    [rawWarehouses]
+  );
 
   // Fetch all suppliers for company
   const { data: rawSuppliers } = useSuppliers('');
@@ -313,6 +329,12 @@ export const CoreProductsView: React.FC<CoreProductsViewProps> = ({
         selectedSupplierId={selectedSupplierId}
         onSupplierChange={sId => {
           setSelectedSupplierId(sId);
+          goToPage(1);
+        }}
+        warehouses={warehouses}
+        selectedWarehouseId={selectedWarehouseId}
+        onWarehouseChange={wId => {
+          setSelectedWarehouseId(wId);
           goToPage(1);
         }}
         displayedCount={displayedProducts.length}

@@ -82,6 +82,8 @@ export interface POSSearchFilters {
     min_stock?: number;
     /** Brand filter */
     brand?: string;
+    /** Warehouse filter */
+    warehouse_id?: string | null;
 }
 
 export interface POSSearchResponse {

@@ -20,9 +20,13 @@ export const transferService = {
   },
 
   /**
-   * Get all transfers for a company (optionally scoped to a specific branch's warehouses)
+   * Get all transfers for a company (optionally scoped to a specific branch or warehouse)
    */
-  getTransfers: async (companyId: string, branchId?: string | null) => {
+  getTransfers: async (
+    companyId: string,
+    branchId?: string | null,
+    warehouseId?: string | null
+  ) => {
     const { data, error } = await supabase
       .from('stock_transfers')
       .select(
@@ -36,13 +40,18 @@ export const transferService = {
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    const rows = data || [];
+    let rows = data || [];
     if (branchId) {
-      return rows.filter(row => {
+      rows = rows.filter(row => {
         const fromBranch = (row.from_warehouse as { branch_id?: string | null } | null)?.branch_id;
         const toBranch = (row.to_warehouse as { branch_id?: string | null } | null)?.branch_id;
         return fromBranch === branchId || toBranch === branchId;
       });
+    }
+    if (warehouseId) {
+      rows = rows.filter(
+        row => row.from_warehouse_id === warehouseId || row.to_warehouse_id === warehouseId
+      );
     }
     return rows;
   },

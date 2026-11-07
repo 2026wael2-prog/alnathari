@@ -109,8 +109,12 @@ export const inventoryService = {
     return transferService.createTransfer(data);
   },
 
-  getTransfers: async (companyId: string, branchId?: string | null) => {
-    return transferService.getTransfers(companyId, branchId);
+  getTransfers: async (
+    companyId: string,
+    branchId?: string | null,
+    warehouseId?: string | null
+  ) => {
+    return transferService.getTransfers(companyId, branchId, warehouseId);
   },
 
   // ==========================================
@@ -145,8 +149,12 @@ export const inventoryService = {
     return auditService.finalizeAudit(sessionId, items, userId, companyId);
   },
 
-  getAuditSessions: async (companyId: string, branchId?: string | null) => {
-    return auditService.getAuditSessions(companyId, branchId);
+  getAuditSessions: async (
+    companyId: string,
+    branchId?: string | null,
+    warehouseId?: string | null
+  ) => {
+    return auditService.getAuditSessions(companyId, branchId, warehouseId);
   },
 
   getAuditSessionDetails: async (sessionId: string) => {

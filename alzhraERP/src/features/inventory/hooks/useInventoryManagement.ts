@@ -68,14 +68,15 @@ export const useInventoryCategoryMutations = () => {
 };
 
 // Transfers
-export const useTransfers = () => {
+export const useTransfers = (warehouseId?: string | null) => {
   const { user } = useAuthStore();
-  const { branchId } = useBranchFilter();
+  const { branchId, warehouseId: activeWarehouseId } = useBranchFilter();
+  const effectiveWarehouseId = warehouseId !== undefined ? warehouseId : activeWarehouseId;
   return useQuery({
-    queryKey: ['transfers', user?.company_id, branchId],
+    queryKey: ['transfers', user?.company_id, branchId, effectiveWarehouseId],
     queryFn: () =>
       user?.company_id
-        ? inventoryService.getTransfers(user.company_id, branchId)
+        ? inventoryService.getTransfers(user.company_id, branchId, effectiveWarehouseId)
         : Promise.resolve<Awaited<ReturnType<typeof inventoryService.getTransfers>>>([]),
     enabled: !!user?.company_id,
   });

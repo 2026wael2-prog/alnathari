@@ -27,14 +27,19 @@ export interface AuditSessionListItem {
   accuracy?: number;
 }
 
-export const useAuditSessions = () => {
+export const useAuditSessions = (warehouseId?: string | null) => {
   const { user } = useAuthStore();
-  const { branchId } = useBranchFilter();
+  const { branchId, warehouseId: activeWarehouseId } = useBranchFilter();
+  const effectiveWarehouseId = warehouseId !== undefined ? warehouseId : activeWarehouseId;
   return useQuery<AuditSessionListItem[]>({
-    queryKey: ['audit_sessions', user?.company_id, branchId],
+    queryKey: ['audit_sessions', user?.company_id, branchId, effectiveWarehouseId],
     queryFn: async () => {
       if (!user?.company_id) return [];
-      const rows = await inventoryService.getAuditSessions(user.company_id, branchId);
+      const rows = await inventoryService.getAuditSessions(
+        user.company_id,
+        branchId,
+        effectiveWarehouseId
+      );
       return rows as unknown as AuditSessionListItem[];
     },
     enabled: !!user?.company_id,

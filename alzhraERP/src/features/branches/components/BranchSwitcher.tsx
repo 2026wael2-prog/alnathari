@@ -4,6 +4,7 @@ import { useAuthStore } from '../../auth/store';
 import { useBranchFilterStore } from '../store';
 import { useBranches } from '../../settings/hooks';
 import { cn } from '../../../core/utils';
+import { BranchWarehouseList } from './BranchWarehouseList';
 
 interface BranchSwitcherProps {
   className?: string;
@@ -24,7 +25,13 @@ const BranchSwitcher: React.FC<BranchSwitcherProps> = ({
   placement = 'top',
 }) => {
   const { user } = useAuthStore();
-  const { activeBranchId, activeBranchName, setActiveBranch, resetToAll } = useBranchFilterStore();
+  const {
+    activeBranchId,
+    activeBranchName,
+    activeWarehouseName,
+    setActiveBranch,
+    resetToAll,
+  } = useBranchFilterStore();
   const branchesQuery = useBranches();
   const branches = (branchesQuery as any)?.data ?? (branchesQuery as any);
   const isLoading = branchesQuery?.isLoading ?? false;
@@ -51,7 +58,10 @@ const BranchSwitcher: React.FC<BranchSwitcherProps> = ({
   const activeBranches = (Array.isArray(branches) ? branches : []).filter(
     (b: any) => b.status === 'active'
   );
-  const label = activeBranchId ? activeBranchName : 'جميع الفروع';
+  const activeBranch = activeBranchId ?? '';
+  const activeWh = activeWarehouseName ?? '';
+  const branchLabel = activeBranch !== '' ? (activeBranchName ?? '') : 'جميع الفروع';
+  const label = activeWh !== '' ? `${branchLabel} — ${activeWh}` : branchLabel;
 
   return (
     <div ref={ref} className={cn('relative', className)}>
@@ -218,6 +228,13 @@ const BranchSwitcher: React.FC<BranchSwitcherProps> = ({
               })}
             </div>
           )}
+
+          {/* Warehouse Selection for Active Branch */}
+          <BranchWarehouseList
+            onSelect={() => {
+              setOpen(false);
+            }}
+          />
         </div>
       )}
     </div>

@@ -72,7 +72,10 @@ const POSPage: React.FC = () => {
     debounceMs: 200,
     minChars: 1,
     limit: 25,
-    filters: { in_stock_only: inStockOnly },
+    filters: {
+      in_stock_only: inStockOnly,
+      warehouse_id: selectedWarehouseId,
+    },
   });
 
   const { items, summary, selectedCustomer, currency, exchangeRate, resetCart, addProductToCart } =
@@ -92,7 +95,8 @@ const POSPage: React.FC = () => {
       const result = await posSearchService.searchByBarcode(
         user.company_id,
         code,
-        currentBranchId
+        currentBranchId,
+        selectedWarehouseId
       );
       if (result) {
         const product = buildProductFromSearchResult(result, user.company_id);

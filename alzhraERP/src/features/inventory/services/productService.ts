@@ -247,7 +247,7 @@ export const productService = {
     companyId: string,
     page = 1,
     limitNum = 500,
-    warehouseId?: string,
+    warehouseId?: string | null,
     signal?: AbortSignal,
     branchId?: string | null
   ): Promise<Product[]> => {

@@ -29,6 +29,7 @@ const PURCHASE_DEFAULT_WIDTHS = {
 const InteractivePurchaseTable: React.FC = () => {
   const {
     items,
+    warehouseId,
     initializeItems,
     addItem,
     updateItem,
@@ -109,6 +110,7 @@ const InteractivePurchaseTable: React.FC = () => {
         onSelect={handleProductSelect}
         initialQuery={modalState.query}
         mode="purchase"
+        warehouseId={warehouseId}
       />
     </div>
   );

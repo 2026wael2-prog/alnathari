@@ -52,7 +52,7 @@ interface RawProduct {
  */
 export function mapRawProducts(
   rows: unknown[],
-  warehouseId?: string,
+  warehouseId?: string | null,
   branchId?: string | null
 ): Product[] {
   return (rows as RawProduct[])

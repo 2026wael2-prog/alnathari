@@ -43,6 +43,8 @@ export interface UseProductsPaginatedOptions {
   sortKey?: string;
   sortDir?: 'asc' | 'desc';
   isCore?: boolean | undefined;
+  branchId?: string | null | undefined;
+  warehouseId?: string | null | undefined;
 }
 
 // ── Query key factory ────────────────────────────────────────────────────────
@@ -55,7 +57,8 @@ export const productsPageKey = (
   sortKey: string,
   sortDir: string,
   branchId?: string | null,
-  isCore?: boolean | null
+  isCore?: boolean | null,
+  warehouseId?: string | null
 ) =>
   [
     'products_paginated',
@@ -67,6 +70,7 @@ export const productsPageKey = (
     sortDir,
     branchId,
     isCore,
+    warehouseId,
   ] as const;
 
 /** Fallback query directly hitting products table if the search RPC is unavailable or encounters error */
@@ -78,7 +82,8 @@ async function fetchProductsFallback(
   sortKey: string,
   sortDir: string,
   isCore?: boolean,
-  branchId?: string | null
+  branchId?: string | null,
+  warehouseId?: string | null
 ): Promise<ProductsPage> {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -150,7 +155,7 @@ async function fetchProductsFallback(
   const { data, count, error } = await query;
   if (error) throw error;
 
-  const products = productService.mapRawProducts(data ?? [], undefined, branchId);
+  const products = productService.mapRawProducts(data ?? [], warehouseId, branchId);
   const totalCount = count ?? 0;
   const totalPages = Math.ceil(totalCount / pageSize);
   return { data: products, totalCount, page, pageSize, totalPages };
@@ -166,12 +171,18 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
     sortKey = 'updated_at',
     sortDir = 'desc',
     isCore,
+    branchId: propBranchId,
+    warehouseId: propWarehouseId,
   } = options;
 
   const { user } = useAuthStore();
   const companyId = user?.company_id ?? '';
   const queryClient = useQueryClient();
-  const { branchId } = useBranchFilter();
+  const { branchId: filterBranchId, warehouseId: filterWarehouseId } = useBranchFilter();
+
+  const effectiveBranchId = propBranchId !== undefined ? propBranchId : filterBranchId;
+  const effectiveWarehouseId =
+    propWarehouseId !== undefined ? propWarehouseId : filterWarehouseId;
 
   const [page, setPage] = useState(initialPage);
   const [search, setSearch] = useState(initialSearch);
@@ -202,8 +213,9 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
     debouncedSearch,
     sortKey,
     sortDir,
-    branchId,
-    isCore ?? null
+    effectiveBranchId,
+    isCore ?? null,
+    effectiveWarehouseId
   );
 
   const query = useQuery<ProductsPage>({
@@ -221,7 +233,7 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
           p_offset: from,
           p_sort_key: sortKey,
           p_sort_dir: sortDir,
-          ...(branchId ? { p_branch_id: branchId } : {}),
+          ...(effectiveBranchId ? { p_branch_id: effectiveBranchId } : {}),
           ...optArg('p_is_core', isCore),
         });
         if (error) {
@@ -234,11 +246,16 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
             sortKey,
             sortDir,
             isCore,
-            branchId
+            effectiveBranchId,
+            effectiveWarehouseId
           );
         }
 
-        const products = productService.mapRawProducts(data ?? [], undefined, branchId);
+        const products = productService.mapRawProducts(
+          data ?? [],
+          effectiveWarehouseId,
+          effectiveBranchId
+        );
         const totalCount = (data as any)?.[0]?.total_count ?? 0;
         const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -253,7 +270,8 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
             sortKey,
             sortDir,
             isCore,
-            branchId
+            effectiveBranchId,
+            effectiveWarehouseId
           );
           if (fallbackRes.totalCount > 0) {
             return fallbackRes;
@@ -271,7 +289,8 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
           sortKey,
           sortDir,
           isCore,
-          branchId
+          effectiveBranchId,
+          effectiveWarehouseId
         );
       }
     },
@@ -291,8 +310,9 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
       debouncedSearch,
       sortKey,
       sortDir,
-      branchId,
-      isCore ?? null
+      effectiveBranchId,
+      isCore ?? null,
+      effectiveWarehouseId
     );
     void queryClient.prefetchQuery({
       queryKey: nextKey,
@@ -307,7 +327,7 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
             p_offset: from,
             p_sort_key: sortKey,
             p_sort_dir: sortDir,
-            ...(branchId ? { p_branch_id: branchId } : {}),
+            ...(effectiveBranchId ? { p_branch_id: effectiveBranchId } : {}),
             ...optArg('p_is_core', isCore),
           });
           if (error) {
@@ -319,11 +339,16 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
               sortKey,
               sortDir,
               isCore,
-              branchId
+              effectiveBranchId,
+              effectiveWarehouseId
             );
           }
 
-          const products = productService.mapRawProducts(data ?? [], undefined, branchId);
+          const products = productService.mapRawProducts(
+            data ?? [],
+            effectiveWarehouseId,
+            effectiveBranchId
+          );
           const totalCount = (data as any)?.[0]?.total_count ?? 0;
 
           if (isCore === true && products.length === 0 && !debouncedSearch.trim()) {
@@ -335,7 +360,8 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
               sortKey,
               sortDir,
               isCore,
-              branchId
+              effectiveBranchId,
+              effectiveWarehouseId
             );
           }
 
@@ -355,7 +381,8 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
             sortKey,
             sortDir,
             isCore,
-            branchId
+            effectiveBranchId,
+            effectiveWarehouseId
           );
         }
       },
@@ -369,7 +396,8 @@ export const useProductsPaginated = (options: UseProductsPaginatedOptions = {}) 
     debouncedSearch,
     sortKey,
     sortDir,
-    branchId,
+    effectiveBranchId,
+    effectiveWarehouseId,
     isCore,
     queryClient,
   ]);

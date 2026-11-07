@@ -168,9 +168,13 @@ export const auditService = {
   },
 
   /**
-   * Get all audit sessions for a company (optionally scoped to a specific branch's warehouses)
+   * Get all audit sessions for a company (optionally scoped to a specific branch or warehouse)
    */
-  getAuditSessions: async (companyId: string, branchId?: string | null) => {
+  getAuditSessions: async (
+    companyId: string,
+    branchId?: string | null,
+    warehouseId?: string | null
+  ) => {
     const { data, error } = await supabase
       .from('audit_sessions')
       .select('*, warehouses(name_ar, branch_id)')
@@ -178,13 +182,16 @@ export const auditService = {
       .neq('status', 'cancelled')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    const rows = (data || []).map((s: Record<string, unknown>) => ({
+    let rows = (data || []).map((s: Record<string, unknown>) => ({
       ...s,
       warehouse_name: (s.warehouses as { name_ar?: string })?.name_ar,
       branch_id: (s.warehouses as { branch_id?: string | null })?.branch_id ?? null,
     }));
     if (branchId) {
-      return rows.filter(r => r.branch_id === branchId);
+      rows = rows.filter(r => r.branch_id === branchId);
+    }
+    if (warehouseId) {
+      rows = rows.filter(r => (r as { warehouse_id?: string }).warehouse_id === warehouseId);
     }
     return rows;
   },
