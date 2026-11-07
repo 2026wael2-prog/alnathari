@@ -67,6 +67,7 @@ interface SalesState {
   ) => void;
   toggleColumn: (field: 'showDiscount') => void;
   resetCart: () => void;
+  loadCartState: (cartState: Partial<SalesState>) => void;
 }
 
 const createNewItem = (): SalesCartItem => ({
@@ -421,6 +422,11 @@ export const useSalesStore = create<SalesState>()(
           showDiscount: false,
           notes: '',
         }));
+      },
+
+      loadCartState: cartState => {
+        set(state => Object.assign({}, state, cartState));
+        get().calculateTotals();
       },
     }),
     {

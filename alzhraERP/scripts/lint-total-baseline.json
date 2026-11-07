@@ -1,9 +1,14 @@
 {
-  "errors": 9061,
+  "errors": 9059,
   "warnings": 201,
   "capturedAt": "2026-11-07",
   "method": "npx eslint . --report-unused-disable-directives --format json (full scan of repo)",
   "history": [
+    {
+      "date": "2026-11-07",
+      "errors": 9059,
+      "note": "Al-Mizan invoice navigator and parallel multi-draft invoices (-2)"
+    },
     {
       "date": "2026-11-07",
       "errors": 9061,

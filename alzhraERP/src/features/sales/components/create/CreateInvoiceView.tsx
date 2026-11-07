@@ -22,6 +22,11 @@ import { formatLocalDate } from '../../../../core/utils/dateUtils';
 import { usePaymentAccounts } from '../../../accounting/hooks/index';
 import { useWarehouses } from '../../../inventory/hooks/useInventoryManagement';
 import { InvoiceConfirmationModal } from '../../../../ui/common/InvoiceConfirmationModal';
+import { useInvoiceNavigation } from '../../hooks/useInvoiceNavigation';
+import { InvoiceNavigatorBar } from './InvoiceNavigatorBar';
+import { PreviousInvoiceView } from './PreviousInvoiceView';
+import { OpenInvoicesTabs } from './OpenInvoicesTabs';
+import { useOpenInvoicesStore } from '../../store/openInvoicesStore';
 
 interface CreateInvoiceViewProps {
   onSuccess: () => void;
@@ -59,11 +64,48 @@ const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({ onSuccess }) => {
   const [showConfirmModal, setShowConfirmModal] = React.useState(false);
   const [targetStatus, setTargetStatus] = React.useState<InvoiceStatus>('paid');
 
+  const navigation = useInvoiceNavigation();
+  const { closeDraft, activeDraftId, syncCurrentDraft } = useOpenInvoicesStore();
+
+  // مزامنة حالة السلة الحالية مع المتجر المفتوح عند تغيير الحقول
+  React.useEffect(() => {
+    if (!navigation.currentViewingInvoice && Boolean(activeDraftId)) {
+      syncCurrentDraft({
+        items,
+        selectedCustomer,
+        summary,
+        invoiceType,
+        currency,
+        exchangeRate,
+        exchangeOperator,
+        warehouseId,
+        cashboxId,
+        paidAmount,
+        notes,
+      });
+    }
+  }, [
+    items,
+    selectedCustomer,
+    summary,
+    invoiceType,
+    currency,
+    exchangeRate,
+    exchangeOperator,
+    warehouseId,
+    cashboxId,
+    paidAmount,
+    notes,
+    navigation.currentViewingInvoice,
+    activeDraftId,
+    syncCurrentDraft,
+  ]);
+
   // Ref للطباعة
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `فاتورة_${nextInvoiceNumber || 'مسودة'}`,
+    documentTitle: `فاتورة_${nextInvoiceNumber ?? 'مسودة'}`,
   });
 
   // Apply defaults on mount
@@ -259,6 +301,9 @@ const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({ onSuccess }) => {
         onSuccess: () => {
           setShowConfirmModal(false);
           resetCart();
+          if (activeDraftId) {
+            closeDraft(activeDraftId);
+          }
           onSuccess();
           invoiceIdempotencyKeyRef.current = createIdempotencyKey('sale');
         },
@@ -285,38 +330,62 @@ const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({ onSuccess }) => {
 
   return (
     <>
-      <div className="animate-in fade-in mx-auto max-w-none space-y-2 px-1 pb-20 pt-1 duration-500 sm:space-y-3 sm:px-2 sm:pb-24 sm:pt-2">
-        <DraftStatusBanner
-          itemCount={enteredItemsCount}
-          onClearDraft={resetCart}
-          entityName={selectedCustomer?.name}
-        />
-        {/* Modern Enterprise Invoice Workspace Container */}
-        <div className="flex flex-col rounded-2xl border border-slate-200 bg-[var(--app-surface)] shadow-xl dark:border-slate-800">
-          {comp && (
-            <div className="hidden md:block">
-              <InvoiceHeader company={comp} />
-            </div>
-          )}
-          <InvoiceMeta invoiceNumber={nextInvoiceNumber!} />
-          <InteractiveInvoiceTable />
-          <InvoiceTotals
-            notes={notes}
-            onNotesChange={value => {
-              setMetadata('notes', value);
-            }}
-          />
+      <div className="animate-in fade-in mx-auto max-w-none space-y-2 px-1 pb-24 pt-1 duration-500 sm:space-y-3 sm:px-2 sm:pb-28 sm:pt-2">
+        {/* شريط تبويبات الفواتير المفتوحة المتعددة بالتوازي */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <OpenInvoicesTabs disabled={Boolean(navigation.currentViewingInvoice)} />
         </div>
 
-        <div className="flex justify-end">
-          <InvoiceActions
-            onSave={handleSave}
-            onPrint={() => {
-              handlePrint();
-            }}
-            isSaving={isPending}
+        {navigation.currentViewingInvoice ? (
+          /* وضع استعراض فاتورة سابقة بنظام الميزان */
+          <PreviousInvoiceView
+            invoiceId={navigation.currentViewingInvoice.id}
+            onClose={navigation.exitViewingMode}
+            onCopiedToNewInvoice={navigation.exitViewingMode}
           />
-        </div>
+        ) : (
+          /* وضع تحرير الفاتورة الجديدة المفتوحة */
+          <>
+            <DraftStatusBanner
+              itemCount={enteredItemsCount}
+              onClearDraft={resetCart}
+              entityName={selectedCustomer?.name}
+            />
+            {/* Modern Enterprise Invoice Workspace Container */}
+            <div className="flex flex-col rounded-2xl border border-slate-200 bg-[var(--app-surface)] shadow-xl dark:border-slate-800">
+              {comp && (
+                <div className="hidden md:block">
+                  <InvoiceHeader company={comp} />
+                </div>
+              )}
+              <InvoiceMeta invoiceNumber={nextInvoiceNumber ?? ''} />
+              <InteractiveInvoiceTable />
+              <InvoiceTotals
+                notes={notes}
+                onNotesChange={value => {
+                  setMetadata('notes', value);
+                }}
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <InvoiceActions
+                onSave={handleSave}
+                onPrint={() => {
+                  handlePrint();
+                }}
+                isSaving={isPending}
+              />
+            </div>
+          </>
+        )}
+
+        {/* شريط الميزان للتنقل بين الفواتير السابقة والجديدة */}
+        <InvoiceNavigatorBar
+          navigation={navigation}
+          defaultNextNumber={nextInvoiceNumber ?? undefined}
+          onNewInvoiceClick={navigation.exitViewingMode}
+        />
       </div>
 
       {/* [FIX #4] PrintableInvoice مخفي دائماً ومرتبط بـ ref للطباعة الصحيحة */}
@@ -337,20 +406,20 @@ const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({ onSuccess }) => {
         }}
         isSubmitting={isPending}
         mode="sale"
-        invoiceNumber={nextInvoiceNumber || undefined}
-        partyName={selectedCustomer?.name || 'عميل نقدي'}
+        invoiceNumber={nextInvoiceNumber ?? undefined}
+        partyName={selectedCustomer?.name ?? 'عميل نقدي'}
         invoiceType={invoiceType}
-        currency={currency || 'SAR'}
+        currency={currency}
         exchangeRate={currency === 'SAR' ? 1 : exchangeRate || 1}
         exchangeOperator={exchangeOperator}
-        cashboxName={paymentAccounts?.find(acc => acc.id === cashboxId)?.name_ar}
+        cashboxName={paymentAccounts.find(acc => acc.id === cashboxId)?.name_ar}
         warehouseName={
           (rawWarehouses as Array<{ id: string; name_ar: string }> | undefined)?.find(
             w => w.id === warehouseId
           )?.name_ar
         }
         items={items
-          .filter(item => item.productId && item.name && item.quantity > 0 && item.price > 0)
+          .filter(item => Boolean(item.productId) && Boolean(item.name) && item.quantity > 0 && item.price > 0)
           .map(item => ({
             name: item.name,
             sku: item.sku,

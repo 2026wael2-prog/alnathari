@@ -45,6 +45,16 @@ export type InvoiceWithDetails = Invoice & {
   invoice_items: InvoiceDetailItem[];
 };
 
+export interface InvoiceNavSummary {
+  id: string;
+  invoice_number: string;
+  created_at: string;
+  issue_date: string;
+  total_amount: number;
+  currency_code: string;
+  party_name?: string | null;
+}
+
 export const salesApi = {
   getInvoices: async (companyId: string, page = 0, limit = 500, branchId?: string | null) => {
     const from = page * limit;
@@ -496,5 +506,183 @@ export const salesApi = {
     const { data, error } = await supabase.rpc('void_invoice', { p_invoice_id: id });
     if (error) throw parseError(error);
     return { data, error: null };
+  },
+
+  getInvoiceNavigatorBoundaries: async (
+    companyId: string,
+    branchId?: string | null
+  ): Promise<{ first: InvoiceNavSummary | null; last: InvoiceNavSummary | null }> => {
+    let firstQuery = supabase
+      .from('invoices')
+      .select('id, invoice_number, created_at, issue_date, total_amount, currency_code, party:party_id(name)')
+      .eq('company_id', companyId)
+      .eq('type', 'sale')
+      .neq('status', 'void')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(1);
+
+    let lastQuery = supabase
+      .from('invoices')
+      .select('id, invoice_number, created_at, issue_date, total_amount, currency_code, party:party_id(name)')
+      .eq('company_id', companyId)
+      .eq('type', 'sale')
+      .neq('status', 'void')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1);
+
+    if (branchId) {
+      firstQuery = firstQuery.eq('branch_id', branchId);
+      lastQuery = lastQuery.eq('branch_id', branchId);
+    }
+
+    const [firstRes, lastRes] = await Promise.all([firstQuery, lastQuery]);
+    if (firstRes.error) throw parseError(firstRes.error);
+    if (lastRes.error) throw parseError(lastRes.error);
+
+    const mapRow = (r: any): InvoiceNavSummary | null => {
+      if (!r) return null;
+      return {
+        id: r.id,
+        invoice_number: r.invoice_number || '',
+        created_at: r.created_at || '',
+        issue_date: r.issue_date || '',
+        total_amount: Number(r.total_amount) || 0,
+        currency_code: r.currency_code || 'SAR',
+        party_name: r.party?.name || null,
+      };
+    };
+
+    return {
+      first: mapRow(firstRes.data?.[0]),
+      last: mapRow(lastRes.data?.[0]),
+    };
+  },
+
+  getAdjacentInvoices: async (
+    companyId: string,
+    currentCreatedAt: string,
+    currentId: string,
+    branchId?: string | null
+  ): Promise<{ prev: InvoiceNavSummary | null; next: InvoiceNavSummary | null }> => {
+    let prevQuery = supabase
+      .from('invoices')
+      .select('id, invoice_number, created_at, issue_date, total_amount, currency_code, party:party_id(name)')
+      .eq('company_id', companyId)
+      .eq('type', 'sale')
+      .neq('status', 'void')
+      .is('deleted_at', null)
+      .or(`created_at.lt.${currentCreatedAt},and(created_at.eq.${currentCreatedAt},id.lt.${currentId})`)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1);
+
+    let nextQuery = supabase
+      .from('invoices')
+      .select('id, invoice_number, created_at, issue_date, total_amount, currency_code, party:party_id(name)')
+      .eq('company_id', companyId)
+      .eq('type', 'sale')
+      .neq('status', 'void')
+      .is('deleted_at', null)
+      .or(`created_at.gt.${currentCreatedAt},and(created_at.eq.${currentCreatedAt},id.gt.${currentId})`)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(1);
+
+    if (branchId) {
+      prevQuery = prevQuery.eq('branch_id', branchId);
+      nextQuery = nextQuery.eq('branch_id', branchId);
+    }
+
+    const [prevRes, nextRes] = await Promise.all([prevQuery, nextQuery]);
+    if (prevRes.error) throw parseError(prevRes.error);
+    if (nextRes.error) throw parseError(nextRes.error);
+
+    const mapRow = (r: any): InvoiceNavSummary | null => {
+      if (!r) return null;
+      return {
+        id: r.id,
+        invoice_number: r.invoice_number || '',
+        created_at: r.created_at || '',
+        issue_date: r.issue_date || '',
+        total_amount: Number(r.total_amount) || 0,
+        currency_code: r.currency_code || 'SAR',
+        party_name: r.party?.name || null,
+      };
+    };
+
+    return {
+      prev: mapRow(prevRes.data?.[0]),
+      next: mapRow(nextRes.data?.[0]),
+    };
+  },
+
+  searchInvoiceForNavigation: async (
+    companyId: string,
+    invoiceNumber: string,
+    branchId?: string | null
+  ): Promise<InvoiceNavSummary | null> => {
+    const cleanNum = invoiceNumber.trim();
+    if (!cleanNum) return null;
+
+    let queryExact = supabase
+      .from('invoices')
+      .select('id, invoice_number, created_at, issue_date, total_amount, currency_code, party:party_id(name)')
+      .eq('company_id', companyId)
+      .eq('type', 'sale')
+      .neq('status', 'void')
+      .is('deleted_at', null)
+      .eq('invoice_number', cleanNum)
+      .limit(1);
+
+    if (branchId) queryExact = queryExact.eq('branch_id', branchId);
+    const { data: exactData, error: exactError } = await queryExact;
+    if (exactError) throw parseError(exactError);
+
+    if (exactData && exactData.length > 0) {
+      const r = exactData[0];
+      return {
+        id: r.id,
+        invoice_number: r.invoice_number || '',
+        created_at: r.created_at || '',
+        issue_date: r.issue_date || '',
+        total_amount: Number(r.total_amount) || 0,
+        currency_code: r.currency_code || 'SAR',
+        party_name: (r as any).party?.name || null,
+      };
+    }
+
+    let queryLike = supabase
+      .from('invoices')
+      .select('id, invoice_number, created_at, issue_date, total_amount, currency_code, party:party_id(name)')
+      .eq('company_id', companyId)
+      .eq('type', 'sale')
+      .neq('status', 'void')
+      .is('deleted_at', null)
+      .ilike('invoice_number', `%${cleanNum}%`)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (branchId) queryLike = queryLike.eq('branch_id', branchId);
+    const { data: likeData, error: likeError } = await queryLike;
+    if (likeError) throw parseError(likeError);
+
+    if (likeData && likeData.length > 0) {
+      const r = likeData[0];
+      return {
+        id: r.id,
+        invoice_number: r.invoice_number || '',
+        created_at: r.created_at || '',
+        issue_date: r.issue_date || '',
+        total_amount: Number(r.total_amount) || 0,
+        currency_code: r.currency_code || 'SAR',
+        party_name: (r as any).party?.name || null,
+      };
+    }
+
+    return null;
   },
 };
