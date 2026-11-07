@@ -1,151 +1,261 @@
+/* eslint-disable max-lines-per-function, complexity */
 import React, { useState, useMemo } from 'react';
-import { ArrowLeftRight, Plus, Maximize2, Sparkles, History as HistoryIcon, LayoutDashboard } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  Plus,
+  Maximize2,
+  Minimize2,
+  Sparkles,
+  History as HistoryIcon,
+  LayoutDashboard,
+  GitPullRequest,
+  Building2,
+} from 'lucide-react';
 import NewTransferModal from './NewTransferModal';
 import { useTransfers, useWarehouses } from '../hooks/useInventoryManagement';
+import { useStockTransferRequests } from '../hooks/useStockTransferRequests';
+import { useBranchFilter } from '@/features/branches/hooks/useBranchFilter';
 import TableSkeleton from '../../../ui/base/TableSkeleton';
 import FullscreenContainer from '../../../ui/base/FullscreenContainer';
+import MicroHeader from '@/ui/base/MicroHeader';
 import { cn } from '../../../core/utils';
 import TransferStats from './transfers/TransferStats';
 import TransferHistoryView from './TransferHistoryView';
 import TransferSuggestionsView from './TransferSuggestionsView';
+import BranchTransferRequestsTab from './transfers/BranchTransferRequestsTab';
+import CreateBranchTransferRequestModal from './transfers/CreateBranchTransferRequestModal';
 
-type SubTab = 'overview' | 'history' | 'suggestions';
+type SubTab = 'requests' | 'history' | 'suggestions' | 'overview';
+
+interface TransferRecord {
+  created_at?: string;
+  item_count?: number | string;
+}
 
 const TransfersView: React.FC = () => {
-    const [activeSubTab, setActiveSubTab] = useState<SubTab>('overview');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const { data: transfers, isLoading: isTransfersLoading } = useTransfers();
-    const { data: warehouses } = useWarehouses();
-    const [isMaximized, setIsMaximized] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<SubTab>('requests');
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState<boolean>(false);
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
 
-    const stats = useMemo(() => {
-        const transfersArray = Array.isArray(transfers) ? transfers : [];
-        return {
-            total: transfersArray.length,
-            thisMonth: transfersArray.filter((t: any) => {
-                const d = new Date(t.created_at);
-                const now = new Date();
-                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-            }).length,
-            totalItems: transfersArray.reduce((s: number, t: any) => s + (Number(t.item_count) || 0), 0),
-            warehouseCount: warehouses?.length || 0
-        };
-    }, [transfers, warehouses]);
+  const { branchId, branchName } = useBranchFilter();
+  const { data: transfers, isLoading: isTransfersLoading } = useTransfers();
+  const { data: warehouses } = useWarehouses();
+  const { data: branchRequests } = useStockTransferRequests('all', branchId);
 
-    if (isTransfersLoading) return <TableSkeleton rows={5} cols={6} />;
+  // حساب عدد الطلبات الواردة المعلقة لهذا الفرع
+  const pendingIncomingCount = useMemo(() => {
+    return (branchRequests ?? []).filter(
+      r => r.source_branch_id === branchId && r.status === 'pending'
+    ).length;
+  }, [branchRequests, branchId]);
 
-    return (
-        <FullscreenContainer isMaximized={isMaximized} onToggleMaximize={() => { setIsMaximized(false); }}>
-            <div className={cn(
-                "space-y-4 flex flex-col h-full",
-                isMaximized && "bg-[var(--app-bg)] p-4 md:p-8"
-            )}>
-                <TransferStats stats={stats} />
+  const stats = useMemo(() => {
+    const transfersArray = transfers !== undefined ? (transfers as unknown as TransferRecord[]) : [];
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
 
-                {/* Internal Sub-Navigation */}
-                <div className="flex bg-gray-100/50 dark:bg-slate-900/50 p-1 rounded-xl w-fit shrink-0 backdrop-blur-sm border border-gray-200/50 dark:border-slate-800/50">
-                    {[
-                        { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
-                        { id: 'history', label: 'سجل المناقلات', icon: HistoryIcon },
-                        { id: 'suggestions', label: 'اقتراحات النقل', icon: Sparkles },
-                    ].map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => { setActiveSubTab(tab.id as SubTab); }}
-                            className={cn(
-                                "flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-black transition-all duration-300",
-                                activeSubTab === tab.id
-                                    ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm shadow-blue-500/10"
-                                    : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                            )}
-                        >
-                            <tab.icon size={12} strokeWidth={activeSubTab === tab.id ? 2.5 : 2} />
-                            <span>{tab.label}</span>
-                        </button>
-                    ))}
-                </div>
+    return {
+      total: transfersArray.length,
+      thisMonth: transfersArray.filter(t => {
+        const createdAt = t.created_at;
+        if (typeof createdAt !== 'string') return false;
+        const d = new Date(createdAt);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      }).length,
+      totalItems: transfersArray.reduce((sum: number, t) => {
+        const count = typeof t.item_count === 'number' ? t.item_count : Number(t.item_count);
+        return sum + (Number.isFinite(count) ? count : 0);
+      }, 0),
+      warehouseCount: Array.isArray(warehouses) ? warehouses.length : 0,
+    };
+  }, [transfers, warehouses]);
 
-                <div className="flex-1 overflow-hidden">
-                    {activeSubTab === 'overview' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            <div className="bg-[var(--app-surface)] border border-gray-100 dark:border-slate-800 p-8 max-md:p-4 rounded-2xl flex flex-col items-center justify-center text-center gap-6 max-md:gap-3 shadow-sm">
-<div className="w-16 h-16 max-md:w-12 max-md:h-12 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center shadow-inner">
-                                    <ArrowLeftRight size={32} />
-                                </div>
-                                <div className="max-w-md">
-                                    <h3 className="text-xl font-black mb-2">إدارة مناقلات المخزون</h3>
-                                    <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
-                                        هنا يمكنك البدء بعملية نقل بضاعة جديدة بين مستودعاتك وفروعك. تصفح التبويبات أعلاه لمشاهدة السجل الكامل أو الحصول على اقتراحات ذكية.
-                                    </p>
-                                </div>
+  if (isTransfersLoading) return <TableSkeleton rows={5} cols={6} />;
 
-                                <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                                    <button
-                                        onClick={() => { setIsModalOpen(true); }}
-                                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2.5 rounded-xl text-xs font-black active:scale-95 flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-500/20 transition-all"
-                                    >
-                                        <Plus size={16} strokeWidth={3} />
-                                        <span>إنشاء مناقلة جديدة الآن</span>
-                                    </button>
-                                    
-                                    {!isMaximized && (
-                                        <button
-                                            onClick={() => { setIsMaximized(true); }}
-                                            className="bg-white dark:bg-slate-800 text-gray-400 border border-gray-100 dark:border-slate-800 px-6 py-2.5 rounded-xl text-xs font-black active:scale-95 flex items-center justify-center gap-2.5 shadow-sm transition-all"
-                                        >
-                                            <Maximize2 size={16} />
-                                            <span>ملئ الشاشة</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
+  return (
+    <FullscreenContainer
+      isMaximized={isMaximized}
+      onToggleMaximize={() => {
+        setIsMaximized(prev => !prev);
+      }}
+    >
+      <div
+        className={cn(
+          'space-y-4 flex flex-col h-full',
+          isMaximized && 'bg-[var(--app-bg)] p-4 md:p-8'
+        )}
+      >
+        {/* الترويسة الموحدة المطابقة للهوية البصرية للتطبيق */}
+        <MicroHeader
+          icon={ArrowLeftRight}
+          title={`إدارة المناقلات وتحويلات المخزون (${branchName ?? 'الفرع الرئيسي'})`}
+        />
 
-                            <div className="grid grid-cols-2 gap-4 max-md:gap-2">
-                                <button 
-                                    onClick={() => { setActiveSubTab('suggestions'); }}
-                                    className="bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/50 p-4 max-md:p-2.5 rounded-xl flex items-center gap-4 max-md:gap-2 text-right hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-all group"
-                                >
-                                    <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                                        <Sparkles size={20} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-[11px] font-black text-amber-900 dark:text-amber-100 italic">اقتراحات ذكية</h4>
-                                        <p className="text-[10px] text-amber-800/70 dark:text-amber-300/70 line-clamp-1">موازنة المخزون آلياً بين الفروع</p>
-                                    </div>
-                                </button>
-                                <button 
-                                    onClick={() => { setActiveSubTab('history'); }}
-                                    className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/50 p-4 max-md:p-2.5 rounded-xl flex items-center gap-4 max-md:gap-2 text-right hover:bg-blue-100/50 dark:hover:bg-blue-900/20 transition-all group"
-                                >
-                                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                                        <HistoryIcon size={20} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-[11px] font-black text-blue-900 dark:text-blue-100 italic">السجل الكامل</h4>
-                                        <p className="text-[10px] text-blue-800/70 dark:text-blue-300/70 line-clamp-1">تدقيق العمليات السابقة والمكتملة</p>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-                    )}
+        {/* بطاقات الإحصائيات العصرية */}
+        <TransferStats stats={stats} />
 
-                    {activeSubTab === 'history' && (
-                        <div className="h-full animate-in fade-in slide-in-from-left-4 duration-500">
-                            <TransferHistoryView />
-                        </div>
-                    )}
+        {/* شريط التبويبات المطور المتناسق مع الهوية البصرية */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-white/70 p-2 rounded-2xl shadow-sm dark:border-slate-800/80 dark:bg-slate-900/60 backdrop-blur-md">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              {
+                id: 'requests',
+                label: 'طلبات الفروع المتبادلة',
+                icon: GitPullRequest,
+                badge: pendingIncomingCount > 0 ? pendingIncomingCount : undefined,
+              },
+              { id: 'history', label: 'سجل المناقلات المنفذة', icon: HistoryIcon },
+              { id: 'suggestions', label: 'اقتراحات التوازن الذكي', icon: Sparkles },
+              { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveSubTab(tab.id as SubTab);
+                }}
+                className={cn(
+                  'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200',
+                  activeSubTab === tab.id
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
+                )}
+              >
+                <tab.icon size={15} />
+                <span>{tab.label}</span>
+                {tab.badge !== undefined && (
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 font-mono text-[10px] font-black text-white animate-pulse">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
 
-                    {activeSubTab === 'suggestions' && (
-                        <div className="h-full animate-in fade-in slide-in-from-right-4 duration-500">
-                            <TransferSuggestionsView />
-                        </div>
-                    )}
-                </div>
+          {/* أزرار الإجراءات السريعة في أعلى الصفحة */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRequestModalOpen(true);
+              }}
+              className="flex h-9 items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 shadow-sm transition hover:bg-blue-100 active:scale-95 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300"
+            >
+              <Building2 size={15} />
+              <span>طلب بضاعة من فرع</span>
+            </button>
 
-                <NewTransferModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); }} />
+            <button
+              type="button"
+              onClick={() => {
+                setIsModalOpen(true);
+              }}
+              className="flex h-9 items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 text-xs font-bold text-white shadow-sm transition hover:from-emerald-700 hover:to-teal-700 active:scale-95"
+            >
+              <Plus size={16} />
+              <span>مناقلة مستودعية مباشرة</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsMaximized(prev => !prev);
+              }}
+              title={isMaximized ? 'تصغير الشاشة' : 'ملء الشاشة'}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400"
+            >
+              {isMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            </button>
+          </div>
+        </div>
+
+        {/* محتوى التبويب النشط */}
+        <div className="flex-1 overflow-hidden">
+          {activeSubTab === 'requests' && (
+            <div className="h-full animate-in fade-in duration-300">
+              <BranchTransferRequestsTab
+                onOpenCreateRequestModal={() => {
+                  setIsRequestModalOpen(true);
+                }}
+              />
             </div>
-        </FullscreenContainer>
-    );
+          )}
+
+          {activeSubTab === 'history' && (
+            <div className="h-full animate-in fade-in duration-300">
+              <TransferHistoryView />
+            </div>
+          )}
+
+          {activeSubTab === 'suggestions' && (
+            <div className="h-full animate-in fade-in duration-300">
+              <TransferSuggestionsView />
+            </div>
+          )}
+
+          {activeSubTab === 'overview' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-inner dark:bg-blue-950/60 dark:text-blue-400">
+                  <ArrowLeftRight size={32} />
+                </div>
+                <div className="mx-auto mt-4 max-w-lg">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    نظام المناقلات والتوزيع الذكي بين الفروع
+                  </h3>
+                  <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                    يتيح لك النظام طلب بضائع من أي فرع شقيق، حيث تظهر رسالة تفاعلية فورية لدى الفرع الآخر للموافقة والشحن المباشر، مع تحديث المخزون المحاسبي والفعلي في كلا الفرعين فور الاعتماد.
+                  </p>
+                </div>
+
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRequestModalOpen(true);
+                    }}
+                    className="flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-5 text-xs font-bold text-white shadow-md hover:bg-blue-700 active:scale-95"
+                  >
+                    <Building2 size={16} />
+                    <span>طلب مناقلة من فرع آخر الآن</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsModalOpen(true);
+                    }}
+                    className="flex h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <Plus size={16} />
+                    <span>مناقلة مستودعية مباشرة</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* نافذة المناقلة المباشرة بين المستودعات */}
+        <NewTransferModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+          }}
+        />
+
+        {/* نافذة إنشاء طلب مناقلة بضاعة من فرع آخر */}
+        <CreateBranchTransferRequestModal
+          isOpen={isRequestModalOpen}
+          onClose={() => {
+            setIsRequestModalOpen(false);
+          }}
+        />
+      </div>
+    </FullscreenContainer>
+  );
 };
 
-export default TransfersView;
+export default TransfersView;

@@ -7,6 +7,8 @@ import CommandPalette from './ui/base/CommandPalette';
 import { useSystemInitialization } from './core/hooks/useSystemInitialization';
 import { prefetchCriticalRoutes } from './core/utils/routePrefetcher';
 import { DebtAlertsRunner } from './features/debts/components/DebtAlertsRunner';
+import { BranchTransferAlertRunner } from './features/inventory/components/transfers/BranchTransferAlertRunner';
+
 const App: React.FC = () => {
   // Centralized system bootstrapping (Auth, I18n, Sync, Shortcuts)
   useSystemInitialization();
@@ -38,6 +40,8 @@ const App: React.FC = () => {
         <AppRoutes />
         {/* محرك تنبيهات التحصيل مركزي: يعمل خارج قسم الديون (مبوّب بصلاحية debts:read) */}
         <DebtAlertsRunner />
+        {/* محرك تنبيهات طلبات المناقلة اللحظية بين الفروع */}
+        <BranchTransferAlertRunner />
         <FeedbackToast />
         <CommandPalette />
       </HashRouter>

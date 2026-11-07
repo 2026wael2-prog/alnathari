@@ -86,7 +86,7 @@ export const InvoiceNavigatorBar: React.FC<InvoiceNavigatorBarProps> = ({
   return (
     <footer className="fixed bottom-0 inset-x-0 z-40 border-t border-slate-200/90 bg-white/95 px-3 py-2 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur-xl transition-all dark:border-slate-800/90 dark:bg-slate-900/95 sm:px-6 sm:py-2.5">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2.5">
-        
+
         {/* الجانب الأيمن: أزرار التنقل VCR على طريقة برنامج الميزان مع الأيقونات المطورة */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* الفاتورة الأولى (|◀) */}

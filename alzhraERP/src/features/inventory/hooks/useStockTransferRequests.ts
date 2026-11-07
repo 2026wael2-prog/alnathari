@@ -186,7 +186,7 @@ export function useCreateStockTransferRequest() {
     },
     onSuccess: () => {
       showToast('تم إرسال طلب نقل المخزون بنجاح ✅', 'success');
-      qc.invalidateQueries({ queryKey: ['stock_transfer_requests'] });
+      void qc.invalidateQueries({ queryKey: ['stock_transfer_requests'] });
     },
     onError: (err: Error) => {
       showToast(err.message || 'فشل في إرسال طلب النقل', 'error');
@@ -207,7 +207,8 @@ export function useRespondToTransferRequest() {
     mutationFn: async (params: {
       requestId: string;
       action: 'approve' | 'reject' | 'cancel';
-      reviewNotes?: string;
+      reviewNotes?: string | undefined;
+      approvedQuantity?: number | undefined;
     }) => {
       if (!user?.company_id || !user?.id) {
         throw new Error('جلسة العمل منتهية، يرجى إعادة تسجيل الدخول');
@@ -217,6 +218,7 @@ export function useRespondToTransferRequest() {
         p_action: params.action,
         p_review_notes: params.reviewNotes ?? null,
         p_user_id: user.id,
+        p_approved_quantity: params.approvedQuantity ?? null,
       });
       if (error) throw new Error(error.message);
     },
@@ -224,12 +226,12 @@ export function useRespondToTransferRequest() {
       const label =
         vars.action === 'approve' ? 'موافقة' : vars.action === 'reject' ? 'رفض' : 'إلغاء';
       showToast(`تمت ${label} طلب النقل بنجاح`, 'success');
-      qc.invalidateQueries({ queryKey: ['stock_transfer_requests'] });
+      void qc.invalidateQueries({ queryKey: ['stock_transfer_requests'] });
       if (vars.action === 'approve') {
-        qc.invalidateQueries({ queryKey: ['products'] });
-        qc.invalidateQueries({ queryKey: ['warehouse_distribution'] });
-        qc.invalidateQueries({ queryKey: ['branches'] });
-        qc.invalidateQueries({ queryKey: ['branch_inventory'] });
+        void qc.invalidateQueries({ queryKey: ['products'] });
+        void qc.invalidateQueries({ queryKey: ['warehouse_distribution'] });
+        void qc.invalidateQueries({ queryKey: ['branches'] });
+        void qc.invalidateQueries({ queryKey: ['branch_inventory'] });
       }
     },
     onError: (err: Error) => {
