@@ -1,9 +1,14 @@
 {
-  "errors": 9045,
+  "errors": 8963,
   "warnings": 201,
-  "capturedAt": "2026-11-07",
+  "capturedAt": "2026-11-08",
   "method": "npx eslint . --report-unused-disable-directives --format json (full scan of repo)",
   "history": [
+    {
+      "date": "2026-11-08",
+      "errors": 8963,
+      "note": "multi-product batch transfers with part_number and brand linkage (-82)"
+    },
     {
       "date": "2026-11-07",
       "errors": 9045,

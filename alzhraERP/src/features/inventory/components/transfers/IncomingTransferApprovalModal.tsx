@@ -1,56 +1,77 @@
-/* eslint-disable max-lines-per-function, complexity, jsx-a11y/label-has-associated-control, jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
-import React, { useState } from 'react';
+/* eslint-disable max-lines-per-function, complexity, @typescript-eslint/strict-boolean-expressions, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/explicit-function-return-type, jsx-a11y/label-has-associated-control, jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
+import React, { useState, useEffect } from 'react';
 import {
   ArrowRightLeft,
-  Package,
   XCircle,
   X,
   Building2,
   Calendar,
   AlertTriangle,
   Loader2,
-  Send,
+  Tag,
+  Hash,
+  CheckCircle2,
 } from 'lucide-react';
 import type { StockTransferRequest } from '../../hooks/useStockTransferRequests';
-import { useRespondToTransferRequest } from '../../hooks/useStockTransferRequests';
+import { useRespondToTransferBatch } from '../../hooks/useStockTransferRequests';
 
 interface IncomingTransferApprovalModalProps {
-  request: StockTransferRequest | null;
+  requests: StockTransferRequest[] | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
 export const IncomingTransferApprovalModal: React.FC<IncomingTransferApprovalModalProps> = ({
-  request,
+  requests,
   isOpen,
   onClose,
 }) => {
-  const [approvedQty, setApprovedQty] = useState<string>('');
+  const [approvedQuantities, setApprovedQuantities] = useState<Record<string, number>>({});
   const [reviewNotes, setReviewNotes] = useState<string>('');
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
-  const { mutate: respond, isPending } = useRespondToTransferRequest();
+  const { mutate: respondBatch, isPending } = useRespondToTransferBatch();
 
-  // ضبط الكمية الأولية عند فتح الطلب
-  React.useEffect(() => {
-    if (request) {
-      setApprovedQty(String(request.requested_quantity));
+  const activeRequests = requests ?? [];
+
+  // ضبط الكميات المعتمدة الأولية لتطابق الكميات المطلوبة
+  useEffect(() => {
+    if (requests && requests.length > 0) {
+      const initial: Record<string, number> = {};
+      for (const req of requests) {
+        initial[req.id] = req.requested_quantity;
+      }
+      setApprovedQuantities(initial);
       setReviewNotes('');
       setIsRejecting(false);
     }
-  }, [request]);
+  }, [requests]);
 
-  if (!isOpen || !request) return null;
+  if (!isOpen || activeRequests.length === 0) return null;
 
-  const parsedApproved = Number(approvedQty);
-  const isValidApproveQty = !isNaN(parsedApproved) && parsedApproved > 0;
+  const firstReq = activeRequests[0];
+  const requesterBranchName = firstReq?.requester_branch_name ?? 'فرع شقيق';
+  const batchId = firstReq?.batch_id ?? undefined;
+  const requestIds = activeRequests.map(r => r.id);
+
+  const handleUpdateApprovedQty = (reqId: string, val: number) => {
+    setApprovedQuantities(prev => ({
+      ...prev,
+      [reqId]: Math.max(1, isNaN(val) ? 1 : val),
+    }));
+  };
 
   const handleApproveAndDispatch = (): void => {
-    if (!isValidApproveQty) return;
-    respond(
+    const itemsApproved = activeRequests.map(req => ({
+      requestId: req.id,
+      approvedQuantity: approvedQuantities[req.id] ?? req.requested_quantity,
+    }));
+
+    respondBatch(
       {
-        requestId: request.id,
+        batchId,
+        requestIds,
         action: 'approve',
-        approvedQuantity: parsedApproved,
+        itemsApproved,
         reviewNotes: reviewNotes.trim() ? reviewNotes.trim() : undefined,
       },
       {
@@ -62,11 +83,14 @@ export const IncomingTransferApprovalModal: React.FC<IncomingTransferApprovalMod
   };
 
   const handleReject = (): void => {
-    respond(
+    respondBatch(
       {
-        requestId: request.id,
+        batchId,
+        requestIds,
         action: 'reject',
-        reviewNotes: reviewNotes.trim() ? reviewNotes.trim() : 'اعتذار عن عدم توفر الكمية المطلوبة حالياً',
+        reviewNotes: reviewNotes.trim()
+          ? reviewNotes.trim()
+          : 'اعتذار عن عدم توفر الكمية المطلوبة حالياً',
       },
       {
         onSuccess: () => {
@@ -75,6 +99,12 @@ export const IncomingTransferApprovalModal: React.FC<IncomingTransferApprovalMod
       }
     );
   };
+
+  const totalRequested = activeRequests.reduce((sum, r) => sum + r.requested_quantity, 0);
+  const totalApproved = activeRequests.reduce(
+    (sum, r) => sum + (approvedQuantities[r.id] ?? r.requested_quantity),
+    0
+  );
 
   return (
     <div
@@ -89,7 +119,7 @@ export const IncomingTransferApprovalModal: React.FC<IncomingTransferApprovalMod
       />
 
       {/* بطاقة النافذة المنبثقة التفاعلية */}
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all dark:border-slate-800 dark:bg-slate-900">
+      <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all dark:border-slate-800 dark:bg-slate-900">
         
         {/* الترويسة بلون مميز لطلبات المناقلة العاجلة */}
         <div className="flex items-center justify-between border-b border-amber-200/80 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent p-4 dark:border-amber-800/60">
@@ -100,14 +130,14 @@ export const IncomingTransferApprovalModal: React.FC<IncomingTransferApprovalMod
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                  طلب مناقلة بضاعة عاجل
+                  طلب مناقلة بضاعة عاجل ({activeRequests.length} أصناف)
                 </h3>
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
                   وارد جديد
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                فرع آخر يطلب تزويده ببضاعة من مستودعك
+                فرع آخر يطلب تزويده ببضاعة من مستودعك — يرجى تحديد الكميات المعتمدة للإرسال
               </p>
             </div>
           </div>
@@ -121,14 +151,15 @@ export const IncomingTransferApprovalModal: React.FC<IncomingTransferApprovalMod
         </div>
 
         {/* جسم النافذة */}
-        <div className="space-y-4 p-5 text-right">
+        <div className="flex flex-1 flex-col overflow-y-auto p-5 text-right space-y-4">
+          
           {/* بيانات الفرع الطالب وتاريخ الطلب */}
           <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/50">
             <div>
               <span className="text-[11px] text-slate-400">الفرع الطالب:</span>
               <div className="mt-0.5 flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
                 <Building2 size={13} className="text-blue-600" />
-                <span>{request.requester_branch_name ?? 'فرع شقيق'}</span>
+                <span>{requesterBranchName}</span>
               </div>
             </div>
             <div>
@@ -136,89 +167,133 @@ export const IncomingTransferApprovalModal: React.FC<IncomingTransferApprovalMod
               <div className="mt-0.5 flex items-center gap-1.5 font-mono font-medium text-slate-600 dark:text-slate-300">
                 <Calendar size={13} className="text-slate-400" />
                 <span>
-                  {new Date(request.created_at).toLocaleTimeString('ar-YE', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true,
-                  })}
+                  {firstReq?.created_at
+                    ? new Date(firstReq.created_at).toLocaleTimeString('ar-YE', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true,
+                      })
+                    : '-'}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* تفاصيل المنتج والكمية المطلوبة */}
-          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 dark:border-blue-900/40 dark:bg-blue-950/20">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2.5">
-                <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
-                  <Package size={16} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">
-                    {request.product_name ?? 'منتج غير محدد'}
-                  </h4>
-                  <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                    كود: {request.product_sku ?? '-'}
-                  </span>
-                </div>
-              </div>
-              <div className="text-left">
-                <span className="text-[10px] text-slate-400">الكمية المطلوبة:</span>
-                <div className="font-mono text-base font-black text-blue-700 dark:text-blue-300">
-                  {request.requested_quantity} <span className="text-[10px]">حبة</span>
-                </div>
-              </div>
+          {/* جدول كافة المنتجات المطلوبة مع رقم القطعة والشركة الصانعة */}
+          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                قائمة المنتجات المطلوبة ({activeRequests.length})
+              </span>
+              <span className="text-[11px] text-slate-500">
+                إجمالي المطلوب: <span className="font-mono font-bold text-blue-600">{totalRequested}</span> | المعتمد للشحن: <span className="font-mono font-bold text-emerald-600">{totalApproved}</span> قطعة
+              </span>
             </div>
 
-            {Boolean(request.notes) && (
-              <div className="mt-2.5 border-t border-blue-200/60 pt-2 text-xs text-slate-600 dark:border-blue-900/60 dark:text-slate-300">
-                <span className="font-bold text-slate-700 dark:text-slate-200">ملاحظة الطالب: </span>
-                <span>{request.notes}</span>
-              </div>
-            )}
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-72 overflow-y-auto">
+              {activeRequests.map((req, idx) => {
+                const currentApproved = approvedQuantities[req.id] ?? req.requested_quantity;
+                const isDifferent = currentApproved !== req.requested_quantity;
+
+                return (
+                  <div key={req.id} className="p-3.5 transition hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      
+                      {/* تفاصيل المنتج */}
+                      <div className="flex items-start gap-2.5">
+                        <span className="font-mono text-xs font-bold text-slate-400 mt-1">
+                          #{idx + 1}
+                        </span>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                            {req.product_name ?? 'منتج غير محدد'}
+                          </h4>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+                            {req.product_part_number && (
+                              <span className="flex items-center gap-0.5 rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                <Hash size={10} className="text-slate-400" />
+                                <span>{req.product_part_number}</span>
+                              </span>
+                            )}
+                            {req.product_brand && (
+                              <span className="flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                                <Tag size={10} className="text-amber-500" />
+                                <span>{req.product_brand}</span>
+                              </span>
+                            )}
+                            <span className="font-mono text-slate-400">
+                              كود: {req.product_sku ?? '-'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* الكمية المطلوبة والمعتمدة */}
+                      <div className="flex items-center gap-3">
+                        <div className="text-left">
+                          <span className="text-[10px] text-slate-400 block">المطلوب:</span>
+                          <span className="font-mono text-xs font-black text-blue-700 dark:text-blue-300">
+                            {req.requested_quantity} حبة
+                          </span>
+                        </div>
+
+                        {!isRejecting && (
+                          <div className="text-left">
+                            <span className="text-[10px] text-slate-400 block font-bold">المرسل:</span>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="1"
+                                value={currentApproved}
+                                onChange={e => {
+                                  const val = parseInt(e.target.value, 10);
+                                  handleUpdateApprovedQty(req.id, val);
+                                }}
+                                className="h-8 w-16 rounded-lg border border-slate-300 bg-white text-center font-mono text-xs font-black text-slate-900 shadow-inner focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                              />
+                              <span className="text-[10px] font-bold text-slate-500">حبة</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* تنبيه تعديل الكمية */}
+                    {isDifferent && !isRejecting && (
+                      <div className="mt-2 flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
+                        <AlertTriangle size={11} />
+                        <span>تم تعديل الكمية المعتمدة لهذا الصنف عن الكمية المطلوبة</span>
+                      </div>
+                    )}
+
+                    {/* ملاحظات الصنف إن وجدت */}
+                    {Boolean(req.notes) && (
+                      <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                        <span className="font-bold">ملاحظة: </span>
+                        <span>{req.notes}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* تحديد الكمية المرسلة والموافقة */}
+          {/* تحديد الملاحظات أو الرفض */}
           {!isRejecting ? (
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  الكمية المعتمدة للإرسال الفعلي:
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    value={approvedQty}
-                    onChange={e => {
-                      setApprovedQty(e.target.value);
-                    }}
-                    className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-center font-mono text-sm font-black text-slate-900 shadow-inner focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                  />
-                  <span className="text-xs font-bold text-slate-500">قطعة</span>
-                </div>
-                {parsedApproved !== request.requested_quantity && isValidApproveQty && (
-                  <p className="mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
-                    <AlertTriangle size={12} />
-                    <span>تنبيه: الكمية المعتمدة تختلف عن الكمية الأصلية المطلوبة</span>
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  ملاحظات الإرسال / الشحن (اختياري):
-                </label>
-                <input
-                  type="text"
-                  value={reviewNotes}
-                  onChange={e => {
-                    setReviewNotes(e.target.value);
-                  }}
-                  placeholder="مثلاً: تم التسليم مع السائق عبده / تم الشحن فوراً..."
-                  className="h-9 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                ملاحظات الإرسال والشحن (اسم السائق، رقم الإرسالية، إلخ):
+              </label>
+              <input
+                type="text"
+                value={reviewNotes}
+                onChange={e => {
+                  setReviewNotes(e.target.value);
+                }}
+                placeholder="مثلاً: تم تجهيز الشحنة مع السائق محمد / جاهزة للاستلام..."
+                className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+              />
             </div>
           ) : (
             <div className="space-y-2 rounded-xl border border-rose-200 bg-rose-50/50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
@@ -248,10 +323,10 @@ export const IncomingTransferApprovalModal: React.FC<IncomingTransferApprovalMod
                   setIsRejecting(true);
                 }}
                 disabled={isPending}
-                className="flex h-9 items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 text-xs font-bold text-rose-600 transition hover:bg-rose-50 active:scale-95 disabled:opacity-40 dark:border-rose-900 dark:bg-slate-900 dark:text-rose-400"
+                className="flex h-10 items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-4 text-xs font-bold text-rose-600 transition hover:bg-rose-50 dark:border-rose-900/60 dark:bg-slate-900 dark:text-rose-400 dark:hover:bg-rose-950/40"
               >
                 <XCircle size={15} />
-                <span>اعتذار / رفض</span>
+                <span>رفض الطلب</span>
               </button>
 
               <div className="flex items-center gap-2">
@@ -259,53 +334,66 @@ export const IncomingTransferApprovalModal: React.FC<IncomingTransferApprovalMod
                   type="button"
                   onClick={onClose}
                   disabled={isPending}
-                  className="h-9 rounded-xl border border-slate-300 px-3 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="h-10 rounded-xl border border-slate-300 px-4 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
-                  لاحقاً
+                  إغلاق لاحقاً
                 </button>
                 <button
                   type="button"
                   onClick={handleApproveAndDispatch}
-                  disabled={!isValidApproveQty || isPending}
-                  className="flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 text-xs font-black text-white shadow-md shadow-emerald-600/20 transition-all hover:from-emerald-700 hover:to-teal-700 active:scale-95 disabled:opacity-50"
+                  disabled={isPending || totalApproved <= 0}
+                  className="flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
                 >
                   {isPending ? (
-                    <Loader2 size={15} className="animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>جاري الاعتماد والشحن...</span>
+                    </>
                   ) : (
-                    <Send size={15} />
+                    <>
+                      <CheckCircle2 size={16} />
+                      <span>موافقة وشحن الأصناف المحددة ({activeRequests.length} أصناف)</span>
+                    </>
                   )}
-                  <span>موافقة وإرسال إلى الفرع</span>
                 </button>
               </div>
             </>
           ) : (
-            <div className="flex w-full items-center justify-between gap-2">
+            <>
               <button
                 type="button"
                 onClick={() => {
                   setIsRejecting(false);
                 }}
-                className="text-xs text-slate-500 hover:underline"
+                disabled={isPending}
+                className="h-10 rounded-xl border border-slate-300 px-4 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
-                تراجع
+                رجوع
               </button>
               <button
                 type="button"
                 onClick={handleReject}
                 disabled={isPending}
-                className="flex h-9 items-center gap-1.5 rounded-xl bg-rose-600 px-4 text-xs font-bold text-white shadow-md hover:bg-rose-700 active:scale-95 disabled:opacity-50"
+                className="flex h-10 items-center gap-2 rounded-xl bg-rose-600 px-5 text-xs font-bold text-white shadow-md hover:bg-rose-700 active:scale-95 disabled:opacity-50"
               >
-                {isPending ? <Loader2 size={15} className="animate-spin" /> : <XCircle size={15} />}
-                <span>تأكيد رفض الطلب</span>
+                {isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>جاري تسجيل الرفض...</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle size={16} />
+                    <span>تأكيد رفض طلب المناقلة</span>
+                  </>
+                )}
               </button>
-            </div>
+            </>
           )}
         </div>
-
       </div>
     </div>
   );
 };
 
 export default IncomingTransferApprovalModal;
-

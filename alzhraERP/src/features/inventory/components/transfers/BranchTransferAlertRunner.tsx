@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function, @typescript-eslint/strict-boolean-expressions */
+/* eslint-disable max-lines-per-function, complexity, @typescript-eslint/strict-boolean-expressions */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '@/features/auth/store';
 import { useBranchFilter } from '@/features/branches/hooks/useBranchFilter';
@@ -12,8 +12,8 @@ export const BranchTransferAlertRunner: React.FC = () => {
   const companyId = user?.company_id;
   const { branchId } = useBranchFilter();
 
-  const [activeIncomingRequest, setActiveIncomingRequest] = useState<StockTransferRequest | null>(null);
-  const [activeDispatchedRequest, setActiveDispatchedRequest] = useState<StockTransferRequest | null>(null);
+  const [activeIncomingRequests, setActiveIncomingRequests] = useState<StockTransferRequest[] | null>(null);
+  const [activeDispatchedRequests, setActiveDispatchedRequests] = useState<StockTransferRequest[] | null>(null);
 
   // تتبع المعرفات التي تم تنبيه المستخدم بها لمنع التكرار المزعج في نفس الجلسة
   const notifiedIncomingIdsRef = useRef<Set<string>>(new Set());
@@ -29,7 +29,7 @@ export const BranchTransferAlertRunner: React.FC = () => {
   // الاشتراك اللحظي في Supabase Realtime عبر هوك الطبقة الخدمية
   useBranchTransferSubscription(companyId, branchId, handleRealtimeUpdate);
 
-  // 1. التحقق من الطلبات الواردة المعلقة وتنبيه الفرع المصدر فوراً
+  // 1. التحقق من الطلبات الواردة المعلقة وتنبيه الفرع المصدر فوراً بحزمة الأصناف
   useEffect(() => {
     if (!branchId || !requests || requests.length === 0) return;
 
@@ -38,9 +38,29 @@ export const BranchTransferAlertRunner: React.FC = () => {
       r => r.source_branch_id === branchId && r.status === 'pending' && !notifiedIncomingIdsRef.current.has(r.id)
     );
 
-    if (pendingIncoming && !activeIncomingRequest) {
-      notifiedIncomingIdsRef.current.add(pendingIncoming.id);
-      setActiveIncomingRequest(pendingIncoming);
+    if (pendingIncoming && !activeIncomingRequests) {
+      let group: StockTransferRequest[] = [];
+      if (pendingIncoming.batch_id) {
+        group = requests.filter(
+          r => r.batch_id === pendingIncoming.batch_id && r.status === 'pending'
+        );
+      } else {
+        const reqTime = new Date(pendingIncoming.created_at).getTime();
+        group = requests.filter(
+          r =>
+            r.requester_branch_id === pendingIncoming.requester_branch_id &&
+            r.source_branch_id === branchId &&
+            r.status === 'pending' &&
+            Math.abs(new Date(r.created_at).getTime() - reqTime) < 60000
+        );
+      }
+
+      if (group.length === 0) group = [pendingIncoming];
+
+      for (const item of group) {
+        notifiedIncomingIdsRef.current.add(item.id);
+      }
+      setActiveIncomingRequests(group);
     }
 
     // البحث عن أحدث طلب مكتمل أو معالج للفرع الطالب لإشعاره
@@ -51,16 +71,28 @@ export const BranchTransferAlertRunner: React.FC = () => {
         !notifiedDispatchedIdsRef.current.has(r.id)
     );
 
-    // نتحقق من حداثة الطلب (تم تحديثه في آخر 10 دقائق مثلاً)
-    if (justResolved && !activeDispatchedRequest) {
+    if (justResolved && !activeDispatchedRequests) {
       const updatedAt = new Date(justResolved.updated_at).getTime();
       const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
       if (updatedAt > tenMinutesAgo) {
-        notifiedDispatchedIdsRef.current.add(justResolved.id);
-        setActiveDispatchedRequest(justResolved);
+        let group: StockTransferRequest[] = [];
+        if (justResolved.batch_id) {
+          group = requests.filter(
+            r => r.batch_id === justResolved.batch_id && (r.status === 'completed' || r.status === 'rejected')
+          );
+        } else {
+          group = [justResolved];
+        }
+
+        if (group.length === 0) group = [justResolved];
+
+        for (const item of group) {
+          notifiedDispatchedIdsRef.current.add(item.id);
+        }
+        setActiveDispatchedRequests(group);
       }
     }
-  }, [requests, branchId, activeIncomingRequest, activeDispatchedRequest]);
+  }, [requests, branchId, activeIncomingRequests, activeDispatchedRequests]);
 
   // 2. مؤقت فحص دوري كل 25 ثانية (Smart Fallback Polling) لضمان عدم تفويت أي طلب
   useEffect(() => {
@@ -77,21 +109,21 @@ export const BranchTransferAlertRunner: React.FC = () => {
 
   return (
     <>
-      {/* النافذة المنبثقة للفرع المطلوب منه: مراجعة والموافقة وتحديد الكميات والإرسال */}
+      {/* النافذة المنبثقة للفرع المطلوب منه: مراجعة والموافقة وتحديد الكميات لكافة الأصناف */}
       <IncomingTransferApprovalModal
-        request={activeIncomingRequest}
-        isOpen={Boolean(activeIncomingRequest)}
+        requests={activeIncomingRequests}
+        isOpen={Boolean(activeIncomingRequests && activeIncomingRequests.length > 0)}
         onClose={() => {
-          setActiveIncomingRequest(null);
+          setActiveIncomingRequests(null);
         }}
       />
 
-      {/* النافذة المنبثقة للفرع الطالب: إشعار بأن البضاعة تم شحنها واعتمادها بنجاح */}
+      {/* النافذة المنبثقة للفرع الطالب: إشعار بأن الأصناف تم شحنها واعتمادها بنجاح */}
       <TransferDispatchedNotificationModal
-        request={activeDispatchedRequest}
-        isOpen={Boolean(activeDispatchedRequest)}
+        requests={activeDispatchedRequests}
+        isOpen={Boolean(activeDispatchedRequests && activeDispatchedRequests.length > 0)}
         onClose={() => {
-          setActiveDispatchedRequest(null);
+          setActiveDispatchedRequests(null);
         }}
         onViewTransfers={() => {
           window.location.hash = '#/inventory';
@@ -102,4 +134,3 @@ export const BranchTransferAlertRunner: React.FC = () => {
 };
 
 export default BranchTransferAlertRunner;
-

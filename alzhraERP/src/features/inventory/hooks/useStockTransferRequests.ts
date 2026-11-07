@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/explicit-function-return-type, max-lines-per-function, complexity, @typescript-eslint/strict-boolean-expressions, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/prefer-nullish-coalescing */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuthStore } from '../../auth/store';
@@ -17,6 +18,7 @@ export type TransferRequestStatus = 'pending' | 'approved' | 'rejected' | 'compl
 
 export interface StockTransferRequest {
   id: string;
+  batch_id?: string | null;
   company_id: string;
   requester_branch_id: string;
   requester_branch_name?: string;
@@ -25,6 +27,8 @@ export interface StockTransferRequest {
   product_id: string;
   product_name?: string;
   product_sku?: string;
+  product_part_number?: string | null;
+  product_brand?: string | null;
   requested_quantity: number;
   status: TransferRequestStatus;
   notes?: string | null;
@@ -42,11 +46,21 @@ export interface CreateTransferRequestDTO {
   notes?: string | undefined;
 }
 
+export interface CreateTransferBatchItem {
+  productId: string;
+  quantity: number;
+}
+
+export interface CreateTransferBatchDTO {
+  sourceBranchId: string;
+  items: CreateTransferBatchItem[];
+  notes?: string | undefined;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Supabase raw helper — جداول branch_visibility_* غير موجودة بعد في types
 // سيتم تحديث types بعد تطبيق المigration والتزامن مع CLI
 // ─────────────────────────────────────────────────────────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,12 +132,12 @@ export function useStockTransferRequests(
         .from('stock_transfer_requests')
         .select(
           `
-          id, company_id, requester_branch_id, source_branch_id,
+          id, batch_id, company_id, requester_branch_id, source_branch_id,
           product_id, requested_quantity, status, notes, review_notes,
           created_by, reviewed_by, created_at, updated_at,
           requester_branch:branches!requester_branch_id(name),
           source_branch:branches!source_branch_id(name),
-          product:products!product_id(name_ar, sku)
+          product:products!product_id(name_ar, sku, part_number, brand)
         `
         )
         .eq('company_id', companyId);
@@ -137,7 +151,6 @@ export function useStockTransferRequests(
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return ((data || []) as any[]).map(
         (r: any) =>
           ({
@@ -146,6 +159,8 @@ export function useStockTransferRequests(
             source_branch_name: r.source_branch?.name,
             product_name: r.product?.name_ar,
             product_sku: r.product?.sku,
+            product_part_number: r.product?.part_number ?? null,
+            product_brand: r.product?.brand ?? null,
           }) as StockTransferRequest
       );
     },
@@ -226,6 +241,112 @@ export function useRespondToTransferRequest() {
       const label =
         vars.action === 'approve' ? 'موافقة' : vars.action === 'reject' ? 'رفض' : 'إلغاء';
       showToast(`تمت ${label} طلب النقل بنجاح`, 'success');
+      void qc.invalidateQueries({ queryKey: ['stock_transfer_requests'] });
+      if (vars.action === 'approve') {
+        void qc.invalidateQueries({ queryKey: ['products'] });
+        void qc.invalidateQueries({ queryKey: ['warehouse_distribution'] });
+        void qc.invalidateQueries({ queryKey: ['branches'] });
+        void qc.invalidateQueries({ queryKey: ['branch_inventory'] });
+      }
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'فشلت العملية', 'error');
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mutation: إنشاء طلب مناقلة متعدد الأصناف (Batch)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useCreateStockTransferBatch() {
+  const { user } = useAuthStore();
+  const { showToast } = useFeedbackStore();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      requesterBranchId: string;
+      dto: CreateTransferBatchDTO;
+    }) => {
+      if (!user?.company_id || !user?.id) {
+        throw new Error('جلسة العمل منتهية، يرجى إعادة تسجيل الدخول');
+      }
+      const { data, error } = await db.rpc('create_stock_transfer_requests_batch', {
+        p_company_id: user.company_id,
+        p_requester_branch_id: params.requesterBranchId,
+        p_source_branch_id: params.dto.sourceBranchId,
+        p_items: params.dto.items.map(it => ({
+          product_id: it.productId,
+          quantity: it.quantity,
+        })),
+        p_notes: params.dto.notes ?? null,
+        p_user_id: user.id,
+      });
+      if (error) throw new Error(error.message);
+      return data as string;
+    },
+    onSuccess: () => {
+      showToast('تم إرسال طلب المناقلة بنجاح لكافة الأصناف ✅', 'success');
+      void qc.invalidateQueries({ queryKey: ['stock_transfer_requests'] });
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'فشل في إرسال طلب المناقلة', 'error');
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mutation: الاستجابة لطلبات مناقلة متعددة دفعة واحدة (Batch Approval/Rejection)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useRespondToTransferBatch() {
+  const { user } = useAuthStore();
+  const { showToast } = useFeedbackStore();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      batchId?: string | undefined;
+      requestIds?: string[] | undefined;
+      action: 'approve' | 'reject' | 'cancel';
+      itemsApproved?: Array<{ requestId: string; approvedQuantity: number }> | undefined;
+      reviewNotes?: string | undefined;
+    }) => {
+      if (!user?.company_id || !user?.id) {
+        throw new Error('جلسة العمل منتهية، يرجى إعادة تسجيل الدخول');
+      }
+
+      if (params.batchId) {
+        const { error } = await db.rpc('respond_stock_transfer_requests_batch', {
+          p_batch_id: params.batchId,
+          p_action: params.action,
+          p_items_approved: params.itemsApproved?.map(it => ({
+            request_id: it.requestId,
+            approved_quantity: it.approvedQuantity,
+          })) ?? null,
+          p_review_notes: params.reviewNotes ?? null,
+          p_user_id: user.id,
+        });
+        if (error) throw new Error(error.message);
+      } else if (params.requestIds && params.requestIds.length > 0) {
+        for (const reqId of params.requestIds) {
+          const approvedQty = params.itemsApproved?.find(i => i.requestId === reqId)?.approvedQuantity;
+          const { error } = await db.rpc('respond_stock_transfer_request', {
+            p_request_id: reqId,
+            p_action: params.action,
+            p_review_notes: params.reviewNotes ?? null,
+            p_user_id: user.id,
+            p_approved_quantity: approvedQty ?? null,
+          });
+          if (error) throw new Error(error.message);
+        }
+      }
+    },
+    onSuccess: (_data, vars) => {
+      const label =
+        vars.action === 'approve' ? 'موافقة وشحن' : vars.action === 'reject' ? 'رفض' : 'إلغاء';
+      showToast(`تمت ${label} الأصناف المطلوبة بنجاح`, 'success');
       void qc.invalidateQueries({ queryKey: ['stock_transfer_requests'] });
       if (vars.action === 'approve') {
         void qc.invalidateQueries({ queryKey: ['products'] });

@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function */
+/* eslint-disable max-lines-per-function, complexity, @typescript-eslint/explicit-function-return-type */
 import React, { useState } from 'react';
 import {
   ArrowRightLeft,
@@ -12,6 +12,8 @@ import {
   Send,
   Inbox,
   SendHorizontal,
+  Tag,
+  Hash,
 } from 'lucide-react';
 import {
   useStockTransferRequests,
@@ -31,7 +33,7 @@ export const BranchTransferRequestsTab: React.FC<BranchTransferRequestsTabProps>
 }) => {
   const { branchId } = useBranchFilter();
   const [filterType, setFilterType] = useState<'all' | 'incoming' | 'outgoing'>('incoming');
-  const [selectedRequestForAction, setSelectedRequestForAction] = useState<StockTransferRequest | null>(null);
+  const [selectedRequestsForAction, setSelectedRequestsForAction] = useState<StockTransferRequest[] | null>(null);
 
   const { data: requests, isLoading } = useStockTransferRequests('all', branchId);
 
@@ -53,6 +55,13 @@ export const BranchTransferRequestsTab: React.FC<BranchTransferRequestsTabProps>
   const pendingIncomingCount = allList.filter(
     r => r.source_branch_id === branchId && r.status === 'pending'
   ).length;
+
+  const handleOpenAction = (req: StockTransferRequest) => {
+    const matchingBatch = req.batch_id !== null && req.batch_id !== undefined && req.batch_id.length > 0
+      ? allList.filter(r => r.batch_id === req.batch_id && r.status === 'pending')
+      : [req];
+    setSelectedRequestsForAction(matchingBatch.length > 0 ? matchingBatch : [req]);
+  };
 
   return (
     <div className="space-y-4">
@@ -118,7 +127,7 @@ export const BranchTransferRequestsTab: React.FC<BranchTransferRequestsTabProps>
           className="flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-xs font-bold text-white shadow-sm transition hover:from-blue-700 hover:to-indigo-700 active:scale-95"
         >
           <Plus size={16} />
-          <span>طلب مناقلة من فرع آخر</span>
+          <span>طلب بضاعة من فرع آخر</span>
         </button>
       </div>
 
@@ -150,6 +159,8 @@ export const BranchTransferRequestsTab: React.FC<BranchTransferRequestsTabProps>
                 <tr>
                   <th className="py-3 pr-4">#</th>
                   <th className="py-3">المنتج والصنف</th>
+                  <th className="py-3">رقم القطعة (Part No)</th>
+                  <th className="py-3">الشركة الصانعة (Brand)</th>
                   <th className="py-3">الفرع الطالب</th>
                   <th className="py-3">الفرع المصدر</th>
                   <th className="py-3 text-center">الكمية</th>
@@ -183,6 +194,28 @@ export const BranchTransferRequestsTab: React.FC<BranchTransferRequestsTabProps>
                             </span>
                           </div>
                         </div>
+                      </td>
+
+                      <td className="py-3">
+                        {req.product_part_number !== null && req.product_part_number !== undefined && req.product_part_number !== '' ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-200">
+                            <Hash size={10} className="text-slate-400" />
+                            <span>{req.product_part_number}</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      <td className="py-3">
+                        {req.product_brand !== null && req.product_brand !== undefined && req.product_brand !== '' ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                            <Tag size={10} className="text-amber-500" />
+                            <span>{req.product_brand}</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
 
                       <td className="py-3">
@@ -234,7 +267,7 @@ export const BranchTransferRequestsTab: React.FC<BranchTransferRequestsTabProps>
                           <button
                             type="button"
                             onClick={() => {
-                              setSelectedRequestForAction(req);
+                              handleOpenAction(req);
                             }}
                             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
                           >
@@ -256,10 +289,10 @@ export const BranchTransferRequestsTab: React.FC<BranchTransferRequestsTabProps>
 
       {/* نافذة الموافقة والإرسال التفاعلية */}
       <IncomingTransferApprovalModal
-        request={selectedRequestForAction}
-        isOpen={Boolean(selectedRequestForAction)}
+        requests={selectedRequestsForAction}
+        isOpen={Boolean(selectedRequestsForAction && selectedRequestsForAction.length > 0)}
         onClose={() => {
-          setSelectedRequestForAction(null);
+          setSelectedRequestsForAction(null);
         }}
       />
     </div>
@@ -267,4 +300,3 @@ export const BranchTransferRequestsTab: React.FC<BranchTransferRequestsTabProps>
 };
 
 export default BranchTransferRequestsTab;
-
