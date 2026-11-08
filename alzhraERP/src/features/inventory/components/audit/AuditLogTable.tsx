@@ -9,37 +9,37 @@ interface AuditLogTableProps {
 
 const AuditLogTable: React.FC<AuditLogTableProps> = ({ log }) => {
   return (
-    <table className="w-full border-collapse select-all text-right">
-      <thead className="sticky top-0 z-10 border-b-2 border-gray-200 bg-gray-50 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+    <table className="w-full border-collapse select-all text-right border border-slate-200 dark:border-slate-800">
+      <thead className="sticky top-0 z-10 border-b border-slate-200 bg-gray-50 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <tr>
-          <th className="w-16 border border-gray-100 p-4 text-center text-[10px] font-black uppercase tracking-tighter text-gray-500 dark:border-slate-700">
+          <th className="w-16 border border-slate-200 p-3 text-center text-[10px] font-black uppercase tracking-tighter text-gray-500 dark:border-slate-800">
             #
           </th>
-          <th className="border border-gray-100 p-4 text-[11px] font-bold text-gray-600 dark:border-slate-700 dark:text-gray-300">
+          <th className="border border-slate-200 p-3 text-[11px] font-bold text-gray-600 dark:border-slate-800 dark:text-gray-300">
             <div className="flex items-center gap-2">
               <Calendar size={12} className="text-blue-500" />
               التاريخ والوقت
             </div>
           </th>
-          <th className="border border-gray-100 p-4 text-[11px] font-bold text-gray-600 dark:border-slate-700 dark:text-gray-300">
+          <th className="border border-slate-200 p-3 text-[11px] font-bold text-gray-600 dark:border-slate-800 dark:text-gray-300">
             <div className="flex items-center gap-2">
               <Clock size={12} className="text-blue-500" />
               نوع العملية / المرجع
             </div>
           </th>
-          <th className="border border-gray-100 p-4 text-[11px] font-bold text-gray-600 dark:border-slate-700 dark:text-gray-300">
+          <th className="border border-slate-200 p-3 text-[11px] font-bold text-gray-600 dark:border-slate-800 dark:text-gray-300">
             الجهة / المورد / العميل
           </th>
-          <th className="w-24 border border-gray-100 p-4 text-center text-[11px] font-bold text-gray-600 dark:border-slate-700 dark:text-gray-300">
+          <th className="w-24 border border-slate-200 p-3 text-center text-[11px] font-bold text-gray-600 dark:border-slate-800 dark:text-gray-300">
             الحالة
           </th>
-          <th className="w-32 border border-gray-100 p-4 text-left text-[11px] font-bold text-gray-600 dark:border-slate-700 dark:text-gray-300">
+          <th className="w-32 border border-slate-200 p-3 text-left text-[11px] font-bold text-gray-600 dark:border-slate-800 dark:text-gray-300">
             الكمية
           </th>
-          <th className="w-32 border border-gray-100 p-4 text-left text-[11px] font-bold text-gray-600 dark:border-slate-700 dark:text-gray-300">
+          <th className="w-32 border border-slate-200 p-3 text-left text-[11px] font-bold text-gray-600 dark:border-slate-800 dark:text-gray-300">
             الرصيد بعدها
           </th>
-          <th className="w-40 border border-gray-100 p-4 text-[11px] font-bold text-gray-600 dark:border-slate-700 dark:text-gray-300">
+          <th className="w-40 border border-slate-200 p-3 text-[11px] font-bold text-gray-600 dark:border-slate-800 dark:text-gray-300">
             <div className="flex items-center gap-2">
               <User size={12} className="text-blue-500" />
               المستخدم
@@ -47,7 +47,7 @@ const AuditLogTable: React.FC<AuditLogTableProps> = ({ log }) => {
           </th>
         </tr>
       </thead>
-      <tbody className="divide-y dark:divide-slate-800">
+      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
         {log.map((entry: any, i: number) => {
           const isIncoming = entry.transaction_type === 'in';
           return (
@@ -55,10 +55,10 @@ const AuditLogTable: React.FC<AuditLogTableProps> = ({ log }) => {
               key={i}
               className="group transition-colors odd:bg-white even:bg-gray-50/30 hover:bg-blue-500/5 dark:odd:bg-slate-900 dark:even:bg-slate-800/20 dark:hover:bg-blue-500/10"
             >
-              <td className="border border-gray-50 p-4 text-center font-mono text-xs font-bold text-gray-400 group-hover:text-blue-500 dark:border-slate-800/60">
+              <td className="border border-slate-200/80 p-3 text-center font-mono text-xs font-bold text-gray-400 group-hover:text-blue-500 dark:border-slate-800/80">
                 {log.length - i}
               </td>
-              <td className="whitespace-nowrap border border-gray-50 p-4 text-[11px] text-gray-600 dark:border-slate-800/60 dark:text-gray-400">
+              <td className="whitespace-nowrap border border-slate-200/80 p-3 text-[11px] text-gray-600 dark:border-slate-800/80 dark:text-gray-400">
                 {new Date(entry.date).toLocaleString('en-GB', {
                   year: 'numeric',
                   month: '2-digit',
@@ -68,7 +68,7 @@ const AuditLogTable: React.FC<AuditLogTableProps> = ({ log }) => {
                   hour12: true,
                 })}
               </td>
-              <td className="border border-gray-50 p-4 dark:border-slate-800/60">
+              <td className="border border-slate-200/80 p-3 dark:border-slate-800/80">
                 <div className="mb-1 font-black text-blue-700 dark:text-blue-400">
                   {entry.document_number}
                 </div>
@@ -82,10 +82,10 @@ const AuditLogTable: React.FC<AuditLogTableProps> = ({ log }) => {
                         : 'مستند يدوي'}
                 </div>
               </td>
-              <td className="border border-gray-50 p-4 text-[11px] font-black text-gray-700 dark:border-slate-800/60 dark:text-slate-200">
+              <td className="border border-slate-200/80 p-3 text-[11px] font-black text-gray-700 dark:border-slate-800/80 dark:text-slate-200">
                 {entry.source_name || '--'}
               </td>
-              <td className="border border-gray-50 p-4 text-center dark:border-slate-800/60">
+              <td className="border border-slate-200/80 p-3 text-center dark:border-slate-800/80">
                 <div
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1 text-[10px] font-black uppercase tracking-tighter',
@@ -105,7 +105,7 @@ const AuditLogTable: React.FC<AuditLogTableProps> = ({ log }) => {
               <td
                 dir="ltr"
                 className={cn(
-                  'border border-gray-50 p-4 text-left font-mono text-sm font-black dark:border-slate-800/60',
+                  'border border-slate-200/80 p-3 text-left font-mono text-sm font-black dark:border-slate-800/80',
                   isIncoming ? 'text-emerald-600' : 'text-rose-600'
                 )}
               >
@@ -114,11 +114,11 @@ const AuditLogTable: React.FC<AuditLogTableProps> = ({ log }) => {
               </td>
               <td
                 dir="ltr"
-                className="border border-gray-50 bg-blue-500/5 p-4 text-left font-mono text-sm font-black text-gray-900 dark:border-slate-800/60 dark:bg-blue-500/10 dark:text-white"
+                className="border border-slate-200/80 bg-blue-500/5 p-3 text-left font-mono text-sm font-black text-gray-900 dark:border-slate-800/80 dark:bg-blue-500/10 dark:text-white"
               >
                 {formatNumberDisplay(entry.balance_after)}
               </td>
-              <td className="border border-gray-50 p-4 dark:border-slate-800/60">
+              <td className="border border-slate-200/80 p-3 dark:border-slate-800/80">
                 <div className="flex items-center gap-3">
                   <Avatar name={entry.source_user || entry.created_by_name || 'System'} size="xs" />
                   <div className="flex flex-col">

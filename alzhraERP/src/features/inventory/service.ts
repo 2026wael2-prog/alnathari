@@ -14,7 +14,13 @@
  * @see ./services/ for individual service modules
  */
 
-import type { Product, ProductFormData, CreateTransferDTO } from './types';
+import type {
+  Product,
+  ProductFormData,
+  CreateTransferDTO,
+  InventoryMovementFeedItem,
+  InventoryMovementsFilterParams,
+} from './types';
 import { supabase } from '@/lib/supabaseClient';
 import { parseError } from '@/core/utils/errorUtils';
 import type { Json } from '@/core/database.types';
@@ -87,6 +93,14 @@ export const inventoryService = {
 
   getItemMovement: async (productId: string, companyId: string, branchId?: string | null) => {
     return productService.getItemMovement(productId, companyId, branchId);
+  },
+
+  getMovementsFeed: async (
+    companyId: string,
+    params: InventoryMovementsFilterParams = {},
+    branchId?: string | null
+  ): Promise<InventoryMovementFeedItem[]> => {
+    return productService.getMovementsFeed(companyId, params, branchId);
   },
 
   // ==========================================

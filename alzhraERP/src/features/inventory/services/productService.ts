@@ -1,5 +1,10 @@
 import { mapRawProducts } from './productMappers';
-import type { Product, ProductFormData } from '../types';
+import type {
+  InventoryMovementFeedItem,
+  InventoryMovementsFilterParams,
+  Product,
+  ProductFormData,
+} from '../types';
 import { inventoryApi, productsApi } from '../api';
 import { supabase } from '../../../lib/supabaseClient';
 import type { InsertDto } from '../../../core/database.helpers';
@@ -571,6 +576,31 @@ export const productService = {
     }
 
     return rows;
+  },
+
+  /**
+   * Get global inventory movements feed combining invoices, adjustments, audits and transfers
+   */
+  getMovementsFeed: async (
+    companyId: string,
+    params: InventoryMovementsFilterParams = {},
+    branchId?: string | null
+  ): Promise<InventoryMovementFeedItem[]> => {
+    const { data, error } = await (supabase.rpc as any)('get_inventory_movements_feed', {
+      p_company_id: companyId,
+      p_branch_id: branchId ?? null,
+      p_limit: params.limit ?? 150,
+      p_offset: params.offset ?? 0,
+      p_search: params.search ?? null,
+      p_movement_type: params.movementType ?? 'all',
+      p_doc_type: params.docType ?? 'all',
+      p_product_id: params.productId ?? null,
+      p_start_date: params.startDate ?? null,
+      p_end_date: params.endDate ?? null,
+    });
+
+    if (error) throw parseError(error);
+    return (data || []) as InventoryMovementFeedItem[];
   },
 
   /**

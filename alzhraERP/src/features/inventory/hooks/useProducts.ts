@@ -3,7 +3,13 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { inventoryService } from '../service';
 import { useAuthStore } from '../../auth/store';
 import { useFeedbackStore } from '../../feedback/store';
-import type { ProductFormData, Product, ItemMovementRow } from '../types';
+import type {
+  ProductFormData,
+  Product,
+  ItemMovementRow,
+  InventoryMovementFeedItem,
+  InventoryMovementsFilterParams,
+} from '../types';
 import { useMemo } from 'react';
 import { syncStore } from '../../../core/lib/sync-store';
 import { invalidateByPreset } from '../../../lib/invalidation';
@@ -185,6 +191,24 @@ export const useItemMovement = (productId: string | null): UseQueryResult<ItemMo
         : Promise.resolve([]),
     enabled: productId !== null && productId !== '' && companyId !== undefined && companyId !== '',
     staleTime: 60 * 1000,
+  });
+};
+
+export const useInventoryMovementsFeed = (
+  params: InventoryMovementsFilterParams = {}
+): UseQueryResult<InventoryMovementFeedItem[]> => {
+  const { user } = useAuthStore();
+  const companyId = user?.company_id;
+  const { branchId } = useBranchFilter();
+
+  return useQuery({
+    queryKey: ['inventory_movements_feed', companyId, branchId, params],
+    queryFn: () =>
+      companyId !== undefined && companyId !== ''
+        ? inventoryService.getMovementsFeed(companyId, params, branchId)
+        : Promise.resolve([]),
+    enabled: companyId !== undefined && companyId !== '',
+    staleTime: 30 * 1000,
   });
 };
 

@@ -163,6 +163,38 @@ export interface ItemMovementRow {
   balance_after: number | null;
 }
 
+export interface InventoryMovementFeedItem {
+  id: string;
+  date: string;
+  doc_type: string;
+  doc_number: string;
+  reference_id: string;
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  product_part_number: string | null;
+  product_brand: string | null;
+  party_name: string;
+  movement_type: 'in' | 'out' | 'transfer';
+  quantity: number;
+  unit_cost: number;
+  unit_price: number;
+  user_name: string;
+  notes: string | null;
+  current_stock: number;
+}
+
+export interface InventoryMovementsFilterParams {
+  search?: string | undefined;
+  movementType?: ('all' | 'in' | 'out') | undefined;
+  docType?: string | undefined;
+  productId?: string | null | undefined;
+  startDate?: string | null | undefined;
+  endDate?: string | null | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
+}
+
 export interface ProductFormData {
   name: string;
   name_ar?: string | undefined;
