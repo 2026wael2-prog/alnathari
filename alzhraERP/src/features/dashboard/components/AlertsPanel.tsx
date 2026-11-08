@@ -97,12 +97,12 @@ const AlertsPanel: React.FC<AlertsPanelProps> = React.memo(({
 
     return (
         <div className={cn(
-            "bg-[var(--app-surface)] border border-[var(--app-border)] rounded-2xl max-md:rounded-xl overflow-hidden",
+            "bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl overflow-hidden",
             className
         )}>
             {/* Header */}
             <div
-                className="flex items-center justify-between p-4 max-md:p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                className="flex items-center justify-between p-4 cursor-pointer hover:bg-[var(--app-surface-hover)] transition-colors"
                 onClick={() => { setIsExpanded(!isExpanded); }}
             >
                 <div className="flex items-center gap-2">

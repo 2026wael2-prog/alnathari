@@ -75,43 +75,22 @@ const CategoriesChart: React.FC<CategoriesChartProps> = ({ data }) => {
   return (
     <div
       ref={containerRef}
-      className="group relative h-[300px] min-h-[300px] w-full overflow-hidden"
+      className="relative h-[300px] min-h-[300px] w-full overflow-hidden"
     >
-      <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-white/5 to-transparent dark:from-slate-800/20 max-md:rounded-xl" />
       {isMounted ? (
         <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={200}>
           <PieChart>
-            <defs>
-              {COLORS.map((color, index) => (
-                <linearGradient
-                  key={`gradient-${index}`}
-                  id={`pieGradient-${index}`}
-                  x1="0"
-                  y1="0"
-                  x2="1"
-                  y2="1"
-                >
-                  <stop offset="0%" stopColor={color} stopOpacity={1} />
-                  <stop offset="100%" stopColor={color} stopOpacity={0.6} />
-                </linearGradient>
-              ))}
-              <filter id="shadowPie" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="4" stdDeviation="6" floodOpacity={isDark ? 0.4 : 0.15} />
-              </filter>
-            </defs>
             <Tooltip
               contentStyle={{
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(12px)',
-                border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.05)',
-                borderRadius: '16px',
-                color: isDark ? '#f8fafc' : '#0f172a',
-                boxShadow:
-                  '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                border: '1px solid var(--app-border)',
+                borderRadius: '8px',
+                color: 'var(--app-text)',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                 fontWeight: 'bold',
-                padding: '12px 16px',
+                padding: '8px 12px',
               }}
-              itemStyle={{ color: isDark ? '#cbd5e1' : '#475569', fontWeight: 'bold' }}
+              itemStyle={{ color: 'var(--app-text-secondary)', fontWeight: 'bold' }}
               formatter={(value: any) => [
                 new Intl.NumberFormat('en-US').format(value || 0),
                 'القيمة',
@@ -124,17 +103,16 @@ const CategoriesChart: React.FC<CategoriesChartProps> = ({ data }) => {
               cy="50%"
               innerRadius={65}
               outerRadius={95}
-              paddingAngle={6}
+              paddingAngle={4}
               dataKey="value"
               onMouseEnter={onPieEnter}
               stroke="none"
-              filter="url(#shadowPie)"
             >
               {data.map((_entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={`url(#pieGradient-${index % COLORS.length})`}
-                  className="cursor-pointer outline-none transition-all duration-300 hover:opacity-90"
+                  fill={COLORS[index % COLORS.length]}
+                  className="cursor-pointer outline-none transition-opacity hover:opacity-80"
                 />
               ))}
             </Pie>

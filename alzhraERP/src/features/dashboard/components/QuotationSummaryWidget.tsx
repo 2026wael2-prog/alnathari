@@ -54,8 +54,6 @@ const QuotationSummaryWidget: React.FC = () => {
     };
   }, [purchaseQuots]);
 
-  // آخر تحديث يُشتق من بيانات العروض الفعلية (updated_at/created_at) بدلاً من
-  // وقت المتصفح الذي كان يظهر وقتاً مضللاً في كل تحميل.
   const lastUpdated = React.useMemo(() => {
     const timestamps = [
       ...((salesQuots?.data as unknown as Array<Record<string, unknown>>) || []),
@@ -76,30 +74,31 @@ const QuotationSummaryWidget: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="animate-pulse rounded-3xl border border-gray-100 bg-[var(--app-surface)] p-6 shadow-sm dark:border-slate-800 max-md:rounded-xl max-md:p-3">
-        <div className="mb-4 h-6 w-32 rounded bg-gray-100 dark:bg-slate-800 max-md:mb-3"></div>
-        <div className="grid grid-cols-2 gap-4 max-md:gap-3">
-          <div className="h-20 rounded-2xl bg-gray-50 dark:bg-slate-800/50 max-md:rounded-xl"></div>
-          <div className="h-20 rounded-2xl bg-gray-50 dark:bg-slate-800/50 max-md:rounded-xl"></div>
+      <div className="animate-pulse rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+        <div className="mb-3 h-5 w-28 rounded bg-[var(--app-surface-hover)]"></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="h-16 rounded-lg bg-[var(--app-surface-hover)]"></div>
+          <div className="h-16 rounded-lg bg-[var(--app-surface-hover)]"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="group rounded-3xl border border-gray-100 bg-[var(--app-surface)] p-5 shadow-sm transition-all hover:shadow-md dark:border-slate-800 max-md:rounded-xl max-md:p-3">
-      <div className="mb-5 flex items-center justify-between max-md:mb-3">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
-            <FileText size={18} />
+    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 transition-colors">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg bg-[var(--app-surface-hover)] p-2 text-[var(--accent)]">
+            <FileText size={16} />
           </div>
-          <h3 className="text-sm font-bold text-gray-900 dark:text-white">عروض الأسعار</h3>
+          <h3 className="text-xs font-bold text-[var(--app-text)]">عروض الأسعار</h3>
         </div>
         <button
+          type="button"
           onClick={() => {
             navigate('/sales');
           }}
-          className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 hover:text-indigo-600"
+          className="text-[11px] font-bold text-[var(--accent)] hover:opacity-80 transition-opacity"
         >
           عرض الكل
         </button>
@@ -107,52 +106,48 @@ const QuotationSummaryWidget: React.FC = () => {
 
       <div className="grid grid-cols-2 gap-3">
         {/* Sales Quotations */}
-        <div className="space-y-3">
-          <div className="rounded-2xl border border-blue-100/50 bg-blue-50/50 p-3 dark:border-blue-800/20 dark:bg-blue-900/10 max-md:rounded-xl">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                عروض المبيعات
+        <div className="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-hover)] p-3">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[10px] font-medium text-[var(--app-text-secondary)]">
+              عروض المبيعات
+            </span>
+            <ArrowUpRight size={12} className="text-blue-500" />
+          </div>
+          <div className="flex items-end gap-2">
+            <span className="font-mono text-lg font-bold leading-none text-[var(--app-text)]">
+              {salesStats.pending + salesStats.accepted}
+            </span>
+            {salesStats.accepted > 0 && (
+              <span className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
+                <CheckCircle size={9} /> {salesStats.accepted} مقبول
               </span>
-              <ArrowUpRight size={12} className="text-blue-400" />
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-xl font-bold leading-none text-gray-900 dark:text-white">
-                {salesStats.pending + salesStats.accepted}
-              </span>
-              {salesStats.accepted > 0 && (
-                <span className="flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:bg-emerald-900/20">
-                  <CheckCircle size={8} /> {salesStats.accepted} مقبول
-                </span>
-              )}
-            </div>
+            )}
           </div>
         </div>
 
         {/* Purchase Quotations */}
-        <div className="space-y-3">
-          <div className="rounded-2xl border border-violet-100/50 bg-violet-50/50 p-3 dark:border-violet-800/20 dark:bg-violet-900/10 max-md:rounded-xl">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400">
-                عروض المشتريات
-              </span>
-              <ArrowDownLeft size={12} className="text-violet-400" />
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-xl font-bold leading-none text-gray-900 dark:text-white">
-                {purchaseStats.pending}
-              </span>
-              <span className="rounded-full bg-gray-50 px-1.5 py-0.5 text-[10px] font-bold text-gray-400 dark:bg-slate-800">
-                قيد التفاوض
-              </span>
-            </div>
+        <div className="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-hover)] p-3">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[10px] font-medium text-[var(--app-text-secondary)]">
+              عروض المشتريات
+            </span>
+            <ArrowDownLeft size={12} className="text-[var(--accent)]" />
+          </div>
+          <div className="flex items-end gap-2">
+            <span className="font-mono text-lg font-bold leading-none text-[var(--app-text)]">
+              {purchaseStats.pending}
+            </span>
+            <span className="rounded px-1.5 py-0.5 text-[10px] text-[var(--app-text-secondary)] bg-[var(--app-surface)]">
+              قيد التفاوض
+            </span>
           </div>
         </div>
       </div>
 
       {lastUpdated && (
-        <div className="mt-4 border-t border-gray-50 pt-3 dark:border-slate-800/50 max-md:mt-3">
-          <div className="flex items-center gap-2 text-[10px] text-gray-500">
-            <Clock size={10} />
+        <div className="mt-3 border-t border-[var(--app-border)] pt-2.5">
+          <div className="flex items-center gap-1.5 text-[10px] text-[var(--app-text-secondary)]">
+            <Clock size={11} />
             <span>
               آخر تحديث:{' '}
               {lastUpdated.toLocaleTimeString('ar-SA-u-nu-latn', {

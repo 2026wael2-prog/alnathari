@@ -114,15 +114,6 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="font-cairo relative flex h-full flex-col bg-[var(--app-bg)]">
-      {/* Cinematic Grain Texture - Optimized Opacity and fixed positioning */}
-      <div
-        className="pointer-events-none fixed inset-0 z-[1] opacity-5 will-change-transform"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.5'/%3E%3C/svg%3E")`,
-          backgroundRepeat: 'repeat',
-        }}
-      />
-
       <MicroHeader
         title={t('smart_performance_summary')}
         icon={Activity}
@@ -203,33 +194,32 @@ const DashboardPage: React.FC = () => {
 
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
             <Suspense fallback={<ChartSkeleton />}>
-              <div className="bg-[var(--app-surface)]/80 hover:border-[var(--accent)]/30 group relative overflow-hidden rounded-2xl border border-[var(--app-border)] p-4 backdrop-blur-xl transition-all duration-500 max-md:rounded-xl max-md:p-3">
-                <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-emerald-500/10 blur-[60px] transition-all duration-700 group-hover:bg-emerald-400/20"></div>
-                <div className="relative z-10 mb-3 flex items-center justify-between">
+              <div className="bg-[var(--app-surface)] rounded-xl border border-[var(--app-border)] p-4 transition-colors">
+                <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 p-2 text-white shadow-lg shadow-emerald-500/30">
+                    <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-600 dark:text-emerald-400">
                       <TrendingUp size={16} />
                     </div>
                     <div>
                       <h3 className="text-xs font-bold text-[var(--app-text)]">
                         {t('sales_flow_analysis')}{' '}
-                        <span className="text-[10px] text-emerald-400">(قطع الغيار)</span>
+                        <span className="text-[10px] text-emerald-500 font-normal">(قطع الغيار)</span>
                       </h3>
-                      <p className="text-[10px] font-bold text-[var(--app-text-secondary)]">
+                      <p className="text-[10px] text-[var(--app-text-secondary)]">
                         تدفق المبيعات اليومية
                       </p>
                     </div>
                   </div>
-                  <div className="rounded-lg border border-white/5 bg-black/20 px-2 py-1 text-left">
+                  <div className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface-hover)] px-2 py-0.5 text-left">
                     <span
-                      className={`font-mono text-sm font-bold tracking-tighter ${growthRate >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+                      className={`font-mono text-xs font-bold ${growthRate >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
                     >
                       {growthRate > 0 ? '+' : ''}
                       {growthRate.toFixed(1)}%
                     </span>
                   </div>
                 </div>
-                <div className="relative z-10">
+                <div>
                   <SalesFlowChart
                     data={salesData.map(d => {
                       const sales = d.value ?? d.sales ?? 0;
@@ -310,10 +300,10 @@ const DashboardPage: React.FC = () => {
 
             <Suspense
               fallback={
-                <div className="h-[300px] min-h-[300px] animate-pulse rounded-2xl bg-[var(--app-surface)] max-md:rounded-xl" />
+                <div className="h-[300px] min-h-[300px] animate-pulse rounded-xl bg-[var(--app-surface)]" />
               }
             >
-              <div className="bg-[var(--app-surface)]/80 h-[350px] rounded-2xl border border-[var(--app-border)] p-4 backdrop-blur-xl max-md:rounded-xl max-md:p-3">
+              <div className="bg-[var(--app-surface)] h-[350px] rounded-xl border border-[var(--app-border)] p-4">
                 <h3 className="mb-4 text-xs font-bold text-[var(--app-text)] max-md:mb-3">
                   التصنيفات الأكثر حركة
                 </h3>

@@ -88,18 +88,15 @@ const WarehouseTransferSuggestions: React.FC<Props> = ({ className }) => {
     <>
       <div
         className={cn(
-          'bg-[var(--app-surface)]/90 relative overflow-hidden rounded-2xl border border-[var(--app-border)] p-4 shadow-sm backdrop-blur-xl transition-all duration-300 max-md:rounded-xl max-md:p-3',
+          'bg-[var(--app-surface)] rounded-xl border border-[var(--app-border)] p-4 transition-colors',
           className
         )}
       >
-        {/* Ambient glow */}
-        <div className="pointer-events-none absolute -bottom-10 -right-10 h-44 w-44 rounded-full bg-violet-500/10 blur-[60px]" />
-
         {/* Header with Title & Action Stats */}
-        <div className="border-[var(--app-border)]/60 relative z-10 mb-3 flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+        <div className="border-[var(--app-border)] mb-3 flex flex-wrap items-center justify-between gap-2 border-b pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-2 shadow-sm shadow-violet-500/10">
-              <ArrowRightLeft size={18} className="text-violet-500 dark:text-violet-400" />
+            <div className="rounded-lg bg-[var(--app-surface-hover)] p-2 text-[var(--accent)]">
+              <ArrowRightLeft size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -328,14 +325,14 @@ const WarehouseTransferSuggestions: React.FC<Props> = ({ className }) => {
                   {/* Bottom Action Row: Reason + Action Button */}
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <p className="truncate text-[10px] text-[var(--app-text-secondary)]">
-                      💡 {s.reason}
+                      {s.reason}
                     </p>
 
                     <button
                       onClick={() => {
                         setActiveModalSuggestion(s);
                       }}
-                      className="flex shrink-0 items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-all hover:bg-violet-700 active:scale-95"
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white transition-opacity hover:opacity-90 active:scale-95"
                     >
                       <ArrowRightLeft size={12} />
                       طلب المناقلة

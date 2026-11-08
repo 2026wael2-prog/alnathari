@@ -71,7 +71,7 @@ const getIcon = (type: string) => {
 
 const RecentActivity: React.FC<Props> = ({ activities = [] }) => {
   return (
-    <div className="flex h-full flex-col justify-between rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-xs max-md:p-3">
+    <div className="flex h-full flex-col justify-between rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-xs">
       <div>
         <div className="mb-3 flex items-center justify-between border-b border-[var(--app-border)] pb-2.5">
           <h3 className="flex items-center gap-1.5 text-xs font-bold text-[var(--app-text)]">

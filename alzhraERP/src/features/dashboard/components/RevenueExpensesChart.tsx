@@ -44,29 +44,28 @@ const ChartTooltip = React.memo<ChartTooltipProps>(({ active, payload, label }) 
     return (
       <div
         className={cn(
-          'rounded-2xl border p-4 shadow-xl backdrop-blur-xl transition-all duration-200 max-md:rounded-xl max-md:p-3',
-          'bg-[var(--app-surface)]/80 border-[var(--app-border)] shadow-black/50'
+          'rounded-xl border border-[var(--app-border)] p-3 shadow-md bg-[var(--app-surface)]'
         )}
       >
-        <p className="mb-3 border-b border-[var(--app-border)] pb-2 text-xs font-bold text-[var(--app-text-secondary)]">
+        <p className="mb-2 border-b border-[var(--app-border)] pb-1.5 text-xs font-bold text-[var(--app-text-secondary)]">
           {label}
         </p>
-        <div className="space-y-3">
+        <div className="space-y-2">
           <div className="flex items-center justify-between gap-6 max-md:gap-3">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+              <div className="h-2 w-2 rounded-full bg-emerald-500" />
               <span className="text-xs font-bold text-[var(--app-text)]">الإيرادات</span>
             </div>
-            <span className="font-mono text-sm font-bold tracking-tight text-slate-700 dark:text-slate-100">
+            <span className="font-mono text-sm font-bold tracking-tight text-[var(--app-text)]">
               {formatNumber(revenue)}
             </span>
           </div>
           <div className="flex items-center justify-between gap-6 max-md:gap-3">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
+              <div className="h-2 w-2 rounded-full bg-rose-500" />
               <span className="text-xs font-bold text-[var(--app-text)]">المصروفات</span>
             </div>
-            <span className="font-mono text-sm font-bold tracking-tight text-slate-700 dark:text-slate-100">
+            <span className="font-mono text-sm font-bold tracking-tight text-[var(--app-text)]">
               {formatNumber(expenses)}
             </span>
           </div>
@@ -203,12 +202,12 @@ const RevenueExpensesChart: React.FC<RevenueExpensesChartProps> = ({ data, class
     return (
       <div
         className={cn(
-          'flex h-64 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5 max-md:rounded-xl max-md:p-3',
+          'flex h-64 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4',
           className
         )}
       >
         <div className="text-center">
-          <Scale size={32} className="mx-auto mb-2 text-[var(--app-text-secondary)]" />
+          <Scale size={32} className="mx-auto mb-2 text-[var(--app-text-secondary)] opacity-40" />
           <p className="text-sm font-bold text-[var(--app-text-secondary)]">لا توجد بيانات</p>
         </div>
       </div>
@@ -218,7 +217,7 @@ const RevenueExpensesChart: React.FC<RevenueExpensesChartProps> = ({ data, class
   return (
     <div
       className={cn(
-        'rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5 max-md:rounded-xl max-md:p-3',
+        'rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 transition-colors',
         className
       )}
     >

@@ -3,66 +3,72 @@ import { Target } from 'lucide-react';
 import { useTranslation } from '../../../lib/hooks/useTranslation';
 
 interface Targets {
-    salesProgress?: number;
-    collectionRate?: number;
+  salesProgress?: number;
+  collectionRate?: number;
 }
 
 interface Props {
-    targets?: Targets | null;
+  targets?: Targets | null;
 }
 
 const SmartTargets: React.FC<Props> = ({ targets }) => {
-    const { t } = useTranslation();
+  const { t } = useTranslation();
 
-    return (
-        <div className="bg-[var(--app-surface)] p-5 max-md:p-3 rounded-2xl max-md:rounded-xl text-[var(--app-text)] shadow-2xl relative overflow-hidden group">
-            <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-5 max-md:mb-3">
-                    <Target size={18} className="text-amber-400 animate-pulse" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider">{t('monthly_targets')}</h3>
-                </div>
-                <div className="space-y-5">
-                    <div>
-                        <div className="flex justify-between items-center mb-1.5">
-                            <span className="text-[10px] font-bold text-[var(--app-text-secondary)] uppercase">{t('sales_target')}</span>
-                            <span className="text-[10px] font-bold font-mono">{targets?.salesProgress || 0}%</span>
-                        </div>
-                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-gradient-to-l from-amber-400 to-amber-500 shadow-[0_0_10px_#fbbf24] transition-all duration-1000"
-                                style={{ width: `${targets?.salesProgress || 0}%` }}
-                            ></div>
-                        </div>
-                    </div>
-                    <div>
-                        <div className="flex justify-between items-center mb-1.5">
-                            <span className="text-[10px] font-bold text-[var(--app-text-secondary)] uppercase">{t('collection_rate')}</span>
-                            <span className="text-[10px] font-bold font-mono">{targets?.collectionRate || 0}%</span>
-                        </div>
-                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-gradient-to-l from-emerald-400 to-emerald-500 transition-all duration-1000"
-                                style={{ width: `${targets?.collectionRate || 0}%` }}
-                            ></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="mt-5 max-md:mt-3 bg-white/5 p-3 border border-[var(--app-border)] relative z-10 rounded-xl">
-                <p className="text-[10px] font-bold text-blue-400 mb-1 uppercase tracking-wider">
-                    {t('financial_intelligence_alert')}
-                </p>
-                <p className="text-[10px] font-medium text-[var(--app-text)] leading-relaxed">
-                    {(targets?.salesProgress || 0) > 80
-                        ? "أداء ممتاز! أنت قريب من تحقيق الهدف الشهري."
-                        : "معدل المبيعات الحالي يتطلب تكثيف الجهود للوصول للهدف."}
-                </p>
-            </div>
-
-            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-blue-600/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
+  return (
+    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 text-[var(--app-text)] transition-colors">
+      <div className="mb-4 flex items-center gap-2">
+        <div className="rounded-lg bg-[var(--app-surface-hover)] p-2 text-[var(--accent)]">
+          <Target size={16} />
         </div>
-    );
+        <h3 className="text-xs font-bold">{t('monthly_targets')}</h3>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[10px] font-medium text-[var(--app-text-secondary)]">
+              {t('sales_target')}
+            </span>
+            <span className="font-mono text-[10px] font-bold">{targets?.salesProgress || 0}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--app-surface-hover)]">
+            <div
+              className="h-full rounded-full bg-amber-500 transition-all duration-300"
+              style={{ width: `${Math.min(100, targets?.salesProgress || 0)}%` }}
+            ></div>
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[10px] font-medium text-[var(--app-text-secondary)]">
+              {t('collection_rate')}
+            </span>
+            <span className="font-mono text-[10px] font-bold">
+              {targets?.collectionRate || 0}%
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--app-surface-hover)]">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+              style={{ width: `${Math.min(100, targets?.collectionRate || 0)}%` }}
+            ></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-hover)] p-2.5">
+        <p className="mb-0.5 text-[10px] font-bold text-[var(--accent)]">
+          {t('financial_intelligence_alert')}
+        </p>
+        <p className="text-[11px] text-[var(--app-text)] leading-relaxed">
+          {(targets?.salesProgress || 0) > 80
+            ? 'أداء ممتاز، اقتربت المنشأة من تحقيق مستهدف المبيعات الشهري.'
+            : 'معدل المبيعات الحالي يتطلب متابعة إضافية للوصول للهدف المحدد.'}
+        </p>
+      </div>
+    </div>
+  );
 };
 
 export default SmartTargets;

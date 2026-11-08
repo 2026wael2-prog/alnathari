@@ -105,52 +105,29 @@ const PerformanceGauge: React.FC<PerformanceGaugeProps> = ({
   return (
     <div
       className={cn(
-        'bg-[var(--app-surface)]/80 group relative overflow-hidden rounded-2xl border border-[var(--app-border)] p-5 backdrop-blur-xl max-md:rounded-xl max-md:p-3',
+        'bg-[var(--app-surface)] rounded-xl border border-[var(--app-border)] p-4 transition-colors',
         className
       )}
     >
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between max-md:mb-3">
+      <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2">
-            <Target size={16} className="text-blue-400" />
+          <div className="rounded-lg bg-[var(--app-surface-hover)] p-2 text-[var(--accent)]">
+            <Target size={16} />
           </div>
-          <h3 className="text-sm font-bold text-[var(--app-text)]">{title}</h3>
+          <h3 className="text-xs font-bold text-[var(--app-text)]">{title}</h3>
         </div>
         <div className={cn('flex items-center gap-1', status.color)}>
-          <status.icon size={14} />
+          <status.icon size={13} />
           <span className="text-[10px] font-bold">{status.label}</span>
         </div>
       </div>
 
       {/* Gauge Chart */}
-      <div ref={containerRef} className="group relative h-40 min-h-[160px] overflow-hidden">
-        {/* Subtle outer glow */}
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-4 h-24 bg-[length:100%_100%] bg-no-repeat opacity-20 transition-opacity duration-700 group-hover:opacity-40"
-          style={{
-            backgroundImage: `radial-gradient(ellipse at bottom, ${color} 0%, transparent 70%)`,
-          }}
-        />
-
+      <div ref={containerRef} className="relative h-40 min-h-[160px] overflow-hidden">
         {isMounted ? (
           <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={120}>
             <PieChart>
-              <defs>
-                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow
-                    dx="0"
-                    dy="0"
-                    stdDeviation="4"
-                    floodColor={color}
-                    floodOpacity="0.4"
-                  />
-                </filter>
-                <linearGradient id="gaugeGradient" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor={color} stopOpacity={0.7} />
-                  <stop offset="100%" stopColor={color} stopOpacity={1} />
-                </linearGradient>
-              </defs>
               <Pie
                 data={data}
                 cx="50%"
@@ -162,33 +139,29 @@ const PerformanceGauge: React.FC<PerformanceGaugeProps> = ({
                 paddingAngle={2}
                 dataKey="value"
                 stroke="none"
-                cornerRadius={8}
+                cornerRadius={4}
               >
                 {data.map((_entry, index) => (
                   <Cell
                     key={`cell-${index}`}
-                    fill={index === 0 ? 'url(#gaugeGradient)' : isDark ? '#334155' : '#e2e8f0'}
-                    filter={index === 0 ? 'url(#glow)' : undefined}
+                    fill={index === 0 ? color : isDark ? '#334155' : '#e2e8f0'}
                   />
                 ))}
               </Pie>
             </PieChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-full w-full animate-pulse rounded-2xl bg-slate-50/50 dark:bg-slate-800/10 max-md:rounded-xl" />
+          <div className="h-full w-full animate-pulse rounded-xl bg-[var(--app-surface-hover)]" />
         )}
 
         {/* Center Text */}
         <div className="absolute inset-0 flex items-center justify-center pt-10">
           <div className="text-center">
-            <p
-              className="font-mono text-4xl font-bold tracking-tighter text-[var(--app-text)] max-md:text-2xl"
-              style={{ textShadow: `0 2px 10px ${color}30` }}
-            >
+            <p className="font-mono text-3xl font-bold tracking-tight text-[var(--app-text)]">
               {percentage.toFixed(0)}%
             </p>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[var(--app-text-secondary)]">
-              من الهدف
+            <p className="mt-0.5 text-[10px] font-medium text-[var(--app-text-secondary)]">
+              من المستهدف
             </p>
           </div>
         </div>

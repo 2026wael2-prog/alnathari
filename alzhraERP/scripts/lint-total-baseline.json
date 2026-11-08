@@ -1,9 +1,14 @@
 {
-  "errors": 8963,
+  "errors": 8962,
   "warnings": 201,
   "capturedAt": "2026-11-08",
   "method": "npx eslint . --report-unused-disable-directives --format json (full scan of repo)",
   "history": [
+    {
+      "date": "2026-11-08",
+      "errors": 8962,
+      "note": "dashboard & analytics enterprise UI cleanup and anti-slop refactor (-1)"
+    },
     {
       "date": "2026-11-08",
       "errors": 8963,

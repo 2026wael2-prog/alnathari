@@ -196,7 +196,7 @@ export const FastMovingPartsModal: React.FC<FastMovingPartsModalProps> = ({
           'relative flex flex-col overflow-hidden border border-slate-700/80 bg-slate-900 text-slate-100 shadow-2xl transition-all duration-200',
           isMaximized
             ? 'h-full w-full rounded-none border-none'
-            : 'max-h-[94vh] w-full max-w-7xl rounded-2xl sm:rounded-3xl'
+            : 'max-h-[94vh] w-full max-w-7xl rounded-2xl'
         )}
       >
         {/* Header */}

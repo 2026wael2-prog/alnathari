@@ -5,7 +5,7 @@ import {
   AlertTriangle,
   TrendingUp,
   AlertOctagon,
-  Sparkles,
+  Layers,
   ArrowRightLeft,
   ShoppingCart,
   Search,
@@ -170,18 +170,15 @@ const InventoryOverview: React.FC<InventoryOverviewProps> = ({
     <>
       <div
         className={cn(
-          'bg-[var(--app-surface)]/90 relative overflow-hidden rounded-2xl border border-[var(--app-border)] p-4 shadow-sm backdrop-blur-xl transition-all duration-300 max-md:rounded-xl max-md:p-3',
+          'bg-[var(--app-surface)] rounded-xl border border-[var(--app-border)] p-4 transition-colors',
           className
         )}
       >
-        {/* Ambient glow */}
-        <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-[60px]" />
-
         {/* Header */}
-        <div className="border-[var(--app-border)]/60 relative z-10 mb-3 flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+        <div className="border-[var(--app-border)] mb-3 flex flex-wrap items-center justify-between gap-2 border-b pb-3">
           <div className="flex items-center gap-2">
-            <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-2 shadow-sm shadow-cyan-500/10">
-              <Package size={18} className="text-cyan-500 dark:text-cyan-400" />
+            <div className="rounded-lg bg-[var(--app-surface-hover)] p-2 text-[var(--accent)]">
+              <Package size={18} />
             </div>
             <div>
               <h3 className="text-sm font-bold text-[var(--app-text)]">
@@ -257,7 +254,7 @@ const InventoryOverview: React.FC<InventoryOverviewProps> = ({
           >
             <div className="mb-1 flex items-center justify-between text-[10px] text-[var(--app-text-secondary)]">
               <span>أصناف رئيسية</span>
-              <Sparkles size={12} className="text-amber-500" />
+              <Layers size={12} className="text-amber-500" />
             </div>
             <p className="font-mono text-base font-bold text-amber-600 dark:text-amber-400">
               {coreStockCount}

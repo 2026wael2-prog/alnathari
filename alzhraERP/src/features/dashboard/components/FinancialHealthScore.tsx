@@ -21,7 +21,7 @@ interface FinancialHealthProps {
     className?: string;
 }
 
-const useCountUp = (end: number, duration = 1500) => {
+const useCountUp = (end: number, duration = 400) => {
     const [count, setCount] = useState(0);
     const prevEnd = useRef(0);
     useEffect(() => {
@@ -80,14 +80,14 @@ const FinancialHealthScore: React.FC<FinancialHealthProps> = ({
         healthScore = 0;
     }
 
-    const animatedScore = useCountUp(healthScore, 2000);
+    const animatedScore = useCountUp(healthScore, 400);
 
     const getScoreColor = () => {
-        if (healthScore === 0) return { main: '#94a3b8', glow: 'rgba(148, 163, 184, 0.4)', label: 'نشاط جديد' };
-        if (healthScore >= 75) return { main: '#10b981', glow: 'rgba(16, 185, 129, 0.4)', label: 'ممتاز' };
-        if (healthScore >= 50) return { main: '#3b82f6', glow: 'rgba(59, 130, 246, 0.4)', label: 'جيد' };
-        if (healthScore >= 25) return { main: '#f59e0b', glow: 'rgba(245, 158, 11, 0.4)', label: 'متوسط' };
-        return { main: '#ef4444', glow: 'rgba(239, 68, 68, 0.4)', label: 'ضعيف' };
+        if (healthScore === 0) return { main: '#94a3b8', label: 'نشاط جديد' };
+        if (healthScore >= 75) return { main: '#10b981', label: 'ممتاز' };
+        if (healthScore >= 50) return { main: '#3b82f6', label: 'جيد' };
+        if (healthScore >= 25) return { main: '#f59e0b', label: 'متوسط' };
+        return { main: '#ef4444', label: 'ضعيف' };
     };
 
     const scoreColor = getScoreColor();
@@ -96,76 +96,59 @@ const FinancialHealthScore: React.FC<FinancialHealthProps> = ({
     const strokeDashoffset = circumference - (animatedScore / 100) * circumference;
 
     const factors = [
-        { label: 'الربح', score: profitScore, max: 30, icon: TrendingUp, color: 'text-emerald-400' },
-        { label: 'التحصيل', score: collectionScore, max: 25, icon: Shield, color: 'text-blue-400' },
-        { label: 'السيولة', score: cashScore, max: 25, icon: Zap, color: 'text-violet-400' },
-        { label: 'الديون', score: debtScore, max: 20, icon: Activity, color: 'text-amber-400' },
+        { label: 'الربح', score: profitScore, max: 30, icon: TrendingUp, color: 'text-emerald-500' },
+        { label: 'التحصيل', score: collectionScore, max: 25, icon: Shield, color: 'text-blue-500' },
+        { label: 'السيولة', score: cashScore, max: 25, icon: Zap, color: 'text-violet-500' },
+        { label: 'الديون', score: debtScore, max: 20, icon: Activity, color: 'text-amber-500' },
     ];
 
     return (
         <div className={cn(
-            "relative bg-[var(--app-surface)]/90 backdrop-blur-2xl border border-[var(--app-border)] rounded-2xl max-md:rounded-xl p-4 max-md:p-3 overflow-hidden",
+            "relative bg-[var(--app-surface)] border border-[var(--app-border)] rounded-xl p-4 transition-colors",
             className
         )}>
-            <div
-                className="absolute inset-0 opacity-20 pointer-events-none"
-                style={{ background: `radial-gradient(ellipse at 30% 50%, ${scoreColor.glow} 0%, transparent 70%)` }}
-            />
-
-            <div className="relative z-10 flex items-center gap-4 max-md:gap-3">
+            <div className="flex items-center gap-4 max-md:gap-3">
                 {/* Compact SVG Gauge */}
                 <div className="relative flex-shrink-0">
                     <svg width="120" height="120" viewBox="0 0 120 120" className="transform -rotate-90 w-24 h-24 max-md:w-20 max-md:h-20">
-                        <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
-                        {Array.from({ length: 16 }).map((_, i) => {
-                            const angle = (i / 16) * 360;
-                            const rad = (angle * Math.PI) / 180;
-                            return (
-                                <line key={i}
-                                    x1={60 + (radius - 12) * Math.cos(rad)} y1={60 + (radius - 12) * Math.sin(rad)}
-                                    x2={60 + (radius - 9) * Math.cos(rad)} y2={60 + (radius - 9) * Math.sin(rad)}
-                                    stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeLinecap="round"
-                                />
-                            );
-                        })}
+                        <circle cx="60" cy="60" r={radius} fill="none" stroke="currentColor" className="text-[var(--app-border)]" strokeWidth="8" />
                         <circle cx="60" cy="60" r={radius} fill="none"
                             stroke={scoreColor.main} strokeWidth="8" strokeLinecap="round"
                             strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
                             style={{
-                                transition: 'stroke-dashoffset 2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                filter: `drop-shadow(0 0 6px ${scoreColor.glow})`
+                                transition: 'stroke-dashoffset 0.4s ease-out',
                             }}
                         />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <Heart size={12} style={{ color: scoreColor.main, filter: `drop-shadow(0 0 4px ${scoreColor.glow})` }} />
-                        <span className="text-2xl max-md:text-lg font-bold font-mono tracking-tighter text-[var(--app-text)]" style={{ textShadow: `0 0 16px ${scoreColor.glow}` }}>
+                        <Heart size={12} style={{ color: scoreColor.main }} />
+                        <span className="text-2xl max-md:text-lg font-bold font-mono tracking-tight text-[var(--app-text)]">
                             {animatedScore}
                         </span>
-                        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: scoreColor.main }}>
+                        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: scoreColor.main }}>
                             {scoreColor.label}
                         </span>
                     </div>
                 </div>
 
-                {/* Factor Breakdown — compact */}
+                {/* Factor Breakdown */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 mb-3">
-                        <Heart size={12} className="text-rose-400" />
+                        <Heart size={14} className="text-rose-500" />
                         <h3 className="text-xs font-bold text-[var(--app-text)]">صحة النشاط المالي</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
                         {factors.map((f) => (
-                            <div key={f.label} className="bg-white/5 border border-white/5 rounded-lg p-2 hover:bg-white/10 transition-all duration-300">
+                            <div key={f.label} className="bg-[var(--app-surface-hover)] border border-[var(--app-border)] rounded-lg p-2 transition-colors">
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="flex items-center gap-1">
-                                        <f.icon size={10} className={f.color} />
-                                        <span className="text-[10px] font-bold text-[var(--app-text-secondary)]">{f.label}</span>
+                                        <f.icon size={11} className={f.color} />
+                                        <span className="text-[10px] font-medium text-[var(--app-text-secondary)]">{f.label}</span>
                                     </div>
                                     <span className="text-[10px] font-bold text-[var(--app-text)] font-mono">{Math.round(f.score)}<span className="text-[var(--app-text-secondary)]">/{f.max}</span></span>
                                 </div>
-                                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                                    <div className="h-full rounded-full transition-all duration-1000"
+                                <div className="h-1 bg-[var(--app-border)] rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-300"
                                         style={{ width: `${(f.score / f.max) * 100}%`, background: scoreColor.main }}
                                     />
                                 </div>

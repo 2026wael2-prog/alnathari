@@ -141,7 +141,7 @@ const StatsGrid: React.FC<StatsGridProps> = ({
       colorClass: 'text-amber-600',
       gradientClass: 'from-amber-500 to-amber-600',
       path: ROUTES.DASHBOARD.DEBTS || ROUTES.DASHBOARD.ACCOUNTING,
-      subtitle: 'ذمم العملاء — مستحق التحصيل',
+      subtitle: 'ذمم العملاء: مستحق التحصيل',
     },
     ...(stats?.supplierDebts !== undefined && Number(stats.supplierDebts) > 0
       ? [
@@ -152,7 +152,7 @@ const StatsGrid: React.FC<StatsGridProps> = ({
             colorClass: 'text-orange-600',
             gradientClass: 'from-orange-500 to-orange-600',
             path: ROUTES.DASHBOARD.SUPPLIERS || ROUTES.DASHBOARD.ACCOUNTING,
-            subtitle: 'ذمم الموردين — مستحقة السداد',
+            subtitle: 'ذمم الموردين: مستحق السداد',
           },
         ]
       : []),
@@ -207,68 +207,46 @@ const StatsGrid: React.FC<StatsGridProps> = ({
             onClick={() => navigate(item.path)}
             className="group relative cursor-pointer"
           >
-            {/* Ambient Glow */}
             <div
               className={cn(
-                'absolute -inset-0.5 rounded-3xl opacity-0 blur-[12px] transition duration-300 group-hover:opacity-40 max-md:rounded-xl',
-                item.gradientClass.replace('to-', 'from-')
-              )}
-            ></div>
-
-            <div
-              className={cn(
-                'bg-[var(--app-surface)]/80 relative overflow-hidden rounded-3xl border border-[var(--app-border)] p-3 backdrop-blur-xl transition-all duration-300 max-md:rounded-xl max-md:p-2.5',
-                'hover:border-[var(--accent)]/30 hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(0,0,0,0.5)]'
+                'bg-[var(--app-surface)] relative rounded-xl border border-[var(--app-border)] p-3 transition-colors duration-150',
+                'hover:border-[var(--accent)]/40 hover:bg-[var(--app-surface-hover)]'
               )}
             >
-              {/* Background Pattern */}
-              <div className="pointer-events-none absolute inset-0 opacity-20 mix-blend-overlay">
-                <div
-                  className={cn(
-                    'absolute -right-10 -top-10 h-32 w-32 rounded-full blur-[40px]',
-                    item.colorClass.replace('text-', 'bg-')
-                  )}
-                ></div>
-                <div
-                  className={cn(
-                    'absolute -bottom-10 -left-10 h-24 w-24 rounded-full blur-[30px]',
-                    item.colorClass.replace('text-', 'bg-')
-                  )}
-                ></div>
-              </div>
-
-              <div className="relative z-10 flex h-full flex-col justify-between gap-4 max-md:gap-2">
+              <div className="flex h-full flex-col justify-between gap-3">
                 {/* Header */}
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col">
-                    <span className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase leading-none tracking-widest text-[var(--app-text-secondary)]">
+                    <span className="mb-1 text-[10px] font-bold uppercase leading-none tracking-wider text-[var(--app-text-secondary)]">
                       {item.title}
                     </span>
                     {item.subtitle && (
-                      <span className="text-[10px] font-bold text-[var(--app-text-secondary)]">
+                      <span className="text-[10px] text-[var(--app-text-secondary)]">
                         {item.subtitle}
                       </span>
                     )}
                   </div>
                   <div
                     className={cn(
-                      'rounded-2xl border border-white/5 p-2.5 shadow-inner backdrop-blur-md max-md:rounded-xl max-md:p-2',
-                      item.gradientClass,
-                      'bg-opacity-20'
+                      'rounded-lg p-2 transition-colors',
+                      item.colorClass.includes('emerald')
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                        : item.colorClass.includes('rose')
+                          ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                          : item.colorClass.includes('amber')
+                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            : 'bg-[var(--app-surface-hover)] text-[var(--accent)]'
                     )}
                   >
-                    <item.icon
-                      size={20}
-                      className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] max-md:h-4 max-md:w-4"
-                    />
+                    <item.icon size={18} />
                   </div>
                 </div>
 
                 {/* Value + Sparkline Row */}
-                <div className="mt-2 flex items-end justify-between">
+                <div className="mt-1 flex items-end justify-between">
                   <h3
                     className={cn(
-                      'shrink-0 whitespace-nowrap font-mono text-lg font-bold leading-none tracking-tighter drop-shadow-md md:text-xl',
+                      'shrink-0 whitespace-nowrap font-mono text-lg font-bold leading-none tracking-tight md:text-xl',
                       item.title === (t('net_loss') || 'صافي الخسارة')
                         ? 'text-rose-600 dark:text-rose-400'
                         : 'text-[var(--app-text)]'
@@ -284,14 +262,14 @@ const StatsGrid: React.FC<StatsGridProps> = ({
                 </div>
 
                 {/* Trend Badge */}
-                <div className="mt-2 flex items-center justify-between">
+                <div className="mt-1 flex items-center justify-between">
                   {trend ? (
                     <div
                       className={cn(
-                        'flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-semibold backdrop-blur-md',
+                        'flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold',
                         trend.isPositive
-                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
-                          : 'border-rose-500/20 bg-rose-500/10 text-rose-400'
+                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'
+                          : 'border-rose-500/20 bg-rose-500/10 text-rose-500'
                       )}
                     >
                       {trend.isPositive ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}

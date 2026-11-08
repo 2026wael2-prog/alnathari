@@ -1,128 +1,183 @@
-
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { formatCurrency } from '../../../core/utils';
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Package,
+  CreditCard,
+  TrendingDown,
+  AlertTriangle,
+  CheckCircle2,
+  LucideIcon,
+} from 'lucide-react';
+import { formatCurrency, cn } from '../../../core/utils';
 
 interface SmartAlert {
-    type: 'warning' | 'danger' | 'info';
-    icon: string;
-    title: string;
-    description: string;
+  type: 'warning' | 'danger' | 'info';
+  icon: LucideIcon;
+  title: string;
+  description: string;
 }
 
 interface AISmartNotificationsProps {
-    stats?: {
+  stats?:
+    | {
         sales: number;
         expenses: number;
         debts: number;
-    } | undefined;
-    lowStockProducts?: unknown[] | undefined;
-    alerts?: unknown[] | undefined;
+      }
+    | undefined;
+  lowStockProducts?: unknown[] | undefined;
+  alerts?: unknown[] | undefined;
 }
 
-const AISmartNotifications: React.FC<AISmartNotificationsProps> = ({ stats, lowStockProducts, alerts: _dashAlerts }) => {
-    const [smartAlerts, setSmartAlerts] = useState<SmartAlert[]>([]);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [dismissed, setDismissed] = useState(false);
+const AISmartNotifications: React.FC<AISmartNotificationsProps> = ({
+  stats,
+  lowStockProducts,
+}) => {
+  const [smartAlerts, setSmartAlerts] = useState<SmartAlert[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
 
-    // Auto-generate smart alerts from props data
-    useEffect(() => {
-        const localAlerts: SmartAlert[] = [];
-        const sales = stats?.sales || 0;
-        const expenses = stats?.expenses || 0;
-        const debts = stats?.debts || 0;
-        const lowStockCount = lowStockProducts?.length || 0;
+  useEffect(() => {
+    const localAlerts: SmartAlert[] = [];
+    const sales = stats?.sales || 0;
+    const expenses = stats?.expenses || 0;
+    const debts = stats?.debts || 0;
+    const lowStockCount = lowStockProducts?.length || 0;
 
-        // Low stock alert
-        if (lowStockCount > 0) {
-            localAlerts.push({
-                type: 'warning',
-                icon: '📦',
-                title: `${lowStockCount} منتج منخفض المخزون`,
-                description: 'يجب طلب بضاعة قبل النفاد — افتح المخزون للتفاصيل'
-            });
-        }
+    // Low stock alert
+    if (lowStockCount > 0) {
+      localAlerts.push({
+        type: 'warning',
+        icon: Package,
+        title: `${lowStockCount} منتج منخفض المخزون`,
+        description: 'يجب طلب بضاعة قبل النفاد، راجع تقرير المخزون للتفاصيل',
+      });
+    }
 
-        // High debt alert
-        if (debts > 50000) {
-            localAlerts.push({
-                type: 'danger',
-                icon: '💸',
-                title: `ديون عملاء: ${formatCurrency(debts)}`,
-                description: 'ديون مرتفعة — تفعيل التحصيل مطلوب'
-            });
-        }
+    // High debt alert
+    if (debts > 50000) {
+      localAlerts.push({
+        type: 'danger',
+        icon: CreditCard,
+        title: `ديون العملاء: ${formatCurrency(debts)}`,
+        description: 'ديون مرتفعة، يتطلب تفعيل خطة التحصيل ومتابعة المستحقات',
+      });
+    }
 
-        // Loss alert
-        const netProfit = sales - expenses;
-        if (sales > 0 && netProfit < 0) {
-            localAlerts.push({
-                type: 'danger',
-                icon: '📉',
-                title: `خسارة: ${formatCurrency(Math.abs(netProfit))}`,
-                description: 'النفقات تتجاوز الإيرادات — راجع المصروفات'
-            });
-        }
+    // Loss alert
+    const netProfit = sales - expenses;
+    if (sales > 0 && netProfit < 0) {
+      localAlerts.push({
+        type: 'danger',
+        icon: TrendingDown,
+        title: `خسارة تشغيلية: ${formatCurrency(Math.abs(netProfit))}`,
+        description: 'النفقات تتجاوز الإيرادات، يرجى تدقيق بنود المصروفات',
+      });
+    }
 
-        // Low margin alert
-        if (sales > 0) {
-            const margin = ((sales - expenses) / sales) * 100;
-            if (margin < 15 && margin > 0) {
-                localAlerts.push({
-                    type: 'warning',
-                    icon: '⚠️',
-                    title: `هامش ربح منخفض: ${margin.toFixed(1)}%`,
-                    description: 'الهامش أقل من 15% — راجع التسعير'
-                });
-            }
-        }
+    // Low margin alert
+    if (sales > 0) {
+      const margin = ((sales - expenses) / sales) * 100;
+      if (margin < 15 && margin > 0) {
+        localAlerts.push({
+          type: 'warning',
+          icon: AlertTriangle,
+          title: `هامش ربح منخفض: ${margin.toFixed(1)}%`,
+          description: 'الهامش أقل من 15%، يرجى مراجعة استراتيجية التسعير',
+        });
+      }
+    }
 
-        // Good performance
-        if (netProfit > 0 && localAlerts.length === 0) {
-            localAlerts.push({
-                type: 'info',
-                icon: '✅',
-                title: 'الأداء جيد',
-                description: `صافي ربح ${formatCurrency(netProfit)} — استمر بالعمل الممتاز!`
-            });
-        }
+    // Positive performance
+    if (netProfit > 0 && localAlerts.length === 0) {
+      localAlerts.push({
+        type: 'info',
+        icon: CheckCircle2,
+        title: 'مؤشرات الأداء إيجابية',
+        description: `صافي ربح محقق بقيمة ${formatCurrency(netProfit)}، استمر بنفس الأداء المالي`,
+      });
+    }
 
-        setSmartAlerts(localAlerts);
-    }, [stats, lowStockProducts]);
+    setSmartAlerts(localAlerts);
+  }, [stats, lowStockProducts]);
 
-    if (dismissed || smartAlerts.length === 0) return null;
+  if (dismissed || smartAlerts.length === 0) return null;
 
-    const current = smartAlerts[currentIndex];
-    const colorMap = {
-        warning: 'from-amber-500/10 to-orange-500/5 border-amber-200/50 dark:border-amber-800/30',
-        danger: 'from-rose-500/10 to-red-500/5 border-rose-200/50 dark:border-rose-800/30',
-        info: 'from-emerald-500/10 to-teal-500/5 border-emerald-200/50 dark:border-emerald-800/30',
-    };
+  const current = smartAlerts[currentIndex];
 
-    return (
-        <div className={`bg-gradient-to-r ${colorMap[current.type]} border rounded-2xl max-md:rounded-xl p-3 flex items-center gap-3 transition-all`}>
-            <span className="text-xl max-md:text-base flex-shrink-0">{current.icon}</span>
-            <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-[var(--app-text)] truncate">{current.title}</p>
-                <p className="text-[10px] text-[var(--app-text-secondary)] truncate">{current.description}</p>
-            </div>
-            {smartAlerts.length > 1 && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={() => { setCurrentIndex(i => i > 0 ? i - 1 : smartAlerts.length - 1); }} className="p-1 rounded-lg hover:bg-[var(--app-surface-hover)] transition-colors">
-                        <ChevronRight size={12} className="text-[var(--app-text-secondary)]" />
-                    </button>
-                    <span className="text-[10px] font-bold text-[var(--app-text-secondary)]">{currentIndex + 1}/{smartAlerts.length}</span>
-                    <button onClick={() => { setCurrentIndex(i => i < smartAlerts.length - 1 ? i + 1 : 0); }} className="p-1 rounded-lg hover:bg-[var(--app-surface-hover)] transition-colors">
-                        <ChevronLeft size={12} className="text-[var(--app-text-secondary)]" />
-                    </button>
-                </div>
-            )}
-            <button onClick={() => { setDismissed(true); }} className="p-1 text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0">
-                <X size={12} />
-            </button>
+  const typeStyles = {
+    warning: {
+      container: 'border-amber-500/20 bg-amber-500/5',
+      icon: 'text-amber-500',
+    },
+    danger: {
+      container: 'border-rose-500/20 bg-rose-500/5',
+      icon: 'text-rose-500',
+    },
+    info: {
+      container: 'border-emerald-500/20 bg-emerald-500/5',
+      icon: 'text-emerald-500',
+    },
+  };
+
+  const style = typeStyles[current.type];
+  const IconComponent = current.icon;
+
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-3 rounded-xl border p-3 transition-colors',
+        style.container
+      )}
+    >
+      <div className={cn('flex shrink-0 items-center justify-center', style.icon)}>
+        <IconComponent size={18} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-bold text-[var(--app-text)]">{current.title}</p>
+        <p className="truncate text-[11px] text-[var(--app-text-secondary)]">{current.description}</p>
+      </div>
+      {smartAlerts.length > 1 && (
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setCurrentIndex(i => (i > 0 ? i - 1 : smartAlerts.length - 1));
+            }}
+            className="rounded-md p-1 text-[var(--app-text-secondary)] transition-colors hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-text)]"
+            title="السابق"
+          >
+            <ChevronRight size={14} />
+          </button>
+          <span className="font-mono text-[10px] font-medium text-[var(--app-text-secondary)]">
+            {currentIndex + 1}/{smartAlerts.length}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setCurrentIndex(i => (i < smartAlerts.length - 1 ? i + 1 : 0));
+            }}
+            className="rounded-md p-1 text-[var(--app-text-secondary)] transition-colors hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-text)]"
+            title="التالي"
+          >
+            <ChevronLeft size={14} />
+          </button>
         </div>
-    );
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          setDismissed(true);
+        }}
+        className="shrink-0 rounded-md p-1 text-[var(--app-text-secondary)] transition-colors hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-text)]"
+        title="إغلاق التنبيه"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
 };
 
 export default AISmartNotifications;
-

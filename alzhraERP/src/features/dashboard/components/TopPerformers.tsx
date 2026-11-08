@@ -224,7 +224,7 @@ const CustomerItem = React.memo(
           </div>
         </div>
 
-        <span className="relative z-10 mr-2 shrink-0 font-mono text-sm font-black text-blue-400 drop-shadow-md sm:text-base">
+        <span className="relative z-10 mr-2 shrink-0 font-mono text-sm font-bold text-blue-500 sm:text-base">
           {formatCurrency(customer.total)}
         </span>
       </div>
@@ -277,20 +277,20 @@ export const TopPerformers: React.FC<TopPerformersProps> = React.memo(
     return (
       <div className={cn('space-y-4', className)}>
         {/* Primary Tab Navigation Bar */}
-        <div className="bg-[var(--app-surface)]/90 relative z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] p-2.5 shadow-sm backdrop-blur-xl">
+        <div className="bg-[var(--app-surface)] relative z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] p-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => {
                 setActiveMainTab('both');
               }}
               className={cn(
-                'flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all sm:text-sm',
+                'flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors',
                 activeMainTab === 'both'
-                  ? 'border border-emerald-500/40 bg-emerald-500/20 text-emerald-400 shadow-sm'
-                  : 'text-[var(--app-text-secondary)] hover:bg-white/5 hover:text-white'
+                  ? 'border border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                  : 'text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-text)]'
               )}
             >
-              <Columns size={16} className="text-emerald-400" />
+              <Columns size={15} />
               <span>عرض مزدوج</span>
             </button>
 
@@ -299,16 +299,16 @@ export const TopPerformers: React.FC<TopPerformersProps> = React.memo(
                 setActiveMainTab('parts');
               }}
               className={cn(
-                'flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all sm:text-sm',
+                'flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors',
                 activeMainTab === 'parts'
-                  ? 'border border-amber-500/40 bg-amber-500/20 text-amber-400 shadow-sm'
-                  : 'text-[var(--app-text-secondary)] hover:bg-white/5 hover:text-white'
+                  ? 'border border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                  : 'text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-text)]'
               )}
             >
-              <Box size={16} className="text-amber-400" />
+              <Box size={15} />
               <span>قطع الغيار الأكثر طلباً</span>
               {hasProducts && (
-                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 font-mono text-xs font-bold text-amber-300">
+                <span className="rounded-full bg-[var(--app-surface-hover)] px-2 py-0.5 font-mono text-xs font-bold text-[var(--app-text)]">
                   {products.length}
                 </span>
               )}
@@ -319,16 +319,16 @@ export const TopPerformers: React.FC<TopPerformersProps> = React.memo(
                 setActiveMainTab('customers');
               }}
               className={cn(
-                'flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all sm:text-sm',
+                'flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors',
                 activeMainTab === 'customers'
-                  ? 'border border-blue-500/40 bg-blue-500/20 text-blue-400 shadow-sm'
-                  : 'text-[var(--app-text-secondary)] hover:bg-white/5 hover:text-white'
+                  ? 'border border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                  : 'text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] hover:text-[var(--app-text)]'
               )}
             >
-              <Users size={16} className="text-blue-400" />
+              <Users size={15} />
               <span>كبار العملاء</span>
               {hasCustomers && (
-                <span className="rounded-full bg-blue-500/20 px-2 py-0.5 font-mono text-xs font-bold text-blue-300">
+                <span className="rounded-full bg-[var(--app-surface-hover)] px-2 py-0.5 font-mono text-xs font-bold text-[var(--app-text)]">
                   {customers.length}
                 </span>
               )}
@@ -341,10 +341,10 @@ export const TopPerformers: React.FC<TopPerformersProps> = React.memo(
               onClick={() => {
                 setIsModalOpen(true);
               }}
-              className="flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 py-2 text-xs font-bold text-amber-300 shadow-sm transition-all hover:bg-amber-500 hover:text-slate-950 sm:text-sm"
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-hover)] px-3 py-1.5 text-xs font-bold text-[var(--app-text)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
               title="عرض الكشف الشامل والتفاصيل"
             >
-              <Maximize2 size={15} />
+              <Maximize2 size={14} />
               <span>الكشف الشامل لقطع الغيار</span>
             </button>
           )}
@@ -353,29 +353,24 @@ export const TopPerformers: React.FC<TopPerformersProps> = React.memo(
         {/* Content Grid */}
         <div
           className={cn(
-            'grid gap-5',
+            'grid gap-4',
             activeMainTab === 'both' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
           )}
         >
           {/* Top Auto Parts Card */}
           {(activeMainTab === 'both' || activeMainTab === 'parts') && (
-            <div className="bg-[var(--app-surface)]/80 group relative overflow-hidden rounded-3xl border border-[var(--app-border)] p-5 backdrop-blur-xl transition-all duration-500 hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)] sm:p-6">
-              <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-amber-500/10 blur-[60px] transition-all duration-700 group-hover:bg-amber-400/20" />
-
+            <div className="bg-[var(--app-surface)] relative overflow-hidden rounded-xl border border-[var(--app-border)] p-4 transition-colors">
               {/* Card Header */}
-              <div className="relative z-10 mb-5 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-500/20 to-orange-600/20 p-2.5 shadow-inner">
-                    <Box
-                      size={20}
-                      className="text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]"
-                    />
+              <div className="relative z-10 mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="rounded-lg bg-amber-500/10 p-2 text-amber-600 dark:text-amber-400">
+                    <Box size={18} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black tracking-wide text-[var(--app-text)] sm:text-base">
+                    <h3 className="text-xs font-bold tracking-wide text-[var(--app-text)]">
                       قطع الغيار الأسرع حركة
                     </h3>
-                    <p className="text-xs font-bold text-[var(--app-text-secondary)]">
+                    <p className="text-[10px] text-[var(--app-text-secondary)]">
                       القطع الأكثر طلباً ومبيعاً ({periodLabel})
                     </p>
                   </div>
@@ -478,29 +473,24 @@ export const TopPerformers: React.FC<TopPerformersProps> = React.memo(
 
           {/* Top Customers Card */}
           {(activeMainTab === 'both' || activeMainTab === 'customers') && (
-            <div className="bg-[var(--app-surface)]/80 group relative overflow-hidden rounded-3xl border border-[var(--app-border)] p-5 backdrop-blur-xl transition-all duration-500 hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)] sm:p-6">
-              <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-blue-500/10 blur-[60px] transition-all duration-700 group-hover:bg-blue-400/20" />
-
+            <div className="bg-[var(--app-surface)] relative overflow-hidden rounded-xl border border-[var(--app-border)] p-4 transition-colors">
               {/* Card Header */}
-              <div className="relative z-10 mb-5 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/20 to-indigo-600/20 p-2.5 shadow-inner">
-                    <Wrench
-                      size={20}
-                      className="text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.8)]"
-                    />
+              <div className="relative z-10 mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="rounded-lg bg-blue-500/10 p-2 text-blue-600 dark:text-blue-400">
+                    <Wrench size={18} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black tracking-wide text-[var(--app-text)] sm:text-base">
+                    <h3 className="text-xs font-bold tracking-wide text-[var(--app-text)]">
                       أفضل العملاء والورش
                     </h3>
-                    <p className="text-xs font-bold text-[var(--app-text-secondary)]">
+                    <p className="text-[10px] text-[var(--app-text-secondary)]">
                       العملاء الأكثر شراءً وسحباً ({periodLabel})
                     </p>
                   </div>
                 </div>
 
-                <span className="rounded-lg border border-white/5 bg-black/20 px-2.5 py-1 text-xs font-bold text-blue-400">
+                <span className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface-hover)] px-2 py-0.5 text-[11px] font-bold text-blue-500">
                   عرض أعلى {Math.min(customers.length, customersLimit)} عملاء
                 </span>
               </div>
