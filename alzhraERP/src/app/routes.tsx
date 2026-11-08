@@ -68,6 +68,7 @@ const PublicSupplierPortalPage = lazy(
 );
 const ChatHubPage = lazy(() => import('../features/chat').then(m => ({ default: m.ChatHubPage })));
 const AdminHubPage = lazy(() => import('../features/admin/pages/AdminHubPage'));
+const ChatwootWidgetPage = lazy(() => import('../features/integrations/chatwoot/ChatwootWidgetPage'));
 import { SuperAdminGuard } from '../features/admin/components/SuperAdminGuard';
 import { MaintenanceGuard } from '../features/admin/components/MaintenanceGuard';
 import { FeatureFlagGate } from '../core/components/FeatureFlagGate';
@@ -137,6 +138,16 @@ export const AppRoutes: React.FC = () => {
               </FeatureBoundary>
             </FeatureFlagGate>
           </MaintenanceGuard>
+        }
+      />
+
+      {/* Chatwoot Dashboard App Sidebar Widget (Standalone without MainLayout) */}
+      <Route
+        path="/chatwoot-widget"
+        element={
+          <FeatureBoundary name="chatwoot-widget">
+            <ChatwootWidgetPage />
+          </FeatureBoundary>
         }
       />
       <Route

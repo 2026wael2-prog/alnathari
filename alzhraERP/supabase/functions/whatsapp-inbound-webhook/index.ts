@@ -214,7 +214,34 @@ async function sendWhatsAppReply(
       return res.ok;
     }
 
-    // 2. إذا كان المزود WASender أو خادم API
+    // 2. إذا كان المزود Evolution API / Evolution Go
+    if (cleanUrl.includes('evolution') || cleanUrl.includes('/message/sendText') || cleanUrl.includes(':8080')) {
+      let endpoint = cleanUrl;
+      if (!endpoint.includes('/message/sendText')) {
+        const parts = cleanUrl.split('/');
+        const lastPart = parts[parts.length - 1];
+        if (lastPart && !lastPart.includes(':') && !lastPart.startsWith('http')) {
+          const base = cleanUrl.substring(0, cleanUrl.lastIndexOf('/'));
+          endpoint = `${base}/message/sendText/${lastPart}`;
+        } else {
+          endpoint = `${cleanUrl}/message/sendText/default`;
+        }
+      }
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': apiKey,
+        },
+        body: JSON.stringify({
+          number: toPhone,
+          text,
+        }),
+      });
+      return res.ok;
+    }
+
+    // 3. إذا كان المزود WASender أو خادم API مخصص
     const endpoint = (cleanUrl.endsWith('/api/send-message') || cleanUrl.endsWith('/send-message'))
       ? cleanUrl
       : `${cleanUrl}/api/send-message`;

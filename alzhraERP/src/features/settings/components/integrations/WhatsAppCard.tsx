@@ -1,5 +1,20 @@
 import React, { useState } from 'react';
-import { CheckCircle, XCircle, Send, Loader2, Eye, EyeOff, Sparkles, Check, QrCode, Copy, Bot } from 'lucide-react';
+import {
+  CheckCircle,
+  XCircle,
+  Send,
+  Loader2,
+  Eye,
+  EyeOff,
+  Sparkles,
+  Check,
+  QrCode,
+  Copy,
+  Bot,
+  Zap,
+  MessageSquare,
+  ExternalLink,
+} from 'lucide-react';
 import Card from '@/ui/base/Card';
 import type { MessagingConfig } from '@/features/notifications/messagingApi';
 import { messagingApi } from '@/features/notifications/messagingApi';
@@ -23,16 +38,25 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
   const [showToken, setShowToken] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [copiedChatwootUrl, setCopiedChatwootUrl] = useState(false);
   const companyId = useAuthStore(s => s.user?.company_id);
   const { showToast } = useFeedbackStore();
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL || 'https://alzhra-smart.vercel.app'}/functions/v1/whatsapp-inbound-webhook`;
+  const chatwootWidgetUrl = `${window.location.origin}/#/chatwoot-widget`;
 
   const handleCopyWebhook = () => {
     void navigator.clipboard.writeText(webhookUrl);
     setCopiedWebhook(true);
     showToast('تم نسخ رابط الـ Webhook للرد الآلي بنجاح 📋', 'success');
     setTimeout(() => setCopiedWebhook(false), 2500);
+  };
+
+  const handleCopyChatwootUrl = () => {
+    void navigator.clipboard.writeText(chatwootWidgetUrl);
+    setCopiedChatwootUrl(true);
+    showToast('تم نسخ رابط ودجت شات ووت بنجاح 📋', 'success');
+    setTimeout(() => setCopiedChatwootUrl(false), 2500);
   };
 
   // فحص إذا كان المفتاح يحتوي على رقم هاتف ملتصق بالمفتاح (مثل 779816860mkojxebwykcncp10)
@@ -47,6 +71,15 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
       whatsapp_phone: config.whatsapp_phone ? config.whatsapp_phone : phonePart,
     });
     showToast('تم فصل المفتاح عن رقم الهاتف بنجاح ✅', 'success');
+  };
+
+  const handleApplyPresetEvolution = () => {
+    onUpdate({
+      whatsapp_enabled: true,
+      whatsapp_api_url: 'http://localhost:8080/message/sendText/alzhra',
+      whatsapp_api_key: '',
+    });
+    showToast('تم ضبط إعدادات خادم Evolution API الافتراضية بنجاح ⚡', 'success');
   };
 
   const handleApplyPresetUltraMsg = () => {
@@ -106,10 +139,19 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-white">WhatsApp</h3>
-              <p className="text-xs text-slate-500">إرسال الإشعارات والرد الآلي الذكي عبر واتساب (WASender & UltraMsg)</p>
+              <p className="text-xs text-slate-500">إرسال الإشعارات والرد الآلي الذكي عبر واتساب (Evolution API / WASender / UltraMsg)</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleApplyPresetEvolution}
+              className="flex items-center gap-1 rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300"
+              title="تعبئة إعدادات خادم Evolution API / Evolution Go تلقائياً"
+            >
+              <Zap size={12} />
+              <span>تعبئة Evolution API</span>
+            </button>
             <button
               type="button"
               onClick={handleApplyPresetWasender}
@@ -265,7 +307,7 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
               </button>
             </div>
 
-            {/* بطاقة رابط الـ Webhook للرد الآلي وإضافة WASender */}
+            {/* بطاقة رابط الـ Webhook للرد الآلي (Evolution API & WASender) */}
             <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-900/30 dark:bg-indigo-950/20">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2.5">
@@ -274,10 +316,10 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-slate-800 dark:text-white">
-                      رابط الـ Webhook للرد الآلي (WASender & Inbound AI)
+                      رابط الـ Webhook للرد الآلي (Evolution API & WASender & Inbound AI)
                     </h4>
                     <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-                      انسخ هذا الرابط وضعه في إعدادات Webhook داخل إضافة أو خادم WASender لتمكين المنظومة من قراءة رسائل العملاء، والرد الذكي عليها، وتوثيق وعود السداد تلقائياً.
+                      انسخ هذا الرابط وضعه في إعدادات Webhook داخل خادم Evolution API أو WASender لتمكين المنظومة من قراءة رسائل العملاء، والرد الذكي عليها، وتوثيق وعود السداد تلقائياً.
                     </p>
                   </div>
                 </div>
@@ -292,6 +334,48 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
               </div>
               <div className="mt-3 overflow-hidden rounded-xl border border-indigo-200/70 bg-white/80 px-3 py-2 font-mono text-xs text-slate-700 select-all dark:border-indigo-900/50 dark:bg-slate-900/80 dark:text-indigo-200" dir="ltr">
                 {webhookUrl}
+              </div>
+            </div>
+
+            {/* بطاقة ودجت شريط Chatwoot الجانبي (Dashboard App) */}
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900/30 dark:bg-emerald-950/20">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <div className="mt-0.5 rounded-lg bg-emerald-100 p-1.5 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                    <MessageSquare size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-white">
+                      ودجت خدمة العملاء داخل Chatwoot (Dashboard App)
+                    </h4>
+                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                      أضف هذا الرابط كتطبيق جانبي (Dashboard App) داخل منصة Chatwoot ليرى موظفو المبيعات والدعم رصيد العميل الحالي، وآخر فواتيره، ووعود سداده مباشرة أثناء المحادثة.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="#/chatwoot-widget"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    title="معاينة مظهر الودجت في تبويب مستقل"
+                  >
+                    <span>معاينة</span>
+                    <ExternalLink size={12} />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={handleCopyChatwootUrl}
+                    className="flex shrink-0 items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm transition-all hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
+                  >
+                    {copiedChatwootUrl ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                    <span>{copiedChatwootUrl ? 'تم النسخ!' : 'نسخ الرابط'}</span>
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 overflow-hidden rounded-xl border border-emerald-200/70 bg-white/80 px-3 py-2 font-mono text-xs text-slate-700 select-all dark:border-emerald-900/50 dark:bg-slate-900/80 dark:text-emerald-200" dir="ltr">
+                {chatwootWidgetUrl}
               </div>
             </div>
           </div>

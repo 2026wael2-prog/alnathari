@@ -75,8 +75,41 @@ async function sendWhatsAppText(
     try {
         const cleanPhone = phone.replace(/[^0-9]/g, '');
 
-        // 1. WASender API Support
-        if (apiUrl.includes('wasender') || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes(':3000') || apiUrl.includes(':8080')) {
+        // 1. Evolution API / Evolution Go Support
+        if (apiUrl.includes('evolution') || apiUrl.includes('/message/sendText') || apiUrl.includes(':8080')) {
+            const cleanUrl = apiUrl.replace(/\/+$/, '');
+            let endpoint = cleanUrl;
+            if (!endpoint.includes('/message/sendText')) {
+                const parts = cleanUrl.split('/');
+                const lastSegment = parts[parts.length - 1];
+                if (lastSegment && !lastSegment.includes(':') && !lastSegment.startsWith('http')) {
+                    const base = cleanUrl.substring(0, cleanUrl.lastIndexOf('/'));
+                    endpoint = `${base}/message/sendText/${lastSegment}`;
+                } else {
+                    endpoint = `${cleanUrl}/message/sendText/default`;
+                }
+            }
+
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': apiKey,
+                },
+                body: JSON.stringify({
+                    number: cleanPhone,
+                    text: message,
+                }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                return { ok: false, error: data?.message || data?.error || `Evolution API error: ${res.status}` };
+            }
+            return { ok: true };
+        }
+
+        // 2. WASender API Support
+        if (apiUrl.includes('wasender') || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes(':3000')) {
             const cleanUrl = apiUrl.replace(/\/+$/, '');
             const endpoint = cleanUrl.endsWith('/api/send-message') || cleanUrl.endsWith('/send-message')
                 ? cleanUrl
@@ -160,8 +193,43 @@ async function sendWhatsAppImage(apiUrl: string, apiKey: string, phone: string, 
         const cleanPhone = phone.replace(/[^0-9]/g, '');
         const imageUri = imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
 
-        // 1. WASender Media Support
-        if (apiUrl.includes('wasender') || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes(':3000') || apiUrl.includes(':8080')) {
+        // 1. Evolution API / Evolution Go Media Support
+        if (apiUrl.includes('evolution') || apiUrl.includes('/message/sendMedia') || apiUrl.includes(':8080')) {
+            const cleanUrl = apiUrl.replace(/\/+$/, '');
+            let endpoint = cleanUrl;
+            if (!endpoint.includes('/message/sendMedia')) {
+                const parts = cleanUrl.split('/');
+                const lastSegment = parts[parts.length - 1];
+                if (lastSegment && !lastSegment.includes(':') && !lastSegment.startsWith('http')) {
+                    const base = cleanUrl.substring(0, cleanUrl.lastIndexOf('/'));
+                    endpoint = `${base}/message/sendMedia/${lastSegment}`;
+                } else {
+                    endpoint = `${cleanUrl}/message/sendMedia/default`;
+                }
+            }
+
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': apiKey,
+                },
+                body: JSON.stringify({
+                    number: cleanPhone,
+                    media: imageUri,
+                    mediatype: 'image',
+                    caption,
+                }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                return await sendWhatsAppText(apiUrl, apiKey, phone, caption);
+            }
+            return { ok: true };
+        }
+
+        // 2. WASender Media Support
+        if (apiUrl.includes('wasender') || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes(':3000')) {
             const cleanUrl = apiUrl.replace(/\/+$/, '');
             const endpoint = cleanUrl.endsWith('/api/send-media') || cleanUrl.endsWith('/send-media')
                 ? cleanUrl
