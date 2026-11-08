@@ -21,6 +21,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { parseError } from '@/core/utils/errorUtils';
 import type { Json } from '@/core/database.types';
+import { broadcastCrossBranchActivity } from '@/features/branches/api';
 import type {
   RequisitionItem,
   RequisitionRecord,
@@ -253,6 +254,18 @@ export const requisitionsApi = {
     if (response.success !== true || !response.id || !response.pr_number) {
       throw new Error(response.error ?? 'requisition_not_found');
     }
+
+    void broadcastCrossBranchActivity(input.companyId, {
+      id: response.id,
+      company_id: input.companyId,
+      branch_id: input.branchId ?? null,
+      type: 'requisition_created',
+      title: 'طلب منتجات مطلوبة جديد',
+      message: `تم تسجيل طلب توفير قطع ومنتجات مطلوبة ${response.pr_number ? `رقم ${response.pr_number}` : ''}`,
+      document_number: response.pr_number,
+      link: '/sales',
+      created_by: input.userId,
+    });
 
     return {
       recordId: response.id,

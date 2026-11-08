@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuthStore } from '../../auth/store';
 import { useFeedbackStore } from '../../feedback/store';
+import { broadcastCrossBranchActivity } from '@/features/branches/api';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -286,9 +287,23 @@ export function useCreateStockTransferBatch() {
       if (error) throw new Error(error.message);
       return data as string;
     },
-    onSuccess: () => {
+    onSuccess: (data, vars) => {
       showToast('تم إرسال طلب المناقلة بنجاح لكافة الأصناف ✅', 'success');
       void qc.invalidateQueries({ queryKey: ['stock_transfer_requests'] });
+      if (user?.company_id) {
+        void broadcastCrossBranchActivity(user.company_id, {
+          id: data || Math.random().toString(36),
+          company_id: user.company_id,
+          branch_id: vars.requesterBranchId,
+          target_branch_id: vars.dto.sourceBranchId,
+          type: 'transfer_request',
+          title: 'طلب مناقلة مخزون وارد',
+          message: `طلب مناقلة أصناف جديد لعدد ${vars.dto.items.length} صنف/أصناف`,
+          item_count: vars.dto.items.length,
+          link: '/inventory',
+          created_by: user.id,
+        });
+      }
     },
     onError: (err: Error) => {
       showToast(err.message || 'فشل في إرسال طلب المناقلة', 'error');
@@ -353,6 +368,20 @@ export function useRespondToTransferBatch() {
         void qc.invalidateQueries({ queryKey: ['warehouse_distribution'] });
         void qc.invalidateQueries({ queryKey: ['branches'] });
         void qc.invalidateQueries({ queryKey: ['branch_inventory'] });
+      }
+
+      if (user?.company_id) {
+        const isApprove = vars.action === 'approve';
+        void broadcastCrossBranchActivity(user.company_id, {
+          id: `batch_resp_${Date.now()}`,
+          company_id: user.company_id,
+          branch_id: user.branch_id ?? null,
+          type: isApprove ? 'transfer_approved' : 'transfer_rejected',
+          title: isApprove ? 'اعتماد وشحن مناقلة' : 'رفض طلب مناقلة',
+          message: isApprove ? 'تمت الموافقة وشحن الأصناف المطلوبة بنجاح' : 'تم رفض طلب المناقلة',
+          link: '/inventory',
+          created_by: user.id,
+        });
       }
     },
     onError: (err: Error) => {

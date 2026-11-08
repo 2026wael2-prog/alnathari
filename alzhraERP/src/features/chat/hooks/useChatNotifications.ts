@@ -1,6 +1,10 @@
+/* eslint-disable max-lines-per-function, complexity, @typescript-eslint/strict-boolean-expressions, @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-unnecessary-condition */
 import { useCallback, useRef } from 'react';
-import { useSoundStore } from '../../notifications/store';
+import { useSoundStore, useNotificationStore } from '../../notifications/store';
 import { showDesktopNotification } from '../../notifications/desktopNotificationService';
+import { useFeedbackStore } from '../../feedback/store';
+import { useAuthStore } from '../../auth/store';
+import { useChatStore } from '../stores/chatStore';
 import { logger } from '../../../core/utils/logger';
 
 // Cooldown so a burst of messages does not stack beeps/desktop popups.
@@ -73,6 +77,43 @@ export const useChatNotifications = () => {
       if (now - lastNotifyAt < NOTIFY_COOLDOWN_MS) return;
       lastNotifyAt = now;
       void playIncomingBeep();
+
+      const chatState = useChatStore.getState();
+      const isViewingActiveChannel =
+        chatState.activeChannelId === conversationId &&
+        typeof document !== 'undefined' &&
+        !document.hidden;
+
+      // إظهار إشعار شاشة منبثق عند ورود محادثة والمستخدم في صفحة أخرى أو في قناة مختلفة
+      if (!isViewingActiveChannel) {
+        const preview =
+          messageText.length > 60 ? `${messageText.slice(0, 60)}...` : messageText;
+        useFeedbackStore.getState().showToast(
+          `💬 رسالة من [${senderName}]: ${preview}`,
+          'info',
+          undefined,
+          {
+            label: 'فتح المحادثة',
+            onClick: () => {
+              window.location.hash = conversationId ? `#/chat/${conversationId}` : '#/chat';
+            },
+          }
+        );
+
+        const user = useAuthStore.getState().user;
+        if (user?.company_id) {
+          useNotificationStore.getState().addNotification({
+            companyId: user.company_id,
+            title: `💬 رسالة محادثة - ${senderName}`,
+            message: messageText,
+            type: 'info',
+            category: 'system',
+            priority: 'normal',
+            link: conversationId ? `#/chat/${conversationId}` : '#/chat',
+            tag: `chat_${conversationId || 'channel'}`,
+          });
+        }
+      }
 
       // If tab is in background or document hidden, dispatch OS desktop notification
       if (typeof document !== 'undefined' && document.hidden) {

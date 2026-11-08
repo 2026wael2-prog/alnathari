@@ -5,6 +5,7 @@ import { notificationService } from '../notifications/service';
 import { toBaseCurrency } from '../../core/utils/currencyUtils';
 import { formatLocalDate } from '../../core/utils/dateUtils';
 import { logger } from '../../core/utils/logger';
+import { broadcastCrossBranchActivity } from '@/features/branches/api';
 
 // Raw shape returned by the Supabase join query in bondsApi.getBonds
 interface RawPaymentRow {
@@ -100,6 +101,23 @@ export const bondsService = {
         data.currency_code || 'SAR',
         data.description || undefined
       );
+
+      // Cross-Branch Live Broadcast
+      const bondId = typeof resultObj.id === 'string' ? resultObj.id : Math.random().toString(36);
+      const paymentNumber = typeof resultObj.payment_number === 'string' ? resultObj.payment_number : '';
+      void broadcastCrossBranchActivity(companyId, {
+        id: bondId,
+        company_id: companyId,
+        branch_id: data.branchId ?? null,
+        type: 'bond_created',
+        title: data.type === 'receipt' ? 'سند قبض جديد' : 'سند صرف جديد',
+        message: `تم إصدار ${data.type === 'receipt' ? 'سند قبض' : 'سند صرف'} ${paymentNumber ? `رقم ${paymentNumber}` : ''}`,
+        amount: data.amount || 0,
+        currency_code: data.currency_code || 'SAR',
+        document_number: paymentNumber,
+        link: '/bonds',
+        created_by: userId,
+      });
     }
 
     return result;

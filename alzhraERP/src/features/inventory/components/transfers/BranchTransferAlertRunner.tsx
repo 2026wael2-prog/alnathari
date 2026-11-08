@@ -4,6 +4,7 @@ import { useAuthStore } from '@/features/auth/store';
 import { useBranchFilter } from '@/features/branches/hooks/useBranchFilter';
 import { useStockTransferRequests, type StockTransferRequest } from '../../hooks/useStockTransferRequests';
 import { useBranchTransferSubscription } from '../../hooks/useBranchTransferSubscription';
+import { useSoundStore } from '@/features/notifications/store';
 import { IncomingTransferApprovalModal } from './IncomingTransferApprovalModal';
 import { TransferDispatchedNotificationModal } from './TransferDispatchedNotificationModal';
 
@@ -61,6 +62,7 @@ export const BranchTransferAlertRunner: React.FC = () => {
         notifiedIncomingIdsRef.current.add(item.id);
       }
       setActiveIncomingRequests(group);
+      void useSoundStore.getState().playNotificationSound('urgent', true);
     }
 
     // البحث عن أحدث طلب مكتمل أو معالج للفرع الطالب لإشعاره
@@ -90,6 +92,7 @@ export const BranchTransferAlertRunner: React.FC = () => {
           notifiedDispatchedIdsRef.current.add(item.id);
         }
         setActiveDispatchedRequests(group);
+        void useSoundStore.getState().playNotificationSound('high', true);
       }
     }
   }, [requests, branchId, activeIncomingRequests, activeDispatchedRequests]);

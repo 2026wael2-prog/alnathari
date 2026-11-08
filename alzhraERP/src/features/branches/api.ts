@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@/core/utils/logger';
 
+export * from './services/crossBranchActivityService';
+
 export interface BranchNotificationPayload {
   id?: string;
   company_id: string;
@@ -28,7 +30,7 @@ export const subscribeToBranchNotifications = (
       }
     )
     .subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') {
+      if ((status as string) === 'SUBSCRIBED') {
         logger.debug('BranchesAPI', 'Subscribed to cross-branch notifications');
       } else if (err) {
         console.error('Error subscribing to cross-branch notifications:', err);
@@ -36,6 +38,6 @@ export const subscribeToBranchNotifications = (
     });
 
   return () => {
-    supabase.removeChannel(channel);
+    void supabase.removeChannel(channel);
   };
 };

@@ -9,6 +9,7 @@ import { salesQuotationsApi } from './quotationsApi';
 import type { MatchedInvoiceItem, SearchInvoiceResultRow } from '@/core/types/invoiceSearch';
 import { optArg } from '@/core/utils/rpcArgs';
 import { resolveSaleInvoiceDueDate } from '../utils/dueDate';
+import { broadcastCrossBranchActivity } from '@/features/branches/api';
 
 // Re-export quotations API
 export { salesQuotationsApi };
@@ -230,7 +231,25 @@ export const salesApi = {
 
     const { data: result, error } = await supabase.rpc('commit_sales_invoice_v2', rpcParams);
     if (error) throw parseError(error);
-    return result as unknown as InvoiceResponse;
+
+    const invResponse = result as unknown as InvoiceResponse;
+    if (invResponse?.id) {
+      void broadcastCrossBranchActivity(companyId, {
+        id: invResponse.id,
+        company_id: companyId,
+        branch_id: payload.branchId ?? null,
+        type: 'sale_created',
+        title: 'فاتورة مبيعات جديدة',
+        message: `تم تسجيل فاتورة مبيعات ${invResponse.invoice_number ? `رقم ${invResponse.invoice_number}` : ''}`,
+        amount: invResponse.total_amount || 0,
+        currency_code: payload.currency || 'SAR',
+        document_number: invResponse.invoice_number,
+        link: '/sales',
+        created_by: userId,
+      });
+    }
+
+    return invResponse;
   },
 
   commitReturnRPC: async (

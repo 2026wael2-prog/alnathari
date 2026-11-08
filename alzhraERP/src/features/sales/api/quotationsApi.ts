@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import type { CreateQuotationDTO } from '../types/quotation';
 import { generateQuotationNumber } from '../../../lib/quotationNumbering';
 import type { Database } from '../../../core/database.types';
+import { broadcastCrossBranchActivity } from '@/features/branches/api';
 
 // DB row types
 interface QuotationRow {
@@ -192,6 +193,20 @@ export const salesQuotationsApi = {
       await supabase.from('quotations').delete().eq('id', quotation.id);
       throw itemsError;
     }
+
+    void broadcastCrossBranchActivity(companyId, {
+      id: quotation.id,
+      company_id: companyId,
+      branch_id: dto.branchId ?? null,
+      type: 'quotation_created',
+      title: 'عرض أسعار جديد',
+      message: `تم إصدار عرض أسعار جديد ${quotation.quotation_number ? `رقم ${quotation.quotation_number}` : ''}`,
+      amount: totalAmount,
+      currency_code: dto.currencyCode || 'SAR',
+      document_number: quotation.quotation_number,
+      link: '/sales',
+      created_by: userId,
+    });
 
     return quotation;
   },

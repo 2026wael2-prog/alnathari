@@ -5,6 +5,7 @@ import type { Json } from '../../core/database.types';
 import { treasuryApi } from '../accounting/api/treasuryApi';
 import type { MatchedInvoiceItem, SearchInvoiceResultRow } from '@/core/types/invoiceSearch';
 import { optArg } from '@/core/utils/rpcArgs';
+import { broadcastCrossBranchActivity } from '@/features/branches/api';
 
 type PurchaseItem = CreatePurchaseDTO['items'][number];
 interface PurchaseItemPayload {
@@ -221,6 +222,29 @@ export const purchasesApi = {
       buildPurchaseParams(companyId, userId, data)
     );
     if (error) throw asError(parseError(error));
+
+    const invId =
+      typeof result === 'string'
+        ? result
+        : typeof (result as Record<string, unknown> | null)?.id === 'string'
+          ? ((result as Record<string, unknown>).id as string)
+          : '';
+    if (invId) {
+      const totalAmount = data.items.reduce((sum, item) => sum + (item.total || 0), 0);
+      void broadcastCrossBranchActivity(companyId, {
+        id: invId,
+        company_id: companyId,
+        branch_id: data.branchId ?? null,
+        type: 'purchase_created',
+        title: 'فاتورة مشتريات جديدة',
+        message: 'تم توريد فاتورة مشتريات جديدة',
+        amount: totalAmount,
+        currency_code: data.currency ?? 'YER',
+        link: '/purchases',
+        created_by: userId,
+      });
+    }
+
     return result;
   },
 

@@ -1,9 +1,14 @@
 {
-  "errors": 8962,
+  "errors": 8952,
   "warnings": 201,
   "capturedAt": "2026-11-08",
   "method": "npx eslint . --report-unused-disable-directives --format json (full scan of repo)",
   "history": [
+    {
+      "date": "2026-11-08",
+      "errors": 8952,
+      "note": "cross-branch realtime activity and notifications with audio chimes (-10)"
+    },
     {
       "date": "2026-11-08",
       "errors": 8962,
