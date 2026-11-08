@@ -459,3 +459,4 @@ export const ChatwootWidgetPage: React.FC = () => {
 };
 
 export default ChatwootWidgetPage;
+

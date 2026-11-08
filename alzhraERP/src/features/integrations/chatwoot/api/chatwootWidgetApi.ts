@@ -1,4 +1,4 @@
-import { supabase } from '@/core/api/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import type { Database } from '@/core/database.types';
 
 export interface ChatwootPartySummary {
@@ -150,3 +150,4 @@ export const chatwootWidgetApi = {
     }
   },
 };
+
