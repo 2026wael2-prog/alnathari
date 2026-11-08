@@ -149,35 +149,35 @@ const BondsList: React.FC<Props> = ({
   if (displayMode === 'table') {
     return (
       <div className="w-full space-y-3">
-        <div className="table-scroll-viewport custom-scrollbar overflow-x-auto rounded-2xl border border-gray-100 bg-[var(--app-surface)] shadow-sm dark:border-slate-800">
-          <table className="w-full min-w-[760px] border-collapse text-right">
+        <div className="table-scroll-viewport custom-scrollbar overflow-x-auto rounded-2xl border border-slate-200 bg-[var(--app-surface)] shadow-sm dark:border-slate-800">
+          <table className="w-full min-w-[760px] border-collapse border border-slate-200 text-right dark:border-slate-800">
             <thead>
-              <tr className="sticky top-0 z-10 border-b bg-gray-50 text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-                <th className="w-12 px-3 py-3 text-center">#</th>
-                <th className="px-4 py-3 font-bold">التاريخ</th>
-                <th className="px-4 py-3 font-bold">رقم السند والنوع</th>
-                <th className="px-4 py-3 font-bold">الجهة / الحساب المقابل</th>
-                <th className="px-4 py-3 font-bold">حساب الصندوق / البنك</th>
-                <th className="px-4 py-3 font-bold">البيان</th>
-                <th className="px-3 py-3 text-center font-bold">طريقة الدفع</th>
-                <th className="px-4 py-3 text-left font-bold">المبلغ</th>
-                <th className="px-4 py-3 text-center font-bold">الإجراءات</th>
+              <tr className="sticky top-0 z-10 border-b border-slate-200 bg-gray-50 text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+                <th className="w-12 border border-slate-200 px-3 py-3 text-center dark:border-slate-800">#</th>
+                <th className="border border-slate-200 px-4 py-3 font-bold dark:border-slate-800">التاريخ</th>
+                <th className="border border-slate-200 px-4 py-3 font-bold dark:border-slate-800">رقم السند والنوع</th>
+                <th className="border border-slate-200 px-4 py-3 font-bold dark:border-slate-800">الجهة / الحساب المقابل</th>
+                <th className="border border-slate-200 px-4 py-3 font-bold dark:border-slate-800">حساب الصندوق / البنك</th>
+                <th className="border border-slate-200 px-4 py-3 font-bold dark:border-slate-800">البيان</th>
+                <th className="border border-slate-200 px-3 py-3 text-center font-bold dark:border-slate-800">طريقة الدفع</th>
+                <th className="border border-slate-200 px-4 py-3 text-left font-bold dark:border-slate-800">المبلغ</th>
+                <th className="border border-slate-200 px-4 py-3 text-center font-bold dark:border-slate-800">الإجراءات</th>
               </tr>
             </thead>
-            <tbody className="divide-y dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {filteredBonds.map((bond, idx) => (
                 <tr
                   key={bond.id}
                   className="group cursor-pointer transition-colors hover:bg-blue-50/40 dark:hover:bg-blue-900/10"
                   onClick={() => onPreviewBond?.(bond)}
                 >
-                  <td className="px-3 py-3 text-center font-mono text-[11px] text-gray-400">
+                  <td className="border border-slate-200/80 px-3 py-3 text-center font-mono text-[11px] text-gray-400 dark:border-slate-800/80">
                     {idx + 1}
                   </td>
-                  <td className="px-4 py-3 font-mono text-[11px] font-medium text-gray-500 dark:text-slate-400">
+                  <td className="border border-slate-200/80 px-4 py-3 font-mono text-[11px] font-medium text-gray-500 dark:border-slate-800/80 dark:text-slate-400">
                     {bond.date}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="border border-slate-200/80 px-4 py-3 dark:border-slate-800/80">
                     <div className="flex items-center gap-2">
                       <div
                         className={cn(
@@ -207,7 +207,7 @@ const BondsList: React.FC<Props> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="border border-slate-200/80 px-4 py-3 dark:border-slate-800/80">
                     <div className="flex flex-col">
                       <span className="text-xs font-bold text-gray-800 dark:text-slate-200">
                         {bond.party_name || bond.account_name}
@@ -217,18 +217,18 @@ const BondsList: React.FC<Props> = ({
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="border border-slate-200/80 px-4 py-3 dark:border-slate-800/80">
                     <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
                       {bond.account_name}
                     </span>
                   </td>
                   <td
-                    className="max-w-[220px] truncate px-4 py-3 text-xs text-gray-600 dark:text-slate-400"
+                    className="max-w-[220px] truncate border border-slate-200/80 px-4 py-3 text-xs text-gray-600 dark:border-slate-800/80 dark:text-slate-400"
                     title={bond.description}
                   >
                     {bond.description || '---'}
                   </td>
-                  <td className="px-3 py-3 text-center">
+                  <td className="border border-slate-200/80 px-3 py-3 text-center dark:border-slate-800/80">
                     <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                       {bond.payment_method === 'cash'
                         ? 'نقداً'
@@ -237,7 +237,7 @@ const BondsList: React.FC<Props> = ({
                           : bond.payment_method || 'نقداً'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-mono">
+                  <td className="border border-slate-200/80 px-4 py-3 font-mono dark:border-slate-800/80">
                     <div className="flex flex-col items-start sm:items-end">
                       <span
                         className={cn(
@@ -256,7 +256,7 @@ const BondsList: React.FC<Props> = ({
                     </div>
                   </td>
                   <td
-                    className="px-4 py-3 text-center"
+                    className="border border-slate-200/80 px-4 py-3 text-center dark:border-slate-800/80"
                     onClick={e => {
                       e.stopPropagation();
                     }}
@@ -304,10 +304,10 @@ const BondsList: React.FC<Props> = ({
             {/* Table Footer Totals */}
             <tfoot>
               <tr className="border-t-2 border-slate-200 bg-slate-50/80 text-xs font-bold dark:border-slate-800 dark:bg-slate-900/80">
-                <td colSpan={3} className="px-4 py-3 font-mono text-slate-500">
+                <td colSpan={3} className="border border-slate-200 px-4 py-3 font-mono text-slate-500 dark:border-slate-800">
                   إجمالي الصفحة ({pageTotals.count} سند)
                 </td>
-                <td colSpan={4} className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                <td colSpan={4} className="border border-slate-200 px-4 py-3 text-slate-600 dark:border-slate-800 dark:text-slate-300">
                   <div className="flex flex-wrap items-center gap-4 text-xs">
                     <span className="text-emerald-600">
                       قبض: {formatCurrency(pageTotals.receipts, 'SAR')}
@@ -322,7 +322,7 @@ const BondsList: React.FC<Props> = ({
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-left font-mono">
+                <td className="border border-slate-200 px-4 py-3 text-left font-mono dark:border-slate-800">
                   <span
                     className={cn(
                       'text-xs font-black',
@@ -332,7 +332,7 @@ const BondsList: React.FC<Props> = ({
                     الصافي: {formatCurrency(pageTotals.net, 'SAR')}
                   </span>
                 </td>
-                <td></td>
+                <td className="border border-slate-200 dark:border-slate-800"></td>
               </tr>
             </tfoot>
           </table>

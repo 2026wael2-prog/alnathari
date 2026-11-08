@@ -232,16 +232,16 @@ const PartyInvoicesList: React.FC<PartyInvoicesListProps> = ({
         </div>
 
         {/* Excel Spreadsheet Table */}
-        <div className="custom-scrollbar max-h-72 overflow-x-auto overflow-y-auto">
-          <table className="w-full border-collapse text-right text-xs">
+        <div className="custom-scrollbar max-h-72 overflow-x-auto overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-800">
+          <table className="w-full border-collapse border border-slate-200 text-right text-xs dark:border-slate-800">
             <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-100/95 text-[10px] font-black uppercase text-slate-600 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-800/95 dark:text-slate-300">
               <tr>
-                <th className="w-10 px-2.5 py-2 text-center">تحديد</th>
+                <th className="w-10 border border-slate-200 px-2.5 py-2 text-center dark:border-slate-700">تحديد</th>
                 <th
                   onClick={() => {
                     handleSort('invoice_number');
                   }}
-                  className="cursor-pointer px-3 py-2 transition-colors hover:text-blue-600"
+                  className="cursor-pointer border border-slate-200 px-3 py-2 transition-colors hover:text-blue-600 dark:border-slate-700"
                 >
                   <div className="flex items-center gap-1">
                     <span>رقم الفاتورة</span>
@@ -252,45 +252,45 @@ const PartyInvoicesList: React.FC<PartyInvoicesListProps> = ({
                   onClick={() => {
                     handleSort('issue_date');
                   }}
-                  className="cursor-pointer px-3 py-2 transition-colors hover:text-blue-600"
+                  className="cursor-pointer border border-slate-200 px-3 py-2 transition-colors hover:text-blue-600 dark:border-slate-700"
                 >
                   <div className="flex items-center gap-1">
                     <span>تاريخ الإصدار</span>
                     <ArrowUpDown size={11} className="opacity-60" />
                   </div>
                 </th>
-                <th className="px-3 py-2">البيان والملاحظات</th>
+                <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">البيان والملاحظات</th>
                 <th
                   onClick={() => {
                     handleSort('total_amount');
                   }}
-                  className="cursor-pointer px-3 py-2 text-left transition-colors hover:text-blue-600"
+                  className="cursor-pointer border border-slate-200 px-3 py-2 text-left transition-colors hover:text-blue-600 dark:border-slate-700"
                 >
                   <div className="flex items-center justify-end gap-1">
                     <span>الإجمالي</span>
                     <ArrowUpDown size={11} className="opacity-60" />
                   </div>
                 </th>
-                <th className="px-3 py-2 text-left">المسدد</th>
+                <th className="border border-slate-200 px-3 py-2 text-left dark:border-slate-700">المسدد</th>
                 <th
                   onClick={() => {
                     handleSort('remaining_amount');
                   }}
-                  className="cursor-pointer px-3 py-2 text-left transition-colors hover:text-blue-600"
+                  className="cursor-pointer border border-slate-200 px-3 py-2 text-left transition-colors hover:text-blue-600 dark:border-slate-700"
                 >
                   <div className="flex items-center justify-end gap-1">
                     <span>المتبقي</span>
                     <ArrowUpDown size={11} className="opacity-60" />
                   </div>
                 </th>
-                <th className="px-3 py-2 text-center">الحالة</th>
-                <th className="w-16 px-3 py-2 text-center">معاينة</th>
+                <th className="border border-slate-200 px-3 py-2 text-center dark:border-slate-700">الحالة</th>
+                <th className="w-16 border border-slate-200 px-3 py-2 text-center dark:border-slate-700">معاينة</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-sans dark:divide-slate-800">
               {processedInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-xs font-bold text-slate-400">
+                  <td colSpan={9} className="border border-slate-200 py-8 text-center text-xs font-bold text-slate-400 dark:border-slate-800">
                     لا توجد فواتير تطابق معايير البحث
                   </td>
                 </tr>
@@ -316,7 +316,7 @@ const PartyInvoicesList: React.FC<PartyInvoicesListProps> = ({
                     >
                       {/* Selection radio/checkbox */}
                       <td
-                        className="px-2.5 py-2 text-center"
+                        className="border border-slate-200/80 px-2.5 py-2 text-center dark:border-slate-800/80"
                         onClick={e => {
                           e.stopPropagation();
                         }}
@@ -333,7 +333,7 @@ const PartyInvoicesList: React.FC<PartyInvoicesListProps> = ({
                       </td>
 
                       {/* Invoice Number */}
-                      <td className="whitespace-nowrap px-3 py-2 font-mono font-bold">
+                      <td className="whitespace-nowrap border border-slate-200/80 px-3 py-2 font-mono font-bold dark:border-slate-800/80">
                         <div className="flex items-center gap-1.5">
                           <FileText size={13} className="text-slate-400" />
                           <span
@@ -349,12 +349,12 @@ const PartyInvoicesList: React.FC<PartyInvoicesListProps> = ({
                       </td>
 
                       {/* Issue Date */}
-                      <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                      <td className="whitespace-nowrap border border-slate-200/80 px-3 py-2 font-mono text-[11px] text-slate-600 dark:border-slate-800/80 dark:text-slate-400">
                         {formatLocalDate(inv.issue_date)}
                       </td>
 
                       {/* Notes / Items summary */}
-                      <td className="max-w-[180px] truncate px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">
+                      <td className="max-w-[180px] truncate border border-slate-200/80 px-3 py-2 text-[11px] text-slate-500 dark:border-slate-800/80 dark:text-slate-400">
                         {inv.notes ||
                           (inv.invoice_items?.length
                             ? `${inv.invoice_items.length} صنف`
@@ -362,22 +362,22 @@ const PartyInvoicesList: React.FC<PartyInvoicesListProps> = ({
                       </td>
 
                       {/* Total Amount */}
-                      <td className="whitespace-nowrap px-3 py-2 text-left font-mono font-bold text-slate-700 dark:text-slate-300">
+                      <td className="whitespace-nowrap border border-slate-200/80 px-3 py-2 text-left font-mono font-bold text-slate-700 dark:border-slate-800/80 dark:text-slate-300">
                         {formatCurrency(inv._total, currency)}
                       </td>
 
                       {/* Paid Amount */}
-                      <td className="whitespace-nowrap px-3 py-2 text-left font-mono text-emerald-600 dark:text-emerald-400">
+                      <td className="whitespace-nowrap border border-slate-200/80 px-3 py-2 text-left font-mono text-emerald-600 dark:border-slate-800/80 dark:text-emerald-400">
                         {inv._paid > 0 ? formatCurrency(inv._paid, currency) : '-'}
                       </td>
 
                       {/* Remaining Amount */}
-                      <td className="whitespace-nowrap px-3 py-2 text-left font-mono font-black text-rose-600 dark:text-rose-400">
+                      <td className="whitespace-nowrap border border-slate-200/80 px-3 py-2 text-left font-mono font-black text-rose-600 dark:border-slate-800/80 dark:text-rose-400">
                         {formatCurrency(inv._remaining, currency)}
                       </td>
 
                       {/* Status Badge */}
-                      <td className="whitespace-nowrap px-3 py-2 text-center">
+                      <td className="whitespace-nowrap border border-slate-200/80 px-3 py-2 text-center dark:border-slate-800/80">
                         {inv._isPartial ? (
                           <span className="inline-block rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                             جزئي
@@ -391,7 +391,7 @@ const PartyInvoicesList: React.FC<PartyInvoicesListProps> = ({
 
                       {/* Preview Button */}
                       <td
-                        className="px-3 py-2 text-center"
+                        className="border border-slate-200/80 px-3 py-2 text-center dark:border-slate-800/80"
                         onClick={e => {
                           e.stopPropagation();
                         }}
