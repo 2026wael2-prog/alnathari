@@ -1,6 +1,7 @@
 import React from 'react';
-import { History, Maximize2, Minimize2, X } from 'lucide-react';
+import { History, Maximize2, Minimize2, X, Download } from 'lucide-react';
 import { cn, formatNumberDisplay } from '../../../../core/utils';
+import { exportToCSV } from '../../../../lib/exportUtils';
 
 interface AuditLogHeaderProps {
     selectedProduct: any;
@@ -17,6 +18,38 @@ const AuditLogHeader: React.FC<AuditLogHeaderProps> = ({
     setIsMaximized,
     onBack
 }) => {
+    const handleExport = () => {
+        if (!log || log.length === 0) return;
+        const exportData = log.map((entry, index) => ({
+            index: log.length - index,
+            date: new Date(entry.date).toLocaleString('en-GB'),
+            document_number: entry.document_number || '',
+            reference_type: entry.reference_type || '',
+            source_name: entry.source_name || '',
+            transaction_type: entry.transaction_type === 'in' ? 'وارد' : 'صادر',
+            quantity: entry.quantity,
+            balance_after: entry.balance_after,
+            source_user: entry.source_user || ''
+        }));
+
+        const headers = [
+            '#',
+            'التاريخ والوقت',
+            'رقم المستند',
+            'نوع الحركة',
+            'الجهة / العميل / المورد',
+            'الاتجاه',
+            'الكمية',
+            'الرصيد بعدها',
+            'المستخدم المسؤول'
+        ];
+
+        const productName = selectedProduct.name_ar || selectedProduct.name || 'item';
+        exportToCSV(exportData, `سجل_حركة_${productName}`, headers);
+    };
+
+    const productName = selectedProduct.name_ar || selectedProduct.name || 'الصنف';
+
     return (
         <div className={cn(
             "p-5 border-b dark:border-slate-800 flex items-center justify-between transition-all",
@@ -33,59 +66,86 @@ const AuditLogHeader: React.FC<AuditLogHeaderProps> = ({
                     </button>
                 )}
                 <div className={cn(
-                    "p-3 bg-blue-600/10 text-blue-600 rounded-2xl",
+                    "p-3 bg-blue-600/10 text-blue-600 rounded-2xl shrink-0",
                     isMaximized && "p-4"
                 )}>
                     <History size={isMaximized ? 24 : 18} />
                 </div>
                 <div>
                     <h3 className={cn(
-                        "text-sm font-black text-gray-900 dark:text-white",
+                        "text-sm font-black text-gray-900 dark:text-white flex flex-wrap items-center gap-2",
                         isMaximized && "text-xl"
                     )}>
-                        {isMaximized ? `تدقيق حركة الصنف: ${selectedProduct.name}` : 'سجل العمليات (Excel Style)'}
+                        <span>{productName}</span>
+                        {selectedProduct.sku && (
+                            <span className="font-mono text-[11px] px-2 py-0.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/20">
+                                {selectedProduct.sku}
+                            </span>
+                        )}
+                        {selectedProduct.part_number && (
+                            <span className="font-mono text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold border dark:border-slate-700">
+                                {selectedProduct.part_number}
+                            </span>
+                        )}
+                        {selectedProduct.brand && (
+                            <span className="text-[11px] px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-600 font-bold border border-emerald-500/20">
+                                {selectedProduct.brand}
+                            </span>
+                        )}
                     </h3>
                     <p className={cn(
-                        "text-[10px] text-gray-500 font-medium tracking-tight",
+                        "text-[10px] text-gray-500 font-medium tracking-tight mt-0.5",
                         isMaximized && "text-xs mt-1"
                     )}>
-                        تدقيق كامل لكل العمليات المخزنية بحسب التسلسل الزمني
+                        سجل الحركات المخزنية والبيعية التراكمي في الوقت الفعلي
                     </p>
                 </div>
             </div>
             
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
                 <div className="hidden md:flex items-center gap-6">
                     <div className="text-right">
-                        <p className={cn("font-black text-gray-900 dark:text-white font-mono leading-none", isMaximized ? "text-2xl" : "text-xs")}>
+                        <p className={cn("font-black text-gray-900 dark:text-white font-mono leading-none", isMaximized ? "text-2xl" : "text-sm")}>
                             {formatNumberDisplay(selectedProduct.stock_quantity)}
                         </p>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mt-0.5">الرصيد الكلي الحالي</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mt-1">الرصيد الكلي الحالي</p>
                     </div>
                     <div className="h-8 w-px bg-gray-200 dark:bg-slate-800" />
                     <div className="text-right">
-                        <p className={cn("font-black text-gray-900 dark:text-white font-mono leading-none", isMaximized ? "text-2xl" : "text-xs")}>
+                        <p className={cn("font-black text-gray-900 dark:text-white font-mono leading-none", isMaximized ? "text-2xl" : "text-sm")}>
                             {log?.length || 0}
                         </p>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mt-0.5">إجمالي العمليات</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mt-1">إجمالي الحركات</p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {Boolean(log && log.length > 0) && (
+                        <button
+                            onClick={handleExport}
+                            className="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-sm text-gray-600 hover:text-emerald-600 dark:text-gray-300 transition-all active:scale-90 flex items-center gap-1.5 text-xs font-bold"
+                            title="تصدير إلى Excel / CSV"
+                        >
+                            <Download size={16} />
+                            <span className="hidden sm:inline">تصدير</span>
+                        </button>
+                    )}
+
                     <button 
                         onClick={() => { setIsMaximized(!isMaximized); }}
-                        className="p-3 bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-sm text-gray-500 hover:text-blue-500 transition-all active:scale-90"
+                        className="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border dark:border-slate-700 shadow-sm text-gray-500 hover:text-blue-500 transition-all active:scale-90"
                         title={isMaximized ? "تصغير" : "تكبير"}
                     >
-                        {isMaximized ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                        {isMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                     </button>
                     
                     {isMaximized && (
                         <button 
                             onClick={() => { setIsMaximized(false); }}
-                            className="p-3 bg-rose-500 text-white rounded-2xl shadow-lg shadow-rose-500/20 transition-all active:scale-90"
+                            className="p-2.5 bg-rose-500 text-white rounded-2xl shadow-lg shadow-rose-500/20 transition-all active:scale-90"
+                            title="إغلاق وضع ملء الشاشة"
                         >
-                            <X size={20} />
+                            <X size={18} />
                         </button>
                     )}
                 </div>

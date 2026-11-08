@@ -75,19 +75,19 @@ export const chatwootWidgetApi = {
     // 2. آخر الفواتير الصادرة
     const { data: invoicesData } = await supabase
       .from('invoices')
-      .select('id, invoice_number, issue_date, total_amount, paid_amount, remaining_amount, currency_code, status')
-      .eq('customer_id', party.id)
+      .select('id, invoice_number, issue_date, total_amount, paid_amount, currency_code, status')
+      .eq('party_id', party.id)
       .is('deleted_at', null)
       .order('issue_date', { ascending: false })
       .limit(3);
 
     const recentInvoices = (invoicesData || []).map(inv => ({
       id: inv.id,
-      invoice_number: inv.invoice_number,
+      invoice_number: inv.invoice_number || '',
       issue_date: inv.issue_date,
       total_amount: Number(inv.total_amount || 0),
       paid_amount: Number(inv.paid_amount || 0),
-      remaining_amount: Number(inv.remaining_amount || 0),
+      remaining_amount: Math.max(0, Number(inv.total_amount || 0) - Number(inv.paid_amount || 0)),
       currency_code: inv.currency_code || 'YER',
       status: inv.status || 'posted',
     }));
@@ -149,7 +149,7 @@ export const chatwootWidgetApi = {
     amount: number;
     currencyCode: string;
     promiseDate: string;
-    notes?: string;
+    notes?: string | undefined;
   }): Promise<{ success: boolean; error?: string }> {
     try {
       type PromiseInsert = Database['public']['Tables']['debt_payment_promises']['Insert'];

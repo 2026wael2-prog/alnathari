@@ -9,7 +9,7 @@ import ProductExcelGrid from './ProductExcelGrid';
 
 const AuditLogView: React.FC = () => {
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
-    const [searchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [isMaximized, setIsMaximized] = useState(false);
 
     const { products, isLoading: isProductsLoading } = useProducts(searchQuery, { enabled: !selectedProduct });
@@ -75,6 +75,8 @@ const AuditLogView: React.FC = () => {
                         title="سجل الحركات"
                         subtitle="اختر صنفاً لعرض تفاصيل حركته المخزنية"
                         colorTheme="indigo"
+                        searchValue={searchQuery}
+                        onSearchChange={setSearchQuery}
                     />
                 )}
             </div>

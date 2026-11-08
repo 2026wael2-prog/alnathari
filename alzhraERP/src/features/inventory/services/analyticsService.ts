@@ -1,5 +1,6 @@
 // Analytics Service - Handles inventory analytics and reporting
 import { supabase } from '../../../lib/supabaseClient';
+import { formatLocalDate } from '../../../core/utils';
 import { inventoryApi } from '../api';
 
 export const analyticsService = {
@@ -90,25 +91,44 @@ export const analyticsService = {
 
   /**
    * Get stock movement history
-   * NOTE: `stock_movements` does not exist in the live schema — the real
-   * table is `inventory_transactions`. Fixed 2026-08-16 (Phase D).
+   * NOTE: Table is `inventory_transactions`, with fallback to invoice items if ledger is sparse.
    */
   getStockMovementHistory: async (companyId: string, days = 30) => {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() - days);
+    const startDate = `${formatLocalDate(targetDate)}T00:00:00.000Z`;
 
     const { data, error } = await supabase
       .from('inventory_transactions')
       .select('id, transaction_type, quantity, created_at, products(name_ar)')
       .eq('company_id', companyId)
       .is('deleted_at', null)
-      .gte('created_at', startDate.toISOString())
+      .gte('created_at', startDate)
       .order('created_at', { ascending: false });
     if (error) throw error;
 
-    return (data || []).map(m => ({
+    if (data && data.length > 0) {
+      return data.map(m => ({
+        id: m.id,
+        type: m.transaction_type,
+        quantity: m.quantity,
+        date: m.created_at,
+        productName: m.products?.name_ar,
+      }));
+    }
+
+    // المسار الاحتياطي: إذا كانت الحركات المباشرة فارغة، نقرأ من بنود الفواتير المعتمدة
+    const { data: invData } = await supabase
+      .from('invoice_items')
+      .select('id, quantity, created_at, products:products(name_ar), invoice:invoices!inner(type, issue_date, deleted_at, status)')
+      .eq('company_id', companyId)
+      .gte('created_at', startDate)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    return (invData || []).map((m: any) => ({
       id: m.id,
-      type: m.transaction_type,
+      type: m.invoice?.type === 'sale' ? 'sales' : m.invoice?.type || 'sale',
       quantity: m.quantity,
       date: m.created_at,
       productName: m.products?.name_ar,
