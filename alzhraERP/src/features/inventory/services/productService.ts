@@ -586,21 +586,157 @@ export const productService = {
     params: InventoryMovementsFilterParams = {},
     branchId?: string | null
   ): Promise<InventoryMovementFeedItem[]> => {
-    const { data, error } = await (supabase.rpc as any)('get_inventory_movements_feed', {
-      p_company_id: companyId,
-      p_branch_id: branchId ?? null,
-      p_limit: params.limit ?? 150,
-      p_offset: params.offset ?? 0,
-      p_search: params.search ?? null,
-      p_movement_type: params.movementType ?? 'all',
-      p_doc_type: params.docType ?? 'all',
-      p_product_id: params.productId ?? null,
-      p_start_date: params.startDate ?? null,
-      p_end_date: params.endDate ?? null,
-    });
+    try {
+      const { data, error } = await (supabase.rpc as any)('get_inventory_movements_feed', {
+        p_company_id: companyId,
+        p_branch_id: branchId ?? null,
+        p_limit: params.limit ?? 150,
+        p_offset: params.offset ?? 0,
+        p_search: params.search ?? null,
+        p_movement_type: params.movementType ?? 'all',
+        p_doc_type: params.docType ?? 'all',
+        p_product_id: params.productId ?? null,
+        p_start_date: params.startDate ?? null,
+        p_end_date: params.endDate ?? null,
+      });
 
+      if (!error && data) {
+        return data as InventoryMovementFeedItem[];
+      }
+
+      if (error) {
+        const errCode = String(error.code || '');
+        const errMsg = String(error.message || '');
+        if (
+          errCode === 'PGRST202' ||
+          errCode === '404' ||
+          errCode === '42883' ||
+          errMsg.includes('not found') ||
+          errMsg.includes('does not exist')
+        ) {
+          logger.warn('productService', 'get_inventory_movements_feed RPC unavailable, using fallback', error);
+          return await productService.fallbackMovementsFeed(companyId, params, branchId);
+        }
+        throw parseError(error);
+      }
+      return [];
+    } catch (err: any) {
+      const errCode = String(err?.code || '');
+      const errMsg = String(err?.message || '');
+      if (
+        errCode === 'PGRST202' ||
+        errCode === '404' ||
+        errCode === '42883' ||
+        errMsg.includes('not found') ||
+        errMsg.includes('does not exist')
+      ) {
+        logger.warn('productService', 'get_inventory_movements_feed caught unavailable, using fallback', err);
+        return await productService.fallbackMovementsFeed(companyId, params, branchId);
+      }
+      throw parseError(err);
+    }
+  },
+
+  /**
+   * Fallback for inventory movements feed when get_inventory_movements_feed RPC is not installed
+   */
+  fallbackMovementsFeed: async (
+    companyId: string,
+    params: InventoryMovementsFilterParams = {},
+    branchId?: string | null
+  ): Promise<InventoryMovementFeedItem[]> => {
+    let query = supabase
+      .from('invoices')
+      .select(`
+        id,
+        type,
+        invoice_number,
+        created_at,
+        issue_date,
+        branch_id,
+        notes,
+        party:parties(name),
+        invoice_items(
+          id,
+          product_id,
+          quantity,
+          unit_price,
+          cost_price,
+          product:products(id, name_ar, sku, part_number, brand)
+        )
+      `)
+      .eq('company_id', companyId)
+      .neq('status', 'void')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(params.limit ?? 100);
+
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+    if (params.docType && params.docType !== 'all') {
+      query = query.eq('type', params.docType);
+    }
+    if (params.startDate) {
+      query = query.gte('issue_date', params.startDate);
+    }
+    if (params.endDate) {
+      query = query.lte('issue_date', params.endDate);
+    }
+
+    const { data, error } = await query;
     if (error) throw parseError(error);
-    return (data || []) as InventoryMovementFeedItem[];
+
+    const rows: InventoryMovementFeedItem[] = [];
+    const searchLow = params.search?.toLowerCase().trim();
+
+    for (const inv of (data || []) as any[]) {
+      const isIncoming = inv.type === 'purchase' || inv.type === 'sale_return';
+      const partyName = inv.party?.name || '---';
+      const docNum = inv.invoice_number ? `فاتورة #${inv.invoice_number}` : 'فاتورة';
+
+      for (const item of (inv.invoice_items || []) as any[]) {
+        if (params.productId && item.product_id !== params.productId) continue;
+        const prod = item.product;
+
+        if (searchLow) {
+          const matchSearch =
+            docNum.toLowerCase().includes(searchLow) ||
+            (prod?.name_ar && prod.name_ar.toLowerCase().includes(searchLow)) ||
+            (prod?.sku && prod.sku.toLowerCase().includes(searchLow)) ||
+            (prod?.part_number && prod.part_number.toLowerCase().includes(searchLow)) ||
+            partyName.toLowerCase().includes(searchLow);
+          if (!matchSearch) continue;
+        }
+
+        if (params.movementType && params.movementType !== 'all') {
+          if (params.movementType === 'in' && !isIncoming) continue;
+          if (params.movementType === 'out' && isIncoming) continue;
+        }
+
+        rows.push({
+          id: item.id,
+          date: inv.created_at || inv.issue_date,
+          doc_type: inv.type,
+          doc_number: docNum,
+          reference_id: inv.id,
+          product_id: item.product_id,
+          product_name: prod?.name_ar || 'صنف',
+          product_sku: prod?.sku || '',
+          product_part_number: prod?.part_number ?? null,
+          product_brand: prod?.brand ?? null,
+          party_name: partyName,
+          movement_type: isIncoming ? 'in' : 'out',
+          quantity: Math.abs(Number(item.quantity || 0)),
+          unit_cost: Number(item.cost_price || 0),
+          unit_price: Number(item.unit_price || 0),
+          user_name: 'النظام',
+          notes: inv.notes ?? null,
+          current_stock: 0,
+        });
+      }
+    }
+    return rows;
   },
 
   /**
