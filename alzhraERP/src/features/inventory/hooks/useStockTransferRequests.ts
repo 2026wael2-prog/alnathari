@@ -129,33 +129,60 @@ export function useStockTransferRequests(
     enabled: !!companyId,
     staleTime: 30_000,
     queryFn: async (): Promise<StockTransferRequest[]> => {
-      let query = db
-        .from('stock_transfer_requests')
-        .select(
-          `
-          id, batch_id, company_id, requester_branch_id, source_branch_id,
-          product_id, requested_quantity, status, notes, review_notes,
-          created_by, reviewed_by, created_at, updated_at,
-          requester_branch:branches!requester_branch_id(name),
-          source_branch:branches!source_branch_id(name),
-          product:products!product_id(name_ar, sku, part_number, brand)
-        `
-        )
-        .eq('company_id', companyId);
+      const selectFieldsWithBatch = `
+        id, batch_id, company_id, requester_branch_id, source_branch_id,
+        product_id, requested_quantity, status, notes, review_notes,
+        created_by, reviewed_by, created_at, updated_at,
+        requester_branch:branches!requester_branch_id(name),
+        source_branch:branches!source_branch_id(name),
+        product:products!product_id(name_ar, sku, part_number, brand)
+      `;
 
-      if (branchId) {
-        if (filter === 'incoming') query = query.eq('source_branch_id', branchId);
-        else if (filter === 'outgoing') query = query.eq('requester_branch_id', branchId);
-        else query = query.or(`requester_branch_id.eq.${branchId},source_branch_id.eq.${branchId}`);
+      const selectFieldsWithoutBatch = `
+        id, company_id, requester_branch_id, source_branch_id,
+        product_id, requested_quantity, status, notes, review_notes,
+        created_by, reviewed_by, created_at, updated_at,
+        requester_branch:branches!requester_branch_id(name),
+        source_branch:branches!source_branch_id(name),
+        product:products!product_id(name_ar, sku, part_number, brand)
+      `;
+
+      const executeQuery = (selectStr: string) => {
+        let q = db
+          .from('stock_transfer_requests')
+          .select(selectStr)
+          .eq('company_id', companyId);
+
+        if (branchId) {
+          if (filter === 'incoming') q = q.eq('source_branch_id', branchId);
+          else if (filter === 'outgoing') q = q.eq('requester_branch_id', branchId);
+          else q = q.or(`requester_branch_id.eq.${branchId},source_branch_id.eq.${branchId}`);
+        }
+
+        return q.order('created_at', { ascending: false });
+      };
+
+      let { data, error } = await executeQuery(selectFieldsWithBatch);
+
+      // Graceful fallback if batch_id column has not been migrated yet in the target database
+      if (
+        error &&
+        (error.code === '42703' ||
+          error.message?.includes('batch_id') ||
+          error.code === 'PGRST100')
+      ) {
+        const fallbackRes = await executeQuery(selectFieldsWithoutBatch);
+        data = fallbackRes.data;
+        error = fallbackRes.error;
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
 
       return ((data || []) as any[]).map(
         (r: any) =>
           ({
             ...r,
+            batch_id: r.batch_id ?? null,
             requester_branch_name: r.requester_branch?.name,
             source_branch_name: r.source_branch?.name,
             product_name: r.product?.name_ar,
