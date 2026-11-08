@@ -25,6 +25,7 @@ import {
   Shield,
   Palette,
   Layers,
+  Headphones,
   type LucideIcon,
 } from 'lucide-react';
 import { ROUTES } from '../../../core/routes/paths';
@@ -55,6 +56,7 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   Shield,
   Palette,
   Layers,
+  Headphones,
 };
 
 /**
@@ -82,6 +84,10 @@ export function getTabMeta(pathname: string): TabMetaInfo {
 
   if (cleanPath.startsWith(ROUTES.DASHBOARD.DEBTS)) {
     return { title: 'الديون والتحصيل', iconKey: 'Scale', IconComponent: Scale };
+  }
+
+  if (cleanPath === ROUTES.DASHBOARD.CUSTOMER_SERVICE) {
+    return { title: 'خدمة العملاء والواتساب', iconKey: 'Headphones', IconComponent: Headphones };
   }
 
   if (cleanPath === ROUTES.DASHBOARD.CLIENTS || cleanPath === '/parties') {
@@ -168,4 +174,5 @@ export const QUICK_LAUNCH_ITEMS = [
   { path: ROUTES.DASHBOARD.EXPENSES, title: 'المصروفات', iconKey: 'ReceiptText' },
   { path: ROUTES.DASHBOARD.REPORTS, title: 'التقارير المالية', iconKey: 'BarChart3' },
   { path: ROUTES.DASHBOARD.CHAT, title: 'المحادثات والتواصل', iconKey: 'MessageSquare' },
+  { path: ROUTES.DASHBOARD.CUSTOMER_SERVICE, title: 'خدمة العملاء والواتساب', iconKey: 'Headphones' },
 ];

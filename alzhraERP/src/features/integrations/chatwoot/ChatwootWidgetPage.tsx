@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   User,
   Phone,
@@ -14,17 +15,24 @@ import {
   Building2,
   AlertCircle,
   Loader2,
+  MessageCircle,
+  Headphones,
 } from 'lucide-react';
 import { chatwootWidgetApi, type ChatwootPartySummary } from './api/chatwootWidgetApi';
 import { formatLocalDate } from '@/core/utils/dateUtils';
 import { formatCurrency } from '@/core/utils';
 
 export const ChatwootWidgetPage: React.FC = () => {
+  const location = useLocation();
+  const isStandalone = location.pathname.includes('chatwoot-widget');
+
   const [phoneQuery, setPhoneQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<ChatwootPartySummary | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
+  const [copiedWidgetUrl, setCopiedWidgetUrl] = useState(false);
+  const [recentParties, setRecentParties] = useState<{ id: string; name: string; phone: string | null; type: string }[]>([]);
 
   // حالة نموذج إضافة وعد سداد سريع
   const [showPromiseForm, setShowPromiseForm] = useState(false);
@@ -35,12 +43,18 @@ export const ChatwootWidgetPage: React.FC = () => {
   const [isSubmittingPromise, setIsSubmittingPromise] = useState(false);
   const [promiseFeedback, setPromiseFeedback] = useState<string | null>(null);
 
-  const fetchCustomer = useCallback(async (phone: string) => {
-    if (!phone || phone.trim().length < 6) return;
+  // تحميل قائمة سريعة لأحدث العملاء عند فتح الصفحة
+  useEffect(() => {
+    void chatwootWidgetApi.getRecentParties().then(setRecentParties);
+  }, []);
+
+  const fetchCustomer = useCallback(async (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed.length < 2) return;
     setIsLoading(true);
     setNotFound(false);
     try {
-      const result = await chatwootWidgetApi.findPartyByPhone(phone);
+      const result = await chatwootWidgetApi.findParty(trimmed);
       if (result) {
         setData(result);
         setPromiseCurrency(result.balances[0]?.currency_code || 'YER');
@@ -65,7 +79,8 @@ export const ChatwootWidgetPage: React.FC = () => {
       params.get('phone') ||
       params.get('phone_number') ||
       params.get('contact[phone_number]') ||
-      params.get('contact_phone');
+      params.get('contact_phone') ||
+      params.get('q');
 
     if (initialPhone) {
       setPhoneQuery(initialPhone);
@@ -96,23 +111,47 @@ export const ChatwootWidgetPage: React.FC = () => {
     return () => window.removeEventListener('message', handleChatwootMessage);
   }, [fetchCustomer]);
 
-  // نسخ ملخص الحساب للرد به على العميل داخل شات ووت بنقرة زر
-  const handleCopySummary = () => {
-    if (!data) return;
+  // إنشاء نص رسالة المطابقة
+  const getSummaryText = useCallback(() => {
+    if (!data) return '';
     const balanceLines =
       data.balances.length > 0
         ? data.balances.map(b => `${formatCurrency(b.balance)} ${b.currency_code}`).join(' و ')
         : 'لا توجد مديونية مسجلة';
 
-    const text = `أهلاً بك أخي ${data.party.name}،
-رصيد حسابك الحالي لدى مؤسسة الجعفري حتى تاريخ اليوم (${formatLocalDate()}):
+    return `أهلاً بك أخي ${data.party.name}،
+رصيد حسابك الحالي لدى مؤسسة الجعفري لقطع الغيار حتى تاريخ اليوم (${formatLocalDate()}):
 💰 ${balanceLines}
 
 شاكرين تعاونكم الدائم معنا 🌹`;
+  }, [data]);
 
+  // نسخ ملخص الحساب للرد به على العميل داخل شات ووت بنقرة زر
+  const handleCopySummary = () => {
+    if (!data) return;
+    const text = getSummaryText();
     void navigator.clipboard.writeText(text);
     setCopiedSummary(true);
     setTimeout(() => setCopiedSummary(false), 2000);
+  };
+
+  // فتح محادثة WhatsApp Web مباشرة مع العميل مع تعبئة الرسالة تلقائياً
+  const handleOpenWhatsAppWeb = () => {
+    if (data?.party.phone) {
+      const cleanDigits = data.party.phone.replace(/[^0-9]/g, '');
+      const text = encodeURIComponent(getSummaryText());
+      window.open(`https://web.whatsapp.com/send?phone=${cleanDigits}&text=${text}`, '_blank');
+    } else {
+      window.open('https://web.whatsapp.com', '_blank');
+    }
+  };
+
+  // نسخ رابط الودجت لـ Chatwoot Dashboard App
+  const handleCopyWidgetUrl = () => {
+    const widgetUrl = `${window.location.origin}/#/chatwoot-widget`;
+    void navigator.clipboard.writeText(widgetUrl);
+    setCopiedWidgetUrl(true);
+    setTimeout(() => setCopiedWidgetUrl(false), 2000);
   };
 
   // إرسال وعد السداد السريع
@@ -147,38 +186,97 @@ export const ChatwootWidgetPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/80 p-3 font-sans text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-100 sm:p-5" dir="rtl">
-      <div className="mx-auto max-w-3xl">
-        {/* الشريط العلوي للودجت */}
-        <header className="mb-3.5 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
-              <Building2 size={18} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xs font-black tracking-tight text-slate-800 dark:text-white">الزهراء ERP</h1>
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                  خدمة العملاء والتحصيل
-                </span>
+    <div
+      className={
+        isStandalone
+          ? 'min-h-screen bg-slate-50/80 p-3 font-sans text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-100 sm:p-5'
+          : 'w-full max-w-7xl mx-auto p-3.5 sm:p-6 font-sans text-slate-800 antialiased dark:text-slate-100'
+      }
+      dir="rtl"
+    >
+      <div className={isStandalone ? 'mx-auto max-w-3xl' : 'mx-auto w-full'}>
+        {/* الشريط العلوي */}
+        {!isStandalone ? (
+          <header className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900/90 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20">
+                <Headphones size={22} />
               </div>
-              <p className="text-[11px] font-medium text-slate-400">
-                شاشة مطابقة الحسابات وودجت محادثات Chatwoot
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-base font-black tracking-tight text-slate-900 dark:text-white">
+                    خدمة العملاء ومكتب الواتساب
+                  </h1>
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    مكتب تفاعلي
+                  </span>
+                </div>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  مطابقة فورية لأرصدة العملاء، الرد والمراسلة السريعة عبر الواتساب، وتسجيل وعود التحصيل
+                </p>
+              </div>
             </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void fetchCustomer(phoneQuery)}
-            className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            title="تحديث البيانات"
-          >
-            <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
-            <span className="hidden sm:inline">تحديث</span>
-          </button>
-        </header>
 
-        {/* حقل البحث السريع برقم الهاتف */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenWhatsAppWeb}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-emerald-700"
+                title="فتح شاشة واتساب ويب في نافذة جديدة"
+              >
+                <MessageCircle size={15} />
+                <span>فتح واتساب ويب</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyWidgetUrl}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                title="نسخ رابط الودجت لاستخدامه كـ Dashboard App داخل Chatwoot"
+              >
+                {copiedWidgetUrl ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                <span>{copiedWidgetUrl ? 'تم نسخ الرابط!' : 'رابط Chatwoot'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void fetchCustomer(phoneQuery)}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                title="تحديث البيانات"
+              >
+                <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+              </button>
+            </div>
+          </header>
+        ) : (
+          <header className="mb-3.5 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900/90">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                <Building2 size={18} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xs font-black tracking-tight text-slate-800 dark:text-white">الزهراء ERP</h1>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    خدمة العملاء والتحصيل
+                  </span>
+                </div>
+                <p className="text-[11px] font-medium text-slate-400">
+                  شاشة مطابقة الحسابات وودجت محادثات Chatwoot
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void fetchCustomer(phoneQuery)}
+              className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              title="تحديث البيانات"
+            >
+              <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">تحديث</span>
+            </button>
+          </header>
+        )}
+
+        {/* حقل البحث السريع بالاسم أو رقم الهاتف */}
         <div className="mb-3.5">
           <div className="relative">
             <input
@@ -188,9 +286,8 @@ export const ChatwootWidgetPage: React.FC = () => {
               onKeyDown={e => {
                 if (e.key === 'Enter') void fetchCustomer(phoneQuery);
               }}
-              placeholder="اكتب رقم جوال العميل للبحث والمطابقة الفورية..."
+              placeholder="اكتب اسم العميل أو رقم هاتفه للمطابقة الفورية (مثال: 770000000 أو أحمد)..."
               className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pr-9 pl-16 text-xs font-bold text-slate-800 shadow-xs focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              dir="ltr"
             />
             <Search size={15} className="pointer-events-none absolute top-3 right-3 text-slate-400" />
             <button
@@ -201,6 +298,27 @@ export const ChatwootWidgetPage: React.FC = () => {
               بحث
             </button>
           </div>
+
+          {/* اقتراحات سريعة لأحدث العملاء */}
+          {recentParties.length > 0 && !data && (
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-bold text-slate-400">عملاء نشطون مؤخراً:</span>
+              {recentParties.map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    const q = p.phone || p.name;
+                    setPhoneQuery(q);
+                    void fetchCustomer(q);
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 shadow-xs transition-colors hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* حالة التحميل */}
@@ -275,15 +393,28 @@ export const ChatwootWidgetPage: React.FC = () => {
                     <Wallet size={14} className="text-emerald-600" />
                     <span>الأرصدة الحالية</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCopySummary}
-                    className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                    title="نسخ كليشة الرد السريع لإرسالها للعميل في Chatwoot"
-                  >
-                    {copiedSummary ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                    <span>{copiedSummary ? 'تم النسخ!' : 'نسخ للرد'}</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {data.party.phone && (
+                      <button
+                        type="button"
+                        onClick={handleOpenWhatsAppWeb}
+                        className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs transition-colors hover:bg-emerald-700"
+                        title="فتح محادثة واتساب ويب مع العميل مباشرةً"
+                      >
+                        <MessageCircle size={12} />
+                        <span>مراسلة واتساب</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleCopySummary}
+                      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                      title="نسخ كليشة الرد السريع لإرسالها للعميل"
+                    >
+                      {copiedSummary ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                      <span>{copiedSummary ? 'تم النسخ!' : 'نسخ النص'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {data.balances.length === 0 ? (

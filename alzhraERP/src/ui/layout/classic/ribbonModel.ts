@@ -42,7 +42,7 @@ export const RIBBON_GROUPS: readonly RibbonGroupSpec[] = [
     id: 'sales',
     labelKey: 'ribbon_group_sales',
     fallbackLabel: 'المبيعات والتحصيل',
-    itemIds: ['sales', 'pos', 'bonds', 'debts'],
+    itemIds: ['sales', 'pos', 'bonds', 'debts', 'customer_service'],
   },
   {
     id: 'stock',

@@ -464,6 +464,16 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
+        {/* Customer Service & WhatsApp Desk */}
+        <Route
+          path={ROUTES.DASHBOARD.CUSTOMER_SERVICE}
+          element={
+            <FeatureBoundary name="customer-service">
+              <ChatwootWidgetPage />
+            </FeatureBoundary>
+          }
+        />
+
         {/* 404 Fallback */}
         <Route path="*" element={<NotFoundPage />} />
       </Route>

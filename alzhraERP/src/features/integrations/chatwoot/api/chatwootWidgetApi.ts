@@ -37,19 +37,26 @@ export interface ChatwootPartySummary {
 
 export const chatwootWidgetApi = {
   /**
-   * البحث عن الطرف (عميل أو مورد) بمطابقة رقم الهاتف (آخر 9 أرقام)
+   * البحث عن الطرف (عميل أو مورد) برقم الهاتف أو الاسم
    */
-  async findPartyByPhone(rawPhone: string): Promise<ChatwootPartySummary | null> {
-    const cleanDigits = rawPhone.replace(/[^0-9]/g, '');
-    if (!cleanDigits || cleanDigits.length < 6) return null;
-    const clean9 = cleanDigits.slice(-9);
+  async findParty(query: string): Promise<ChatwootPartySummary | null> {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed.length < 2) return null;
 
-    const { data: matched, error: partyError } = await supabase
+    const cleanDigits = trimmed.replace(/[^0-9]/g, '');
+    let queryBuilder = supabase
       .from('parties')
       .select('id, company_id, name, phone, type, tax_number, credit_limit')
-      .is('deleted_at', null)
-      .ilike('phone', `%${clean9}%`)
-      .limit(1);
+      .is('deleted_at', null);
+
+    if (cleanDigits.length >= 6) {
+      const clean9 = cleanDigits.slice(-9);
+      queryBuilder = queryBuilder.or(`phone.ilike.%${clean9}%,name.ilike.%${trimmed}%`);
+    } else {
+      queryBuilder = queryBuilder.ilike('name', `%${trimmed}%`);
+    }
+
+    const { data: matched, error: partyError } = await queryBuilder.limit(1);
 
     if (partyError || !matched || matched.length === 0) {
       return null;
@@ -104,19 +111,33 @@ export const chatwootWidgetApi = {
     }));
 
     return {
-      party: {
-        id: party.id,
-        company_id: party.company_id,
-        name: party.name,
-        phone: party.phone,
-        type: party.type,
-        tax_number: party.tax_number,
-        credit_limit: party.credit_limit,
-      },
+      party,
       balances,
       recentInvoices,
       pendingPromises,
     };
+  },
+
+  /**
+   * توافقية مع الاستدعاء برقم الهاتف فقط
+   */
+  findPartyByPhone(rawPhone: string): Promise<ChatwootPartySummary | null> {
+    return this.findParty(rawPhone);
+  },
+
+  /**
+   * جلب قائمة سريعة بأحدث العملاء للاختيار السريع
+   */
+  async getRecentParties(): Promise<{ id: string; name: string; phone: string | null; type: string }[]> {
+    const { data } = await supabase
+      .from('parties')
+      .select('id, name, phone, type')
+      .is('deleted_at', null)
+      .not('phone', 'is', null)
+      .order('updated_at', { ascending: false })
+      .limit(6);
+
+    return data || [];
   },
 
   /**

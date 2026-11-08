@@ -15,6 +15,7 @@ import {
   Building2,
   MessageSquare,
   Scale,
+  Headphones,
 } from 'lucide-react';
 import type { MenuItem } from './types';
 import { ROUTES } from './routes/paths';
@@ -49,6 +50,13 @@ export const MENU_ITEMS: MenuItem[] = [
     color: 'yellow',
   },
   { id: 'debts', labelKey: 'debts', icon: HandCoins, path: ROUTES.DASHBOARD.DEBTS, color: 'red' },
+  {
+    id: 'customer_service',
+    labelKey: 'customer_service',
+    icon: Headphones,
+    path: ROUTES.DASHBOARD.CUSTOMER_SERVICE,
+    color: 'emerald',
+  },
   {
     id: 'clients',
     labelKey: 'customers',
