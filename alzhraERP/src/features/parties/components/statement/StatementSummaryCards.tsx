@@ -18,6 +18,13 @@ interface CurrencySummary {
   totalCredit: number;
 }
 
+/** اسم العملة كما يُطبع في التفقيط — خارج المكوّن كي لا يرفع تعقيده. */
+const currencyLabel = (code: string): string => {
+  if (code === 'YER') return 'ريال يمني';
+  if (code === 'USD') return 'دولار أمريكي';
+  return 'ريال سعودي';
+};
+
 export const StatementSummaryCards: React.FC<StatementSummaryCardsProps> = ({
   movements,
   partyType = 'customer',
@@ -164,7 +171,7 @@ export const StatementSummaryCards: React.FC<StatementSummaryCardsProps> = ({
                   <p className="text-xs font-bold leading-relaxed text-slate-800 dark:text-slate-100">
                     {finalBalance === 0
                       ? 'الرصيد مصفر حالياً'
-                      : `فقط ${tafqeet(absBalance)} ${item.currency === 'YER' ? 'ريال يمني' : item.currency === 'USD' ? 'دولار أمريكي' : 'ريال سعودي'} لا غير.`}
+                      : `فقط ${tafqeet(absBalance, currencyLabel(item.currency))} لا غير.`}
                   </p>
                 </div>
               </div>

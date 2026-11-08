@@ -14,6 +14,23 @@ import { broadcastCrossBranchActivity } from '@/features/branches/api';
 // Re-export quotations API
 export { salesQuotationsApi };
 
+/**
+ * هل الفشل بسبب غياب الدالة نفسها (بيئة قديمة لم تُطبَّق عليها الهجرة)؟
+ *
+ * PGRST202 = PostgREST لم يجد الدالة في ذاكنة المخطط، 42883 = undefined_function.
+ * أي خطأ آخر (مهلة، 57014، تعارض، 23505…) لا يُعدّ دليلاً على أن العملية لم تحدث،
+ * لذا لا يجوز سلوك مسار احتياطي مكافئ لها — راجع تعليق catch في commitReturnRPC.
+ */
+const isMissingFunctionError = (err: unknown): boolean => {
+  if (typeof err !== 'object' || err === null) return false;
+  const record = err as { code?: unknown; message?: unknown };
+  if (record.code === 'PGRST202' || record.code === '42883') return true;
+  return (
+    typeof record.message === 'string' &&
+    /could not find the function|function .+ does not exist|schema cache/i.test(record.message)
+  );
+};
+
 // Define types for invoice with relations
 type InvoiceWithParty = Invoice & {
   party: Pick<Party, 'name'>;
@@ -290,22 +307,17 @@ export const salesApi = {
       if (error) throw error;
       return result as unknown as InvoiceResponse;
     } catch (err) {
-      const errCode = (err as { code?: string })?.code;
-      const errMsg =
-        typeof (err as { message?: string })?.message === 'string'
-          ? (err as { message: string }).message
-          : '';
-      if (
-        errCode === '42501' ||
-        errCode === 'P0001' ||
-        errMsg.includes('عذراً، لا تمتلك صلاحية') ||
-        errMsg.includes('تتجاوز')
-      ) {
+      // ⚠️ المسار الاحتياطي مسموح فقط عند غياب الدالة نفسها في بيئة قديمة.
+      // أي فشل آخر (مهلة الشبكة 45s، انقطاع، 57014، 23505…) قد يكون قد نُفِّذ
+      // فعلياً على الخادم ثم فُقد الردّ؛ فيُنشئ commit_sale_return مرتجعاً ثانياً
+      // بلا مفتاح idempotency (الدالة لا تقبل مفتاحاً أصلاً) → ازدواج مالي حقيقي
+      // في المخزون والقيود والأرصدة. لذلك نُظهر الخطأ بدل إعادة المحاولة بعقد آخر.
+      if (!isMissingFunctionError(err)) {
         throw parseError(err);
       }
       logger.warn(
         'salesApi',
-        'process_sales_return failed, attempting fallback to commit_sale_return:',
+        'process_sales_return is unavailable in this database; using legacy commit_sale_return:',
         err
       );
       const rpcParams = {

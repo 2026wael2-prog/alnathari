@@ -194,12 +194,15 @@ export default tseslint.config(
     },
   },
   // ============================================================
-  // Financial-critical gate (npm run lint:critical)
+  // Financial-critical rule scope (api/ services/ usecases/ lib)
   // ------------------------------------------------------------
-  // طبقات المال والمخزون: api/ services/ usecases/ core-services/ lib.
-  // نطاق البوابة = قواعد الصحة المالية فقط، مع كتم ضجيج الأسلوب
-  // الموروث من الإعداد العام حتى يكون مخرج البوابة إشارة خالصة
-  // وقابلة للإنفاذ اليوم (exit 0 مطلوب في CI).
+  // هذه الكتلة تُطبَّق تلقائيًا على طبقات المال والمخزون في كل تشغيل لـ eslint،
+  // وتكتم ضجيج الأسلوب الموروث حتى تبقى إشارة القواعد المالية خالصة:
+  // no-floating-promises / no-misused-promises / restrict-plus-operands / no-explicit-any.
+  //
+  // ⚠️ لا يوجد سكربت `lint:critical` منفصل: الإشارة تُقرأ من `npm run lint`
+  // ومن بوابة `check:lint-ratchet` للملفات المتغيرة. (الديون الموروثة في هذه
+  // الطبقات مُجمَّدة في scripts/lint-baseline.json وتُسدَّد تدريجيًا.)
   // ============================================================
   {
     files: [

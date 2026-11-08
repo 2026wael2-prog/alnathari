@@ -31,6 +31,103 @@ import {
 import type { StatementMovement } from '../../service';
 import type { Party, PartyType } from '../../types';
 
+interface CurrencySummary {
+  currency: string;
+  totalDebit: number;
+  totalCredit: number;
+  finalBalance: number;
+  count: number;
+}
+
+/**
+ * Minimal shape of the UltraMsg gateway JSON payload.
+ * The endpoint is external, so every field is validated at the boundary.
+ */
+interface UltraMsgResponse {
+  sent?: string | boolean | undefined;
+  error?: string | undefined;
+  message?: string | undefined;
+}
+
+/** Runtime capability view of `navigator` for clipboard image copying. */
+interface ClipboardCapabilities {
+  clipboard?:
+    | {
+        write?: ((items: ClipboardItem[]) => Promise<void>) | undefined;
+      }
+    | undefined;
+}
+
+/** Runtime capability view of `navigator` for the Web Share API. */
+interface ShareCapabilities {
+  canShare?: ((data?: ShareData) => boolean) | undefined;
+  share?: ((data?: ShareData) => Promise<void>) | undefined;
+}
+
+/** Runtime capability view of the global scope for `ClipboardItem`. */
+interface ClipboardItemGlobal {
+  ClipboardItem?: typeof ClipboardItem | undefined;
+}
+
+/** Coerce a possibly non-numeric amount exactly like `Number(value) || 0`. */
+const toAmount = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+/** Read a scalar message/error field, mirroring the gateway's truthiness rules. */
+const readMessageField = (value: unknown): string | undefined => {
+  if (typeof value === 'string') return value === '' ? undefined : value;
+  if (typeof value === 'number') return value === 0 ? undefined : String(value);
+  return undefined;
+};
+
+/** Safely parse an untrusted UltraMsg JSON response into a precise interface. */
+const parseUltraMsgResponse = (raw: unknown): UltraMsgResponse => {
+  if (typeof raw !== 'object' || raw === null) return {};
+  const { sent, error, message } = raw as Record<string, unknown>;
+  const parsed: UltraMsgResponse = {};
+  if (typeof sent === 'string' || typeof sent === 'boolean') parsed.sent = sent;
+  const errorText = readMessageField(error);
+  if (errorText !== undefined) parsed.error = errorText;
+  const messageText = readMessageField(message);
+  if (messageText !== undefined) parsed.message = messageText;
+  return parsed;
+};
+
+const pickUltraMsgError = (data: UltraMsgResponse, fallback: string): string =>
+  data.error ?? data.message ?? fallback;
+
+/** Group movements by normalized currency, preserving first-seen order. */
+const summarizeByCurrency = (movements: StatementMovement[]): CurrencySummary[] => {
+  const summaries = new Map<string, CurrencySummary>();
+  movements.forEach(m => {
+    const curr = (m.currency || 'SAR').trim().toUpperCase();
+    const existing = summaries.get(curr) ?? {
+      currency: curr,
+      totalDebit: 0,
+      totalCredit: 0,
+      finalBalance: 0,
+      count: 0,
+    };
+    existing.totalDebit += toAmount(m.debit);
+    existing.totalCredit += toAmount(m.credit);
+    existing.finalBalance = toAmount(m.balance);
+    existing.count += 1;
+    summaries.set(curr, existing);
+  });
+  return Array.from(summaries.values());
+};
+
+/** Normalize a raw phone string to the Yemeni international format. */
+const formatToPhone = (rawPhone: string): string => {
+  const digits = rawPhone.replace(/[^\d]/g, '');
+  if (digits.startsWith('00')) return digits.slice(2);
+  if (digits.startsWith('0')) return `967${digits.slice(1)}`;
+  if (digits.length === 9) return `967${digits}`;
+  return digits;
+};
+
 interface StatementWhatsAppModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -59,6 +156,7 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
   const [phone, setPhone] = useState(party.phone || '');
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isCapturingImage, setIsCapturingImage] = useState(false);
+  const [isSendingDirect, setIsSendingDirect] = useState(false);
   const [copiedType, setCopiedType] = useState<'text' | 'image' | null>(null);
 
   const gridImageRef = useRef<HTMLDivElement>(null);
@@ -70,38 +168,7 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
   }, [party.phone]);
 
   // Group calculations strictly partitioned by currency
-  const currencySummaries = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        currency: string;
-        totalDebit: number;
-        totalCredit: number;
-        finalBalance: number;
-        count: number;
-      }
-    >();
-
-    movements.forEach(m => {
-      const curr = (m.currency || 'SAR').trim().toUpperCase();
-      if (!map.has(curr)) {
-        map.set(curr, {
-          currency: curr,
-          totalDebit: 0,
-          totalCredit: 0,
-          finalBalance: 0,
-          count: 0,
-        });
-      }
-      const existing = map.get(curr)!;
-      existing.totalDebit += Number(m.debit) || 0;
-      existing.totalCredit += Number(m.credit) || 0;
-      existing.finalBalance = Number(m.balance) || 0;
-      existing.count += 1;
-    });
-
-    return Array.from(map.values());
-  }, [movements]);
+  const currencySummaries = useMemo(() => summarizeByCurrency(movements), [movements]);
 
   // Separate movements for visual preview
   const sarMovements = useMemo(
@@ -129,9 +196,9 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
       operation_type: r.operation_type ?? '',
       reference_no: r.ref,
       desc: r.desc,
-      debit: Number(r.debit) || 0,
-      credit: Number(r.credit) || 0,
-      balance: Number(r.balance) || 0,
+      debit: toAmount(r.debit),
+      credit: toAmount(r.credit),
+      balance: toAmount(r.balance),
       payment_status: r.payment_status,
       currency: r.currency || 'SAR',
     }));
@@ -179,7 +246,7 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
   const isValidPhone = hasValidWhatsAppPhone(phone);
 
   // Handle Share Excel via Web Share API or download + open WhatsApp
-  const handleShareExcel = async () => {
+  const handleShareExcel = async (): Promise<void> => {
     setIsExportingExcel(true);
     try {
       const blob = await generateStatementExcelBlob(
@@ -199,7 +266,8 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
 
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      const shareNavigator: ShareCapabilities = navigator;
+      if (shareNavigator.canShare?.({ files: [file] }) === true) {
         await navigator.share({
           files: [file],
           title: `كشف حساب ${party.name}`,
@@ -228,7 +296,7 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
           window.open(waLink, '_blank', 'noopener,noreferrer');
         }
       }
-    } catch (err) {
+    } catch {
       showToast('تعذر تصدير أو مشاركة ملف Excel', 'error');
     } finally {
       setIsExportingExcel(false);
@@ -236,7 +304,7 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
   };
 
   // Handle Download Excel only
-  const handleDownloadExcel = async () => {
+  const handleDownloadExcel = async (): Promise<void> => {
     setIsExportingExcel(true);
     try {
       await exportStatementToExcel(company, party.name, statementEntries, {
@@ -254,7 +322,39 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
   };
 
   // Handle Capture & Copy Image to Clipboard
-  const handleCopyGridImage = async () => {
+  const handleCapturedImageBlob = async (blob: Blob | null): Promise<void> => {
+    if (blob === null) {
+      showToast('فشل توليد صورة الجريد', 'error');
+      setIsCapturingImage(false);
+      return;
+    }
+
+    const clipboardNavigator: ClipboardCapabilities = navigator;
+    const clipboardApi = clipboardNavigator.clipboard;
+    const clipboardItemCtor: typeof ClipboardItem | undefined = (
+      globalThis as ClipboardItemGlobal
+    ).ClipboardItem;
+
+    if (clipboardItemCtor !== undefined && clipboardApi?.write !== undefined) {
+      try {
+        const item = new clipboardItemCtor({ 'image/png': blob });
+        await clipboardApi.write([item]);
+        setCopiedType('image');
+        setTimeout(() => setCopiedType(null), 3000);
+        showToast(
+          'تم نسخ صورة كشف الحساب بنجاح! يمكنك الآن لصقها (Ctrl+V) مباشرة في واتساب',
+          'success'
+        );
+      } catch {
+        showToast('المتصفح لم يسمح بالنسخ المباشر للصورة، يرجى استخدام زر التحميل', 'info');
+      }
+    } else {
+      showToast('المتصفح لا يدعم نسخ الصور المباشر، تم توفير زر التحميل', 'info');
+    }
+    setIsCapturingImage(false);
+  };
+
+  const handleCopyGridImage = async (): Promise<void> => {
     if (!gridImageRef.current) return;
     setIsCapturingImage(true);
     try {
@@ -265,30 +365,8 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
         backgroundColor: '#ffffff',
       });
 
-      canvas.toBlob(async blob => {
-        if (!blob) {
-          showToast('فشل توليد صورة الجريد', 'error');
-          setIsCapturingImage(false);
-          return;
-        }
-
-        if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-          try {
-            const item = new ClipboardItem({ 'image/png': blob });
-            await navigator.clipboard.write([item]);
-            setCopiedType('image');
-            setTimeout(() => setCopiedType(null), 3000);
-            showToast(
-              'تم نسخ صورة كشف الحساب بنجاح! يمكنك الآن لصقها (Ctrl+V) مباشرة في واتساب',
-              'success'
-            );
-          } catch {
-            showToast('المتصفح لم يسمح بالنسخ المباشر للصورة، يرجى استخدام زر التحميل', 'info');
-          }
-        } else {
-          showToast('المتصفح لا يدعم نسخ الصور المباشر، تم توفير زر التحميل', 'info');
-        }
-        setIsCapturingImage(false);
+      canvas.toBlob(blob => {
+        void handleCapturedImageBlob(blob);
       }, 'image/png');
     } catch {
       showToast('حدث خطأ أثناء التقاط صورة الجريد', 'error');
@@ -297,7 +375,7 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
   };
 
   // Handle Download Grid Image
-  const handleDownloadGridImage = async () => {
+  const handleDownloadGridImage = async (): Promise<void> => {
     if (!gridImageRef.current) return;
     setIsCapturingImage(true);
     try {
@@ -322,18 +400,8 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
     }
   };
 
-  const [isSendingDirect, setIsSendingDirect] = useState(false);
-
-  const formatToPhone = (rawPhone: string): string => {
-    const digits = rawPhone.replace(/[^\d]/g, '');
-    if (digits.startsWith('00')) return digits.slice(2);
-    if (digits.startsWith('0')) return `967${digits.slice(1)}`;
-    if (digits.length === 9) return `967${digits}`;
-    return digits;
-  };
-
   // إرسال مباشر للنص عبر UltraMsg
-  const handleSendDirectUltraMsg = async () => {
+  const handleSendDirectUltraMsg = async (): Promise<void> => {
     if (!isValidPhone) {
       showToast('يرجى التأكد من صحة رقم العميل أولاً', 'error');
       return;
@@ -355,12 +423,12 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
         body: params.toString(),
       });
 
-      const data = await res.json().catch(() => null);
-      if (res.ok && (data?.sent === 'true' || data?.sent === true)) {
+      const data = parseUltraMsgResponse(await res.json().catch(() => null));
+      if (res.ok && (data.sent === 'true' || data.sent === true)) {
         showToast('تم إرسال كشف الحساب مباشرة للعميل عبر واتساب المنشأة الرسمي! ✨', 'success');
       } else {
-        const errMsg = data?.error || data?.message || 'تعذر الإرسال عبر البوابة';
-        if (typeof errMsg === 'string' && (errMsg.includes('not connected') || errMsg.includes('qr'))) {
+        const errMsg = pickUltraMsgError(data, 'تعذر الإرسال عبر البوابة');
+        if (errMsg.includes('not connected') || errMsg.includes('qr')) {
           showToast('جلسة واتساب غير مقترنة (بحاجة لمسح QR). يرجى ربط واتساب من لوحة الوكيل الذكي', 'warning');
         } else {
           showToast(errMsg, 'error');
@@ -374,7 +442,7 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
   };
 
   // إرسال صورة الجريد مباشرة عبر UltraMsg
-  const handleSendGridImageDirectUltraMsg = async () => {
+  const handleSendGridImageDirectUltraMsg = async (): Promise<void> => {
     if (!gridImageRef.current || !isValidPhone) {
       showToast('يرجى التأكد من صحة رقم العميل أولاً', 'error');
       return;
@@ -403,12 +471,12 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
         }),
       });
 
-      const data = await res.json().catch(() => null);
-      if (res.ok && (data?.sent === 'true' || data?.sent === true)) {
+      const data = parseUltraMsgResponse(await res.json().catch(() => null));
+      if (res.ok && (data.sent === 'true' || data.sent === true)) {
         showToast('تم إرسال صورة كشف الحساب مباشرة لواتساب العميل بنجاح! 📸', 'success');
       } else {
-        const errMsg = data?.error || data?.message || 'تعذر إرسال الصورة عبر البوابة';
-        if (typeof errMsg === 'string' && (errMsg.includes('not connected') || errMsg.includes('qr'))) {
+        const errMsg = pickUltraMsgError(data, 'تعذر إرسال الصورة عبر البوابة');
+        if (errMsg.includes('not connected') || errMsg.includes('qr')) {
           showToast('جلسة واتساب غير مقترنة (بحاجة لمسح QR). يرجى ربط واتساب من لوحة الوكيل الذكي', 'warning');
         } else {
           showToast(errMsg, 'error');
@@ -422,7 +490,7 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
   };
 
   // Handle Copy text
-  const handleCopyText = async () => {
+  const handleCopyText = async (): Promise<void> => {
     await navigator.clipboard.writeText(whatsappMessage);
     setCopiedType('text');
     setTimeout(() => setCopiedType(null), 2500);
@@ -430,7 +498,7 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
   };
 
   // Handle Open WhatsApp Web
-  const handleOpenWhatsAppWeb = () => {
+  const handleOpenWhatsAppWeb = (): void => {
     if (!isValidPhone) {
       showToast('يرجى التأكد من إدخال رقم هاتف صالح للعميل', 'error');
       return;
@@ -440,7 +508,7 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
   };
 
   // Handle Open WhatsApp App
-  const handleOpenWhatsAppApp = () => {
+  const handleOpenWhatsAppApp = (): void => {
     if (!isValidPhone) {
       showToast('يرجى التأكد من إدخال رقم هاتف صالح للعميل', 'error');
       return;
@@ -488,11 +556,15 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
           </div>
 
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <label
+              htmlFor="statement-whatsapp-phone"
+              className="text-[10px] font-bold uppercase tracking-wider text-slate-400"
+            >
               رقم هاتف الواتساب:
             </label>
             <div className="relative mt-1">
               <input
+                id="statement-whatsapp-phone"
                 type="text"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
@@ -659,7 +731,9 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
                   <button
                     type="button"
-                    onClick={handleShareExcel}
+                    onClick={() => {
+                      void handleShareExcel();
+                    }}
                     disabled={isExportingExcel}
                     className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:bg-emerald-700 disabled:opacity-50"
                   >
@@ -669,7 +743,9 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
 
                   <button
                     type="button"
-                    onClick={handleDownloadExcel}
+                    onClick={() => {
+                      void handleDownloadExcel();
+                    }}
                     disabled={isExportingExcel}
                     className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                   >
@@ -700,7 +776,9 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleSendGridImageDirectUltraMsg}
+                    onClick={() => {
+                      void handleSendGridImageDirectUltraMsg();
+                    }}
                     disabled={isCapturingImage || isSendingDirect || !isValidPhone}
                     className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
                     title="إرسال صورة الجريد الملون مباشرة لواتساب العميل من رقم المنشأة"
@@ -710,7 +788,9 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={handleCopyGridImage}
+                    onClick={() => {
+                      void handleCopyGridImage();
+                    }}
                     disabled={isCapturingImage}
                     className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
                   >
@@ -719,7 +799,9 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={handleDownloadGridImage}
+                    onClick={() => {
+                      void handleDownloadGridImage();
+                    }}
                     disabled={isCapturingImage}
                     className="flex items-center gap-1 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:bg-slate-800 dark:text-blue-300"
                   >
@@ -909,7 +991,9 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleSendDirectUltraMsg}
+                    onClick={() => {
+                      void handleSendDirectUltraMsg();
+                    }}
                     disabled={!isValidPhone || isSendingDirect}
                     className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
                     title="إرسال فوري تلقائي من رقم المنشأة مباشرة دون فتح أي نافذة"
@@ -919,7 +1003,9 @@ export const StatementWhatsAppModal: React.FC<StatementWhatsAppModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={handleCopyText}
+                    onClick={() => {
+                      void handleCopyText();
+                    }}
                     className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                   >
                     {copiedType === 'text' ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}

@@ -208,7 +208,6 @@ export const reportService = {
       total_debit: row.total_debit,
       total_credit: row.total_credit,
       net_balance: row.balance,
-      currency_code: 'SAR',
     }));
   },
 
@@ -242,7 +241,6 @@ export const reportService = {
       // [FIX] لا ABS() — sign convention: expense=debit-credit، revenue=credit-debit
       // سالب = قيد عكسي يُطرح لا يُجمع
       net_balance: row.balance,
-      currency_code: 'SAR',
       // exactOptionalPropertyTypes: نُدرج is_cogs فقط عند وجود قيمة صريحة
       ...(typeof row.is_cogs === 'boolean' ? { is_cogs: row.is_cogs } : {}),
     });
@@ -311,7 +309,6 @@ export const reportService = {
               total_debit: 0,
               total_credit: totalRevenue,
               net_balance: totalRevenue,
-              currency_code: 'SAR',
             },
           ]
         : [];
@@ -325,7 +322,6 @@ export const reportService = {
               total_debit: totalExpense,
               total_credit: 0,
               net_balance: totalExpense,
-              currency_code: 'SAR',
             },
           ]
         : [];
@@ -379,7 +375,6 @@ export const reportService = {
           total_debit: r.total_debit,
           total_credit: r.total_credit,
           net_balance: r.balance,
-          currency_code: 'SAR',
         }));
       liabilityTBI = rows
         .filter(r => r.account_type === 'liability')
@@ -391,7 +386,6 @@ export const reportService = {
           total_debit: r.total_debit,
           total_credit: r.total_credit,
           net_balance: r.balance,
-          currency_code: 'SAR',
         }));
       equityTBI = rows
         .filter(r => r.account_type === 'equity')
@@ -403,7 +397,6 @@ export const reportService = {
           total_debit: r.total_debit,
           total_credit: r.total_credit,
           net_balance: r.balance,
-          currency_code: 'SAR',
         }));
 
       // Calculate unclosed prior period retained earnings (e.g. earlier years not yet closed to account 3200)
@@ -420,7 +413,6 @@ export const reportService = {
           total_debit: priorEarnings < 0 ? -priorEarnings : 0,
           total_credit: priorEarnings > 0 ? priorEarnings : 0,
           net_balance: priorEarnings,
-          currency_code: 'SAR',
         });
       }
     } else {
@@ -435,7 +427,6 @@ export const reportService = {
               total_debit: totalAssets,
               total_credit: 0,
               net_balance: totalAssets,
-              currency_code: 'SAR',
             },
           ]
         : [];
@@ -449,7 +440,6 @@ export const reportService = {
               total_debit: 0,
               total_credit: totalLiabilities,
               net_balance: totalLiabilities,
-              currency_code: 'SAR',
             },
           ]
         : [];
@@ -463,7 +453,6 @@ export const reportService = {
               total_debit: 0,
               total_credit: baseEquity,
               net_balance: baseEquity,
-              currency_code: 'SAR',
             },
           ]
         : [];

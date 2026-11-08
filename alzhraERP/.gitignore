@@ -63,6 +63,9 @@ tsc-errors*.txt
 ts_errors.txt
 tsc_output*.txt
 *.txt
+# خطوط الأساس (ratchet) تُحفظ كـ .txt داخل scripts/ — الاستثناء يمنع الحاجة إلى -f
+# عند تحديثها، ويُبقي الحظر الشامل على بقية ملفات .txt (سجلات ونتائج تشخيص).
+!scripts/*.txt
 *.log
 vite.config.ts.timestamp*
 DeepSeek-OCR*

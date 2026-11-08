@@ -24,12 +24,20 @@ export const PASSWORD_RECOVERY_INTENT: boolean =
   typeof window !== 'undefined' &&
   /(^|[#&?])type=recovery(&|$)/.test(window.location.hash || window.location.href);
 
-// Validate URL format (should end with .supabase.co)
+// Validate URL format.
+// لم يعد مقبولًا حصر النطاق في `*.supabase.co`: الاستضافة الذاتية (Supabase
+// self-hosted) ونطاق مخصّص وهما بيئتان مدعومتان، إضافةً إلى Supabase CLI
+// المحلي (http://127.0.0.1:54321) الذي كان يفشل هذا الفحص فيمنع التطوير محليًا.
+// الضابط الأمني: https لأي مضيف، وhttp للمضيف المحلي فقط.
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
 const isValidSupabaseUrl = (url: string): boolean => {
   if (!url) return false;
   try {
     const parsed = new URL(url);
-    return parsed.hostname.endsWith('.supabase.co');
+    if (parsed.hostname === '') return false;
+    if (parsed.protocol === 'https:') return true;
+    return parsed.protocol === 'http:' && LOCAL_HOSTNAMES.has(parsed.hostname);
   } catch {
     return false;
   }
@@ -44,7 +52,7 @@ export const SUPABASE_CONFIG_ERROR: string | null = (() => {
     return 'لم يتم إعداد الاتصال بقاعدة البيانات.\nانسخ ملف .env.example إلى .env واملأ قيمتي VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY.';
   }
   if (!isValidSupabaseUrl(supabaseUrl)) {
-    return 'عنوان Supabase غير صالح. يجب أن يكون بصيغة https://your-project.supabase.co';
+    return 'عنوان Supabase غير صالح. استخدم https://<project>.supabase.co أو نطاقك المخصّص (أو http://127.0.0.1:54321 للبيئة المحلية).';
   }
   return null;
 })();

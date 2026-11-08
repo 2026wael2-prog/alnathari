@@ -142,6 +142,27 @@ export interface Product {
   uoms?: ProductUOM[] | undefined;
 }
 
+/**
+ * صف من دالة get_item_movements_with_balance (سجل حركات الصنف مع الرصيد التراكمي).
+ *
+ * `quantity` = قيمة مطلقة للعرض، `transaction_type` = اتجاه ('in' | 'out')،
+ * `raw_quantity` = القيمة الموقّعة التي استُخدمت في حساب `balance_after`.
+ */
+export interface ItemMovementRow {
+  id: string;
+  date: string;
+  quantity: number;
+  transaction_type: string;
+  original_type: string | null;
+  reference_type: string | null;
+  source_user: string | null;
+  source_name: string | null;
+  document_number: string | null;
+  notes: string | null;
+  raw_quantity: number | null;
+  balance_after: number | null;
+}
+
 export interface ProductFormData {
   name: string;
   name_ar?: string | undefined;

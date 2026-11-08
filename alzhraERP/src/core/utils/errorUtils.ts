@@ -29,6 +29,27 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
 /**
+ * يفكّ رسائل الأخطاء المُغلّفة بـ JSON.
+ *
+ * بعض المسارات (PostgREST عبر طبقة وسيطة، أخطاء Edge Functions) تُعيد الرسالة
+ * كنصّ JSON: `{"message":"القيد غير متوازن: ..."}`. كان parseError يمرّر النصّ
+ * كاملاً لأن فحص العربية ينجح داخله، فيرى المستخدم أقواسًا ومفاتيح JSON.
+ */
+const unwrapJsonMessage = (raw: string): string => {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return raw;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (!isRecord(parsed)) return raw;
+    const inner = parsed.message ?? parsed.error_description ?? parsed.error;
+    if (typeof inner === 'string' && inner.trim() !== '') return inner.trim();
+  } catch {
+    // ليس JSON صالحاً — النصّ الأصلي هو الرسالة
+  }
+  return raw;
+};
+
+/**
  * Portal-token RPC failures (`get_supplier_portal_context`,
  * `submit_supplier_portal_quotation`) are raised with ERRCODE `42501` — the
  * same code as a real permission denial — so they must be mapped BEFORE the
@@ -67,7 +88,7 @@ export const parseError = (error: unknown): AppError => {
     rawMessageBase.toLowerCase().includes('internal server error') ||
     rawMessageBase.toLowerCase().includes('bad request') ||
     rawMessageBase === 'error';
-  const rawMessage = isGenericHttpMsg && hint ? hint : rawMessageBase;
+  const rawMessage = unwrapJsonMessage(isGenericHttpMsg && hint ? hint : rawMessageBase);
   const lowerMsg = rawMessage.toLowerCase();
 
   // Network Errors - Catch generic fetch failures

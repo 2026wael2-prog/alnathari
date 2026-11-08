@@ -126,9 +126,21 @@ export const analyticsService = {
       .order('created_at', { ascending: false })
       .limit(100);
 
-    return (invData || []).map((m: any) => ({
+    // صفوف المسار الاحتياطي تُحدَّد صراحةً: اختيار Supabase المتداخل (products/invoice)
+    // لا يُستنتج نوعه من مخطط PostgREST، فكان يصل كـ any إلى كل قراءة لاحقة.
+    interface InvoiceFallbackRow {
+      id: string;
+      quantity: number | null;
+      created_at: string;
+      products?: { name_ar: string | null } | null;
+      invoice?: { type: string | null } | null;
+    }
+
+    const invRows = (invData ?? []) as unknown as InvoiceFallbackRow[];
+
+    return invRows.map(m => ({
       id: m.id,
-      type: m.invoice?.type === 'sale' ? 'sales' : m.invoice?.type || 'sale',
+      type: m.invoice?.type === 'sale' ? 'sales' : (m.invoice?.type ?? 'sale'),
       quantity: m.quantity,
       date: m.created_at,
       productName: m.products?.name_ar,
@@ -212,9 +224,8 @@ export const analyticsService = {
         | { cost_price?: number; purchase_price?: number; name_ar?: string; sku?: string }
         | undefined;
       const productInfo = allProducts.find(p => p.id === pid);
-      const unitCost = Number(
-        products?.cost_price || products?.purchase_price || productInfo?.cost_price || 0
-      );
+      const unitCost =
+        products?.cost_price || products?.purchase_price || productInfo?.cost_price || 0;
       const cost = unitCost * qty;
 
       // Handle Returns (negative qty/rev)
@@ -227,9 +238,11 @@ export const analyticsService = {
       const adjustedRev = rev * multiplier;
       const adjustedCost = cost * multiplier;
 
-      if (!productStats.has(pid)) {
-        const productInfo = allProducts.find(p => p.id === pid);
-        productStats.set(pid, {
+      // نفس منطق التجميع السابق، لكن بلا `!`: إنشاء الصف وإسناده في نفس الفرع
+      // يجعل النوع معروفًا (لا non-null assertion) ويُلغي البحث المكرر عن المنتج.
+      let stats = productStats.get(pid);
+      if (stats === undefined) {
+        stats = {
           id: pid,
           name: products?.name_ar || 'Unknown',
           sku: products?.sku || '---',
@@ -239,10 +252,10 @@ export const analyticsService = {
           profit: 0,
           lastSoldDate: null,
           stock_quantity: productInfo?.stock_quantity || 0,
-        });
+        };
+        productStats.set(pid, stats);
       }
 
-      const stats = productStats.get(pid)!;
       stats.qtySold += adjustedQty;
       stats.revenue += adjustedRev;
       stats.cost += adjustedCost;

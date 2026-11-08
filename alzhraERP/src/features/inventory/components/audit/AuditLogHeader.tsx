@@ -2,13 +2,27 @@ import React from 'react';
 import { History, Maximize2, Minimize2, X, Download } from 'lucide-react';
 import { cn, formatNumberDisplay } from '../../../../core/utils';
 import { exportToCSV } from '../../../../lib/exportUtils';
+import type { ItemMovementRow } from '../../types';
+
+/**
+ * الحقول التي يعرضها هذا الرأس من الصنف المحدد فقط — نوع بنيوي (structural)
+ * بدل `any` كي تبقى كل قراءة معروفة النوع ولا تتسرّب قيم غير متوقعة إلى التصدير.
+ */
+export interface AuditLogProduct {
+  name_ar?: string | null;
+  name?: string | null;
+  sku?: string | null;
+  part_number?: string | null;
+  brand?: string | null;
+  stock_quantity?: number | null;
+}
 
 interface AuditLogHeaderProps {
-    selectedProduct: any;
-    log: any[] | undefined;
-    isMaximized: boolean;
-    setIsMaximized: (maximized: boolean) => void;
-    onBack?: () => void;
+  selectedProduct: AuditLogProduct;
+  log: ItemMovementRow[] | undefined;
+  isMaximized: boolean;
+  setIsMaximized: (maximized: boolean) => void;
+  onBack?: () => void;
 }
 
 const AuditLogHeader: React.FC<AuditLogHeaderProps> = ({
@@ -18,18 +32,18 @@ const AuditLogHeader: React.FC<AuditLogHeaderProps> = ({
     setIsMaximized,
     onBack
 }) => {
-    const handleExport = () => {
+    const handleExport = (): void => {
         if (!log || log.length === 0) return;
         const exportData = log.map((entry, index) => ({
             index: log.length - index,
             date: new Date(entry.date).toLocaleString('en-GB'),
-            document_number: entry.document_number || '',
-            reference_type: entry.reference_type || '',
-            source_name: entry.source_name || '',
+            document_number: entry.document_number ?? '',
+            reference_type: entry.reference_type ?? '',
+            source_name: entry.source_name ?? '',
             transaction_type: entry.transaction_type === 'in' ? 'وارد' : 'صادر',
             quantity: entry.quantity,
-            balance_after: entry.balance_after,
-            source_user: entry.source_user || ''
+            balance_after: entry.balance_after ?? 0,
+            source_user: entry.source_user ?? ''
         }));
 
         const headers = [
@@ -44,11 +58,18 @@ const AuditLogHeader: React.FC<AuditLogHeaderProps> = ({
             'المستخدم المسؤول'
         ];
 
-        const productName = selectedProduct.name_ar || selectedProduct.name || 'item';
+        const productName = selectedProduct.name_ar ?? selectedProduct.name ?? 'item';
         exportToCSV(exportData, `سجل_حركة_${productName}`, headers);
     };
 
-    const productName = selectedProduct.name_ar || selectedProduct.name || 'الصنف';
+    const productName = selectedProduct.name_ar ?? selectedProduct.name ?? 'الصنف';
+    // قيم مُطبَّعة مسبقًا: تقارن صراحةً مع '' فتحقّق `strict-boolean-expressions`
+    // ولا تُمرّر null إلى formatNumberDisplay.
+    const sku = selectedProduct.sku ?? '';
+    const partNumber = selectedProduct.part_number ?? '';
+    const brand = selectedProduct.brand ?? '';
+    const stockQuantity = selectedProduct.stock_quantity ?? 0;
+    const movementsCount = log?.length ?? 0;
 
     return (
         <div className={cn(
@@ -77,19 +98,19 @@ const AuditLogHeader: React.FC<AuditLogHeaderProps> = ({
                         isMaximized && "text-xl"
                     )}>
                         <span>{productName}</span>
-                        {selectedProduct.sku && (
+                        {sku !== '' && (
                             <span className="font-mono text-[11px] px-2 py-0.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/20">
-                                {selectedProduct.sku}
+                                {sku}
                             </span>
                         )}
-                        {selectedProduct.part_number && (
+                        {partNumber !== '' && (
                             <span className="font-mono text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold border dark:border-slate-700">
-                                {selectedProduct.part_number}
+                                {partNumber}
                             </span>
                         )}
-                        {selectedProduct.brand && (
+                        {brand !== '' && (
                             <span className="text-[11px] px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-600 font-bold border border-emerald-500/20">
-                                {selectedProduct.brand}
+                                {brand}
                             </span>
                         )}
                     </h3>
@@ -106,14 +127,14 @@ const AuditLogHeader: React.FC<AuditLogHeaderProps> = ({
                 <div className="hidden md:flex items-center gap-6">
                     <div className="text-right">
                         <p className={cn("font-black text-gray-900 dark:text-white font-mono leading-none", isMaximized ? "text-2xl" : "text-sm")}>
-                            {formatNumberDisplay(selectedProduct.stock_quantity)}
+                            {formatNumberDisplay(stockQuantity)}
                         </p>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mt-1">الرصيد الكلي الحالي</p>
                     </div>
                     <div className="h-8 w-px bg-gray-200 dark:bg-slate-800" />
                     <div className="text-right">
                         <p className={cn("font-black text-gray-900 dark:text-white font-mono leading-none", isMaximized ? "text-2xl" : "text-sm")}>
-                            {log?.length || 0}
+                            {movementsCount}
                         </p>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mt-1">إجمالي الحركات</p>
                     </div>

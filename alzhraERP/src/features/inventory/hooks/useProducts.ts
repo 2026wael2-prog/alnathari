@@ -3,7 +3,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { inventoryService } from '../service';
 import { useAuthStore } from '../../auth/store';
 import { useFeedbackStore } from '../../feedback/store';
-import type { ProductFormData, Product } from '../types';
+import type { ProductFormData, Product, ItemMovementRow } from '../types';
 import { useMemo } from 'react';
 import { syncStore } from '../../../core/lib/sync-store';
 import { invalidateByPreset } from '../../../lib/invalidation';
@@ -173,7 +173,7 @@ export const useMinimalProducts = (): UseQueryResult<Product[]> => {
   }) as unknown as UseQueryResult<Product[]>;
 };
 
-export const useItemMovement = (productId: string | null): UseQueryResult<unknown[]> => {
+export const useItemMovement = (productId: string | null): UseQueryResult<ItemMovementRow[]> => {
   const { user } = useAuthStore();
   const companyId = user?.company_id;
   const { branchId } = useBranchFilter();

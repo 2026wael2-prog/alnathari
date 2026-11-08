@@ -241,8 +241,18 @@ export const calculateExchangeRate = (
     return 1;
   }
 
-  const fromRate = rates[fromCurrency] || 1;
-  const toRate = rates[toCurrency] || 1;
+  // لا fallback صامت إلى 1: كان غياب العملة من خريطة الأسعار يجعل التحويل 1:1
+  // فيُسجَّل مبلغ بعملة كأنه بعملة أخرى بلا أي إشارة. الفشل الصريح أأمن.
+  // (Number.isFinite تُرجع false للقيمة الغائبة undefined فتُلتقط هنا.)
+  const fromRate = rates[fromCurrency];
+  const toRate = rates[toCurrency];
+
+  if (!Number.isFinite(fromRate) || fromRate <= 0) {
+    throw new CurrencyError(`سعر صرف العملة ${fromCurrency} غير متوفر أو غير صالح.`);
+  }
+  if (!Number.isFinite(toRate) || toRate <= 0) {
+    throw new CurrencyError(`سعر صرف العملة ${toCurrency} غير متوفر أو غير صالح.`);
+  }
 
   return fromRate / toRate;
 };

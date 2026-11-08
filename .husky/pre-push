@@ -1,35 +1,20 @@
 #!/bin/sh
 # Husky pre-push hook - Al-Zahra Smart ERP
-# Gates: encoding guard -> TS error ratchet -> i18n key coverage -> UX guards -> production build
-# (Comments kept ASCII-only: this file once contained mojibake.)
+#
+# Single source of truth for the gate list: the "pre-push" script in
+# alzhraERP/package.json. This file used to keep its own duplicate list, and the
+# two drifted apart (the hook ran the build but not layers/type-check:tests;
+# the npm script had the opposite gap). Add any new gate in ONE place only.
+#
+# The full lint-debt gate (lint-total, an ~8 minute scan of every file) stays in
+# CI on every push to main; the hook runs the changed-files ratchet only.
+#
+# Comments kept ASCII-only: this file once contained mojibake.
 
-echo "[pre-push] 1/7 Encoding guard (Arabic mojibake check)..."
+echo "[pre-push] Running the unified gate list (alzhraERP/package.json -> scripts.pre-push)..."
 
 cd alzhraERP || exit 1
 
-npx tsx scripts/check-encoding.ts || exit 1
-
-echo "[pre-push] 2/7 TypeScript ratchet (no NEW errors beyond baseline)..."
-npx tsx scripts/check-ts-baseline.ts || exit 1
-
-echo "[pre-push] 3/7 i18n key coverage (used t() keys must exist in ar/en)..."
-node scripts/check-i18n-keys.mjs || exit 1
-
-echo "[pre-push] 4/7 Tailwind contradicting classes guard..."
-node scripts/check-contradicting-classes.mjs || exit 1
-
-echo "[pre-push] 5/7 Tiny font-sizes guard (no text-[1-9px])..."
-node scripts/check-tiny-fonts.mjs || exit 1
-
-echo "[pre-push] 6/7 Lint ratchet (no NEW lint debt beyond baseline)..."
-node scripts/check-lint-ratchet.mjs || exit 1
-
-echo "[pre-push] 7/7 Production build..."
-npx vite build --logLevel error 2>&1
-if [ $? -ne 0 ]; then
-  echo ""
-  echo "[pre-push] Build FAILED. Run 'npm run build' locally to see the error."
-  exit 1
-fi
+npm run pre-push || exit 1
 
 echo "[pre-push] All gates passed. Pushing."
