@@ -116,7 +116,7 @@ const WhatsAppFields: React.FC<ChannelFieldsProps> = ({ form, keys, patch, patch
       id="wa-url"
       label="رابط الـ API"
       value={form.whatsapp_api_url}
-      placeholder="https://api.ultramsg.com/instance.../ أو Meta Cloud API"
+      placeholder="WASender (http://localhost:3000/api/send-message) أو UltraMsg"
       onChange={value => {
         patch({ whatsapp_api_url: value });
       }}

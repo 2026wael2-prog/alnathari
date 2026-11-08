@@ -73,6 +73,38 @@ async function sendWhatsAppText(
     referenceId?: string
 ): Promise<{ ok: boolean; error?: string }> {
     try {
+        const cleanPhone = phone.replace(/[^0-9]/g, '');
+
+        // 1. WASender API Support
+        if (apiUrl.includes('wasender') || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes(':3000') || apiUrl.includes(':8080')) {
+            const cleanUrl = apiUrl.replace(/\/+$/, '');
+            const endpoint = cleanUrl.endsWith('/api/send-message') || cleanUrl.endsWith('/send-message')
+                ? cleanUrl
+                : `${cleanUrl}/api/send-message`;
+            const authHeader = apiKey ? (apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`) : undefined;
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (authHeader) headers['Authorization'] = authHeader;
+            if (apiKey) headers['x-api-key'] = apiKey;
+
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    phone: cleanPhone,
+                    to: cleanPhone,
+                    message,
+                    text: message,
+                    reference_id: referenceId,
+                }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                return { ok: false, error: data?.error || data?.message || `WASender error: ${res.status}` };
+            }
+            return { ok: true };
+        }
+
+        // 2. UltraMsg Support
         if (apiUrl.includes('ultramsg.com')) {
             const cleanUrl = apiUrl.replace(/\/+$/, '');
             const endpoint = cleanUrl.endsWith('/messages/chat') ? cleanUrl : `${cleanUrl}/messages/chat`;
@@ -125,10 +157,42 @@ async function sendWhatsAppText(
 // ---- WhatsApp: Image ----
 async function sendWhatsAppImage(apiUrl: string, apiKey: string, phone: string, imageBase64: string, caption: string): Promise<{ ok: boolean; error?: string }> {
     try {
+        const cleanPhone = phone.replace(/[^0-9]/g, '');
+        const imageUri = imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+
+        // 1. WASender Media Support
+        if (apiUrl.includes('wasender') || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1') || apiUrl.includes(':3000') || apiUrl.includes(':8080')) {
+            const cleanUrl = apiUrl.replace(/\/+$/, '');
+            const endpoint = cleanUrl.endsWith('/api/send-media') || cleanUrl.endsWith('/send-media')
+                ? cleanUrl
+                : `${cleanUrl}/api/send-media`;
+            const authHeader = apiKey ? (apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`) : undefined;
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (authHeader) headers['Authorization'] = authHeader;
+            if (apiKey) headers['x-api-key'] = apiKey;
+
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    phone: cleanPhone,
+                    to: cleanPhone,
+                    media: imageUri,
+                    image: imageUri,
+                    caption,
+                }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                return await sendWhatsAppText(apiUrl, apiKey, phone, caption);
+            }
+            return { ok: true };
+        }
+
+        // 2. UltraMsg Support
         if (apiUrl.includes('ultramsg.com')) {
             const cleanUrl = apiUrl.replace(/\/+$/, '');
             const endpoint = cleanUrl.endsWith('/messages/image') ? cleanUrl : `${cleanUrl}/messages/image`;
-            const imageUri = imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
             const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

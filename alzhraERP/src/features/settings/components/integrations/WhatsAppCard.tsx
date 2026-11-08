@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle, XCircle, Send, Loader2, Eye, EyeOff, Sparkles, Check, QrCode } from 'lucide-react';
+import { CheckCircle, XCircle, Send, Loader2, Eye, EyeOff, Sparkles, Check, QrCode, Copy, Bot } from 'lucide-react';
 import Card from '@/ui/base/Card';
 import type { MessagingConfig } from '@/features/notifications/messagingApi';
 import { messagingApi } from '@/features/notifications/messagingApi';
@@ -22,8 +22,18 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
   const [isTesting, setIsTesting] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
   const companyId = useAuthStore(s => s.user?.company_id);
   const { showToast } = useFeedbackStore();
+
+  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL || 'https://alzhra-smart.vercel.app'}/functions/v1/whatsapp-inbound-webhook`;
+
+  const handleCopyWebhook = () => {
+    void navigator.clipboard.writeText(webhookUrl);
+    setCopiedWebhook(true);
+    showToast('تم نسخ رابط الـ Webhook للرد الآلي بنجاح 📋', 'success');
+    setTimeout(() => setCopiedWebhook(false), 2500);
+  };
 
   // فحص إذا كان المفتاح يحتوي على رقم هاتف ملتصق بالمفتاح (مثل 779816860mkojxebwykcncp10)
   const tokenMatch = (config.whatsapp_api_key || '').match(/^(\d{9,12})([a-zA-Z0-9]{10,})$/);
@@ -47,6 +57,15 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
       whatsapp_phone: '967771147694',
     });
     showToast('تم ضبط إعدادات بوابة UltraMsg الخاصة بالمؤسسة بنجاح ✅', 'success');
+  };
+
+  const handleApplyPresetWasender = () => {
+    onUpdate({
+      whatsapp_enabled: true,
+      whatsapp_api_url: 'http://localhost:3000/api/send-message',
+      whatsapp_api_key: '',
+    });
+    showToast('تم ضبط إعدادات بوابة WASender الافتراضية بنجاح ✅', 'success');
   };
 
   const handleTest = async () => {
@@ -87,10 +106,19 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-white">WhatsApp</h3>
-              <p className="text-xs text-slate-500">إرسال الإشعارات وتذكيرات الديون عبر واتساب (UltraMsg)</p>
+              <p className="text-xs text-slate-500">إرسال الإشعارات والرد الآلي الذكي عبر واتساب (WASender & UltraMsg)</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleApplyPresetWasender}
+              className="flex items-center gap-1 rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300"
+              title="تعبئة إعدادات بوابة WASender (محلي أو خادم) تلقائياً"
+            >
+              <Bot size={12} />
+              <span>تعبئة WASender</span>
+            </button>
             <button
               type="button"
               onClick={handleApplyPresetUltraMsg}
@@ -98,7 +126,7 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
               title="تعبئة بيانات بوابة UltraMsg الخاصة بمؤسسة الجعفري تلقائياً"
             >
               <Sparkles size={12} />
-              <span>تعبئة بوابة المتجر (UltraMsg)</span>
+              <span>تعبئة UltraMsg</span>
             </button>
             <div
               className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
@@ -235,6 +263,36 @@ const WhatsAppCard: React.FC<Props> = ({ config, onUpdate }) => {
                 <QrCode size={14} />
                 <span>فحص الجلسة ومسح QR</span>
               </button>
+            </div>
+
+            {/* بطاقة رابط الـ Webhook للرد الآلي وإضافة WASender */}
+            <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-900/30 dark:bg-indigo-950/20">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <div className="mt-0.5 rounded-lg bg-indigo-100 p-1.5 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">
+                    <Bot size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-white">
+                      رابط الـ Webhook للرد الآلي (WASender & Inbound AI)
+                    </h4>
+                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                      انسخ هذا الرابط وضعه في إعدادات Webhook داخل إضافة أو خادم WASender لتمكين المنظومة من قراءة رسائل العملاء، والرد الذكي عليها، وتوثيق وعود السداد تلقائياً.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyWebhook}
+                  className="flex shrink-0 items-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 shadow-sm transition-all hover:bg-indigo-50 dark:border-indigo-800 dark:bg-slate-900 dark:text-indigo-300 dark:hover:bg-indigo-950/50"
+                >
+                  {copiedWebhook ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                  <span>{copiedWebhook ? 'تم النسخ!' : 'نسخ الرابط'}</span>
+                </button>
+              </div>
+              <div className="mt-3 overflow-hidden rounded-xl border border-indigo-200/70 bg-white/80 px-3 py-2 font-mono text-xs text-slate-700 select-all dark:border-indigo-900/50 dark:bg-slate-900/80 dark:text-indigo-200" dir="ltr">
+                {webhookUrl}
+              </div>
             </div>
           </div>
         )}

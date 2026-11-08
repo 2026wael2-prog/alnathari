@@ -4,10 +4,10 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 // ============================================================
 // whatsapp-inbound-webhook — Al-Zahra Smart ERP
 // ============================================================
-// يستقبل رسائل الواتساب الواردة من بوابة UltraMsg لحظياً (Inbound Webhook).
+// يستقبل رسائل الواتساب الواردة من WASender أو UltraMsg أو أي بوابة Webhook لحظياً.
 // يقوم بالتعرف على العميل، وتحليل رسالته بالذكاء الاصطناعي،
 // وتدوين الملاحظة أو وعد السداد تلقائياً في قاعدة البيانات وتحديث التطبيق،
-// والرد على العميل آلياً باحترافية.
+// والرد على العميل آلياً باحترافية عبر WASender أو UltraMsg.
 // ============================================================
 
 const cors = {
@@ -23,17 +23,76 @@ const json = (payload: unknown, status = 200): Response =>
     headers: { ...cors, 'Content-Type': 'application/json' },
   });
 
-interface UltraMsgWebhookBody {
-  event_type?: string;
-  instanceId?: string;
-  data?: {
-    id?: string;
-    from?: string;
-    to?: string;
-    body?: string;
-    fromMe?: boolean;
-    type?: string;
-    pushname?: string;
+interface NormalizedInboundMessage {
+  senderPhone: string;
+  messageText: string;
+  fromMe: boolean;
+  pushName?: string;
+  isGroup?: boolean;
+}
+
+/** استخراج ومعايرة الرسالة الواردة لدعم كل من WASender و UltraMsg والبوابات المعيارية */
+function extractInboundMessage(body: Record<string, unknown>): NormalizedInboundMessage | null {
+  if (!body || typeof body !== 'object') return null;
+
+  const data = (body.data && typeof body.data === 'object' ? body.data : null) as Record<string, unknown> | null;
+
+  // 1. فحص هل الرسالة مرسلة من المنشأة نفسها (fromMe)
+  const fromMe = Boolean(
+    body.fromMe === true ||
+    data?.fromMe === true ||
+    (data?.key && typeof data.key === 'object' && (data.key as Record<string, unknown>).fromMe === true)
+  );
+
+  // 2. استخراج رقم المرسل
+  let rawFrom = '';
+  if (typeof body.sender === 'string') rawFrom = body.sender;
+  else if (typeof body.phone === 'string') rawFrom = body.phone;
+  else if (typeof body.from === 'string') rawFrom = body.from;
+  else if (data && typeof data.from === 'string') rawFrom = data.from;
+  else if (data && typeof data.sender === 'string') rawFrom = data.sender;
+  else if (data && typeof data.phone === 'string') rawFrom = data.phone;
+  else if (data && data.key && typeof data.key === 'object') {
+    const key = data.key as Record<string, unknown>;
+    if (typeof key.remoteJid === 'string') rawFrom = key.remoteJid;
+  }
+
+  // 3. فحص هل الرسالة داخل مجموعة (Group)
+  const isGroup = Boolean(
+    body.isGroup === true ||
+    data?.isGroup === true ||
+    rawFrom.includes('@g.us') ||
+    (typeof body.chatId === 'string' && body.chatId.includes('@g.us'))
+  );
+
+  // 4. استخراج نص الرسالة من مختلف هياكل WASender و UltraMsg
+  let messageText = '';
+  if (typeof body.message === 'string') messageText = body.message;
+  else if (typeof body.text === 'string') messageText = body.text;
+  else if (typeof body.body === 'string') messageText = body.body;
+  else if (data) {
+    if (typeof data.body === 'string') messageText = data.body;
+    else if (typeof data.message === 'string') messageText = data.message;
+    else if (typeof data.text === 'string') messageText = data.text;
+    else if (data.message && typeof data.message === 'object') {
+      const msgObj = data.message as Record<string, unknown>;
+      if (typeof msgObj.conversation === 'string') messageText = msgObj.conversation;
+      else if (msgObj.extendedTextMessage && typeof msgObj.extendedTextMessage === 'object') {
+        const ext = msgObj.extendedTextMessage as Record<string, unknown>;
+        if (typeof ext.text === 'string') messageText = ext.text;
+      }
+    }
+  }
+
+  // تنظيف رقم الهاتف وإزالة بادئات الواتساب والرموز غير الرقمية
+  const senderPhone = rawFrom.replace(/@.*$/, '').replace(/[^0-9]/g, '');
+
+  return {
+    senderPhone,
+    messageText: messageText.trim(),
+    fromMe,
+    pushName: typeof body.pushname === 'string' ? body.pushname : (typeof data?.pushname === 'string' ? data.pushname : undefined),
+    isGroup,
   };
 }
 
@@ -134,18 +193,68 @@ async function analyzeCustomerMessageWithAI(params: {
   }
 }
 
-/** إرسال رسالة واتساب للعميل عبر UltraMsg */
-async function sendUltraMsgChat(instanceUrl: string, token: string, toPhone: string, text: string): Promise<boolean> {
+/** إرسال رسالة واتساب للعميل سواء عبر WASender أو UltraMsg */
+async function sendWhatsAppReply(
+  instanceUrl: string,
+  apiKey: string,
+  toPhone: string,
+  text: string
+): Promise<boolean> {
   try {
     const cleanUrl = instanceUrl.replace(/\/+$/, '');
-    const endpoint = cleanUrl.endsWith('/messages/chat') ? cleanUrl : `${cleanUrl}/messages/chat`;
+
+    // 1. إذا كان المزود UltraMsg
+    if (cleanUrl.includes('ultramsg.com')) {
+      const endpoint = cleanUrl.endsWith('/messages/chat') ? cleanUrl : `${cleanUrl}/messages/chat`;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: apiKey, to: toPhone, body: text }),
+      });
+      return res.ok;
+    }
+
+    // 2. إذا كان المزود WASender أو خادم API
+    const endpoint = (cleanUrl.endsWith('/api/send-message') || cleanUrl.endsWith('/send-message'))
+      ? cleanUrl
+      : `${cleanUrl}/api/send-message`;
+
+    const authHeader = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`;
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, to: toPhone, body: text }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader,
+        'x-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        phone: toPhone,
+        to: toPhone,
+        message: text,
+        text,
+      }),
     });
-    return res.ok;
-  } catch {
+
+    if (res.ok) return true;
+
+    // محاولة بديلة إذا كان المسار /send-message بدون /api
+    if (endpoint.endsWith('/api/send-message')) {
+      const fallbackEndpoint = `${cleanUrl}/send-message`;
+      const fallbackRes = await fetch(fallbackEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader,
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({ phone: toPhone, to: toPhone, message: text, text }),
+      });
+      return fallbackRes.ok;
+    }
+
+    return false;
+  } catch (err) {
+    console.error('[sendWhatsAppReply] Error sending reply:', err);
     return false;
   }
 }
@@ -157,21 +266,28 @@ Deno.serve(async (req: Request) => {
 
   // دعم فحص الـ Webhook بواسطة GET
   if (req.method === 'GET') {
-    return json({ status: 'active', service: 'Al-Zahra WhatsApp Inbound Webhook' });
+    return json({ status: 'active', service: 'Al-Zahra WhatsApp Inbound Webhook (WASender & UltraMsg)' });
   }
 
   try {
-    const body: UltraMsgWebhookBody = await req.json().catch(() => ({}));
-    const data = body.data;
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const parsed = extractInboundMessage(body);
+
+    if (!parsed) {
+      return json({ status: 'unrecognized_payload' });
+    }
 
     // 1. تجاهل أي رسائل مرسلة من المحل نفسه لتفادي الحلقات التكرارية (Loop)
-    if (!data || data.fromMe === true || body.event_type !== 'message_received') {
+    if (parsed.fromMe) {
       return json({ status: 'ignored_outgoing' });
     }
 
-    const rawFrom = String(data.from || '');
-    const senderPhone = rawFrom.replace(/@.*$/, '').replace(/[^0-9]/g, '');
-    const messageText = String(data.body || '').trim();
+    // 2. تجاهل رسائل المجموعات (التركيز على محادثات العملاء المباشرة)
+    if (parsed.isGroup) {
+      return json({ status: 'ignored_group_message' });
+    }
+
+    const { senderPhone, messageText } = parsed;
 
     if (!senderPhone || !messageText) {
       return json({ status: 'empty_payload' });
@@ -186,7 +302,7 @@ Deno.serve(async (req: Request) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 2. البحث عن العميل في المنظومة بمطابقة آخر 9 أرقام من هاتفه
+    // 3. البحث عن العميل في المنظومة بمطابقة آخر 9 أرقام من هاتفه
     const clean9 = senderPhone.slice(-9);
     const { data: matchedParties, error: partyError } = await supabaseAdmin
       .from('parties')
@@ -207,7 +323,7 @@ Deno.serve(async (req: Request) => {
       return json({ status: 'unregistered_customer', phone: senderPhone });
     }
 
-    // 3. قراءة أرصدة العميل المحدثة
+    // 4. قراءة أرصدة العميل المحدثة
     const { data: balances } = await supabaseAdmin.rpc('get_party_all_balances', {
       p_company_id: party.company_id,
       p_party_id: party.id,
@@ -220,7 +336,7 @@ Deno.serve(async (req: Request) => {
         .join(' · ');
     }
 
-    // 4. استدعاء الذكاء الاصطناعي لتحليل الرسالة
+    // 5. استدعاء الذكاء الاصطناعي لتحليل الرسالة
     const aiAnalysis = await analyzeCustomerMessageWithAI({
       customerName: party.name,
       messageText,
@@ -230,7 +346,7 @@ Deno.serve(async (req: Request) => {
     const summary = aiAnalysis?.summary || `رسالة واتساب: ${messageText}`;
     const intent = aiAnalysis?.intent || 'general_note';
 
-    // 5. إذا كان الرد يتضمن وعداً بالسداد -> إدراجه في جدول وعود السداد تلقائياً
+    // 6. إذا كان الرد يتضمن وعداً بالسداد -> إدراجه في جدول وعود السداد تلقائياً
     if (intent === 'promise' && aiAnalysis?.promise_date) {
       await supabaseAdmin.from('debt_payment_promises').insert({
         company_id: party.company_id,
@@ -243,7 +359,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 6. تدوين النشاط في الخط الزمني وسجل المتابعة (customer_activities)
+    // 7. تدوين النشاط في الخط الزمني وسجل المتابعة (customer_activities)
     await supabaseAdmin.rpc('log_collection_activity', {
       p_company_id: party.company_id,
       p_party_id: party.id,
@@ -254,7 +370,7 @@ Deno.serve(async (req: Request) => {
       p_priority: intent === 'promise' ? 'high' : 'medium',
     });
 
-    // 7. الرد الآلي على العميل عبر UltraMsg (إذا توفر رد ذكي ومفتاح البوابة)
+    // 8. الرد الآلي على العميل عبر WASender أو UltraMsg (إذا توفر رد ذكي ورابط البوابة)
     const { data: config } = await supabaseAdmin
       .from('messaging_config')
       .select('whatsapp_api_url, whatsapp_api_key, whatsapp_enabled')
@@ -264,8 +380,8 @@ Deno.serve(async (req: Request) => {
     const instanceUrl = config?.whatsapp_api_url || 'https://api.ultramsg.com/instance196299/';
     const apiKey = config?.whatsapp_api_key || 'mkojxebwykcncp10';
 
-    if (aiAnalysis?.reply_to_customer && apiKey) {
-      await sendUltraMsgChat(instanceUrl, apiKey, senderPhone, aiAnalysis.reply_to_customer);
+    if (aiAnalysis?.reply_to_customer && instanceUrl) {
+      await sendWhatsAppReply(instanceUrl, apiKey, senderPhone, aiAnalysis.reply_to_customer);
     }
 
     return json({
